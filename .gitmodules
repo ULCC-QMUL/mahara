@@ -16,3 +16,6 @@
 [submodule "htdocs/blocktype/embedly"]
 	path = htdocs/blocktype/embedly
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_embedly
+[submodule "htdocs/blocktype/openbadgedisplayer"]
+	path = htdocs/blocktype/openbadgedisplayer
+	url = git@github.com:/ULCC-QMUL/mahara-blocktype_openbadgedisplayer
