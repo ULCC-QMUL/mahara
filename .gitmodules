@@ -4,3 +4,6 @@
 [submodule "htdocs/theme/qmulblue"]
 	path = htdocs/theme/qmulblue
 	url = git@github.com:/ULCC-QMUL/mahara-theme_qmulblue
+[submodule "htdocs/theme/qmulpink"]
+	path = htdocs/theme/qmulpink
+	url = git@github.com:/ULCC-QMUL/mahara-theme_qmulpink
