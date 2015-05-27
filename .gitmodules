@@ -19,3 +19,6 @@
 [submodule "htdocs/blocktype/openbadgedisplayer"]
 	path = htdocs/blocktype/openbadgedisplayer
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_openbadgedisplayer
+[submodule "theme/qmuldark"]
+	path = theme/qmuldark
+	url = git@github.com:/ULCC-QMUL/mahara-theme_qmuldark
