@@ -1,22 +1,22 @@
-[submodule "htdocs/theme/qmul"]
+[submodule "theme/qmul"]
 	path = theme/qmul
 	url = git@github.com:/ULCC-QMUL/mahara-theme_qmul
-[submodule "htdocs/theme/qmulblue"]
+[submodule "theme/qmulblue"]
 	path = theme/qmulblue
 	url = git@github.com:/ULCC-QMUL/mahara-theme_qmulblue
-[submodule "htdocs/theme/qmulpink"]
+[submodule "theme/qmulpink"]
 	path = theme/qmulpink
 	url = git@github.com:/ULCC-QMUL/mahara-theme_qmulpink
-[submodule "htdocs/theme/qmulpurple"]
+[submodule "theme/qmulpurple"]
 	path = theme/qmulpurple
 	url = git@github.com:/ULCC-QMUL/mahara-theme_qmulpurple
-[submodule "htdocs/artefact/cpds"]
+[submodule "artefact/cpds"]
 	path = artefact/cpds
 	url = git@github.com:/ULCC-QMUL/mahara-artefact_cpds.git
-[submodule "htdocs/blocktype/embedly"]
+[submodule "blocktype/embedly"]
 	path = blocktype/embedly
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_embedly
-[submodule "htdocs/blocktype/openbadgedisplayer"]
+[submodule "blocktype/openbadgedisplayer"]
 	path = blocktype/openbadgedisplayer
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_openbadgedisplayer
 [submodule "theme/qmuldark"]
