@@ -22,3 +22,6 @@
 [submodule "blocktype/embedly"]
 	path = blocktype/embedly
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_embedly
+[submodule "blocktype/openbadgedisplayer"]
+	path = blocktype/openbadgedisplayer
+	url = git@github.com:/ULCC-QMUL/mahara-blocktype_openbadgedisplayer
