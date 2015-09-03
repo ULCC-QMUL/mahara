@@ -26,5 +26,6 @@ mahara-*.zip
 /debian/mahara-apache2
 .DS_Store
 /config.php
+.htaccess
 !lib/tests
 
