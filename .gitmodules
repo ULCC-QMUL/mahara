@@ -19,3 +19,6 @@
 [submodule "theme/qmulgradient"]
 	path = theme/qmulgradient
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmulgradient
+[submodule "theme/qmulpink"]
+	path = theme/qmulpink
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpink
