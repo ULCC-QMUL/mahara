@@ -22,3 +22,6 @@
 [submodule "theme/qmulpink"]
 	path = theme/qmulpink
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpink
+[submodule "theme/qmulpurple"]
+	path = theme/qmulpurple
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpurple
