@@ -10,3 +10,6 @@
 [submodule "theme/qmul"]
 	path = theme/qmul
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmul
+[submodule "theme/qmulblue"]
+	path = theme/qmulblue
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulblue
