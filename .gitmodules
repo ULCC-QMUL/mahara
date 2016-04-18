@@ -25,3 +25,6 @@
 [submodule "theme/qmulpurple"]
 	path = theme/qmulpurple
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpurple
+[submodule "artefact/cloud"]
+	path = artefact/cloud
+	url = git@github.com:povsod/mahara-artefact-cloud
