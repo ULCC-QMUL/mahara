@@ -1,0 +1,17 @@
+TinyMCE
+========
+
+Website: http://tinymce.moxiecode.com/
+Version: 4.1.9
+
+Based on development version
+
+Changes:
+
+ * Added all of the language packs
+ * Removed all .min.js and .dev.js files
+ * Removed all files in 'classes' directory since they're packaged into tinymce.js
+ * Removed all .less files from skin
+ * Added code to spellchecker/spellchecker.rpc to use $CFG->spellcheckerengine
+ * Adjusted the charmap plugin to contain Māori macrons
+ * Adding the 'aria-hidden="true"' to presentation icons
