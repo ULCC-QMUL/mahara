@@ -1,12 +1,12 @@
 [submodule "blocktype/openbadgedisplayer"]
 	path = blocktype/openbadgedisplayer
-	url = git@github.com:ULCC-QMUL/mahara-blocktype_openbadgedisplayer.git
+	url = git@github.com:discendum/mahara-openbadgedisplayer
 [submodule "blocktype/embedly"]
 	path = blocktype/embedly
-	url = git@github.com:ULCC-QMUL/mahara-blocktype_embedly.git
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_embedly
 [submodule "artefact/cpds"]
 	path = artefact/cpds
-	url = git@github.com:ULCC-QMUL/mahara-artefact_cpds.git
+	url = git@github.com:geoffrowland/mahara-artefact_cpds
 [submodule "theme/qmul"]
 	path = theme/qmul
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmul
@@ -28,3 +28,9 @@
 [submodule "artefact/cloud"]
 	path = artefact/cloud
 	url = git@github.com:povsod/mahara-artefact-cloud
+
+
+
+
+
+
