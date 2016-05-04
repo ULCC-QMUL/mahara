@@ -22,3 +22,9 @@
 [submodule "artefact/cpds"]
 	path = artefact/cpds
 	url = git@github.com:ULCC-QMUL/mahara-artefact_cpds.git
+[submodule "blocktype/openbadgedisplayer"]
+	path = blocktype/openbadgedisplayer
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_openbadgedisplayer.git
+[submodule "blocktype/embedly"]
+	path = blocktype/embedly
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_embedly.git
