@@ -38,7 +38,7 @@ class View {
     private $ownerobj;
     private $groupobj;
     private $institutionobj;
-    private $numcolumns; // now redundant
+    private $numcolumns; // Obsolete - need to leave for upgrade purposes. This can be deleted once we no longer need to support direct upgrades from 15.10 and earlier.
     private $columnsperrow; // assoc array of rows set and get using view_rows_columns db table
     private $numrows;
     private $layout;
@@ -58,7 +58,6 @@ class View {
     private $allowcomments;
     private $approvecomments;
     private $collection;
-    private $accessconf;
     private $locked;
     private $urlid;
     private $skin;
@@ -67,6 +66,10 @@ class View {
     const UNSUBMITTED = 0;
     const SUBMITTED = 1;
     const PENDING_RELEASE = 2;
+
+    // constansts view templates
+    const USER_TEMPLATE = 1;
+    const SITE_TEMPLATE = 2;
 
     /**
      * Which view layout is considered the "default" for views with the given
@@ -311,6 +314,48 @@ class View {
         // set only for existing views - _create provides default value
         if (empty($this->columnsperrow)) {
             $this->columnsperrow = get_records_assoc('view_rows_columns', 'view', $this->get('id'), 'row', 'row, columns');
+            if (empty($this->columnsperrow)) {
+                // if we are missing the info for some reason we will give the page it's layout back
+                // this can happen in MySQL when many users are copying the same page
+                if ($this->layout) {
+                    if ($rowscols = get_records_sql_array("
+                        SELECT vlrc.row, vlc.columns
+                        FROM {view_layout_rows_columns} vlrc
+                        JOIN {view_layout_columns} vlc ON vlc.id = vlrc.columns
+                        WHERE viewlayout = ?", array($this->layout))) {
+                            $default = array();
+                            foreach ($rowscols as $row) {
+                                insert_record('view_rows_columns', (object) array(
+                                    'view' => $this->get('id'),
+                                    'row' => $row->row, 'columns' => $row->columns));
+                                $default[$row->row] = $row;
+                            }
+                    }
+                }
+                else if ($rowscols = get_records_sql_array("
+                    SELECT vrc.row, vrc.columns
+                    FROM {view} v
+                    JOIN {view_rows_columns} vrc ON vrc.view = v.id
+                    WHERE v.template = ?
+                    AND v.type = ?", array(self::SITE_TEMPLATE, $this->type))) {
+                        // Layout not specified so use the view type default layout
+                        $default = array();
+                        foreach ($rowscols as $row) {
+                            insert_record('view_rows_columns', (object) array(
+                                'view' => $this->get('id'),
+                                'row' => $row->row, 'columns' => $row->columns));
+                            $default[$row->row] = $row;
+                        }
+                }
+                else {
+                    // Layout not known so make it 1 row / 3 cols
+                    insert_record('view_rows_columns', (object) array(
+                        'view' => $this->get('id'),
+                        'row' => 1, 'columns' => 3));
+                    $default = self::default_columnsperrow();
+                }
+                $this->columnsperrow = $default;
+            }
         }
     }
 
@@ -345,13 +390,15 @@ class View {
      * @param int $userid     The user who has issued the command to create the
      *                        view. See View::_create
      * @param int $checkaccess Whether to check that the user can see the view before copying it
+     * @param bool $titlefromtemplate Use the default title supplied by template
+     * @param array $artefactcopies The mapping between old artefact ids and new ones (created in blockinstance copy)
      * @return array A list consisting of the new view, the template view and
      *               information about the copy - i.e. how many blocks and
      *               artefacts were copied
      * @throws SystemException under various circumstances, see the source for
      *                         more information
      */
-    public static function create_from_template($viewdata, $templateid, $userid=null, $checkaccess=true, $titlefromtemplate=false) {
+    public static function create_from_template($viewdata, $templateid, $userid=null, $checkaccess=true, $titlefromtemplate=false, &$artefactcopies) {
         if (is_null($userid)) {
             global $USER;
             $userid = $USER->get('id');
@@ -397,7 +444,7 @@ class View {
         $view->urlid = self::new_urlid($view->urlid, (object)$viewdata);
 
         try {
-            $copystatus = $view->copy_contents($template);
+            $copystatus = $view->copy_contents($template, $artefactcopies);
         }
         catch (QuotaExceededException $e) {
             db_rollback();
@@ -555,7 +602,7 @@ class View {
 
         // Create the view
         $defaultdata = array(
-            'numcolumns'    => 2,
+            'numcolumns'    => 2, // Obsolete - need to leave for upgrade purposes. This can be deleted once we no longer need to support direct upgrades from 15.10 and earlier.
             'numrows'       => 1,
             'columnsperrow' => self::default_columnsperrow(),
             'template'      => 0,
@@ -718,7 +765,7 @@ class View {
 
         if (empty($this->id)) {
             // users are only allowed one profile view
-            if ($this->type == 'profile' && record_exists('view', 'owner', $this->owner, 'type', 'profile')) {
+            if (!$this->template && $this->type == 'profile' && record_exists('view', 'owner', $this->owner, 'type', 'profile')) {
                 throw new SystemException(get_string('onlonlyyoneprofileviewallowed', 'error'));
             }
             $this->id = insert_record('view', $fordb, 'id', true);
@@ -757,58 +804,30 @@ class View {
         $this->deleted = false;
     }
 
+    /**
+     * Returns an array of all the artefacts on this page.
+     *
+     * @return array
+     */
     public function get_artefact_instances() {
-        if (!isset($this->artefact_instances)) {
-            $this->artefact_instances = false;
-            if ($instances = $this->get_artefact_metadata()) {
-                foreach ($instances as $instance) {
-                    safe_require('artefact', $instance->plugin);
-                    $classname = generate_artefact_class_name($instance->artefacttype);
-                    $i = new $classname($instance->id, $instance);
-                    $this->childreninstances[] = $i;
-                }
+        $this->artefact_instances = array();
+
+        $sql = 'SELECT a.*, i.name, i.plugin, va.block
+                FROM {view_artefact} va
+                JOIN {artefact} a ON va.artefact = a.id
+                JOIN {artefact_installed_type} i ON a.artefacttype = i.name
+                WHERE va.view = ?';
+        $this->artefact_metadata = get_records_sql_array($sql, array($this->id));
+
+        if ($instances = $this->artefact_metadata) {
+            foreach ($instances as $instance) {
+                safe_require('artefact', $instance->plugin);
+                $classname = generate_artefact_class_name($instance->artefacttype);
+                $i = new $classname($instance->id, $instance);
+                $this->artefact_instances[] = $i;
             }
         }
         return $this->artefact_instances;
-    }
-
-    public function get_artefact_metadata() {
-        if (!isset($this->artefact_metadata)) {
-            $sql = 'SELECT a.*, i.name, va.block
-                    FROM {view_artefact} va
-                    JOIN {artefact} a ON va.artefact = a.id
-                    JOIN {artefact_installed_type} i ON a.artefacttype = i.name
-                    WHERE va.view = ?';
-            $this->artefact_metadata = get_records_sql_array($sql, array($this->id));
-        }
-        return $this->artefact_metadata;
-    }
-
-    public function find_artefact_children($artefact, $allchildren, &$refs) {
-
-        $children = array();
-        if ($allchildren) {
-            foreach ($allchildren as $child) {
-                if ($child->parent != $artefact->id) {
-                    continue;
-                }
-                $children[$child->id] = array();
-                $children[$child->id]['artefact'] = $child;
-                $refs[$child->id] = $child;
-                $children[$child->id]['children'] = $this->find_artefact_children($child,
-                                                            $allchildren, $refs);
-            }
-        }
-
-        return $children;
-    }
-
-
-    public function has_artefacts() {
-        if ($this->get_artefact_metadata()) {
-            return true;
-        }
-        return false;
     }
 
     public function get_owner_object() {
@@ -961,27 +980,6 @@ class View {
         return $data;
     }
 
-    /* Attempt to sort two access records in the same order as the
-       query in get_access_records */
-    public static function cmp_accesslist($a, $b) {
-        if (($c = empty($a->accesstype) - empty($b->accesstype))
-            || ($c = strcmp($b->accesstype, $a->accesstype))
-            || ($c = $a->group - $b->group)
-            || ($c = !empty($a->role) - !empty($b->role))
-            || ($c = strcmp($a->role, $b->role))
-            || ($c = !empty($a->institution) - !empty($b->institution))
-            || ($c = strcmp($a->institution, $b->institution))
-            || ($c = $a->usr - $b->usr)
-            || ($c = !empty($a->startdate) - !empty($b->startdate))
-            || ($c = strcmp($a->startdate, $b->startdate))
-            || ($c = !empty($a->stopdate) - !empty($b->stopdate))
-            || ($c = strcmp($a->stopdate, $b->stopdate))
-            || ($c = $a->allowcomments - $b->allowcomments)) {
-            return $c;
-        }
-        return $a->approvecomments - $b->approvecomments;
-    }
-
     public static function update_view_access($config, $viewids) {
 
         db_begin();
@@ -997,12 +995,31 @@ class View {
         // Sort the full access list in the same order as the list
         // returned by get_access, so that views with the same set of
         // access records get grouped together
-        usort($fullaccesslist, array('self', 'cmp_accesslist'));
+        usort(
+            $fullaccesslist,
+            static function ($a, $b) {
+                if (($c = empty($a->accesstype) - empty($b->accesstype))
+                    || ($c = strcmp($b->accesstype, $a->accesstype))
+                    || ($c = $a->group - $b->group)
+                    || ($c = !empty($a->role) - !empty($b->role))
+                    || ($c = strcmp($a->role, $b->role))
+                    || ($c = !empty($a->institution) - !empty($b->institution))
+                    || ($c = strcmp($a->institution, $b->institution))
+                    || ($c = $a->usr - $b->usr)
+                    || ($c = !empty($a->startdate) - !empty($b->startdate))
+                    || ($c = strcmp($a->startdate, $b->startdate))
+                    || ($c = !empty($a->stopdate) - !empty($b->stopdate))
+                    || ($c = strcmp($a->stopdate, $b->stopdate))
+                    || ($c = $a->allowcomments - $b->allowcomments)) {
+                    return $c;
+                }
+                return $a->approvecomments - $b->approvecomments;
+            }
+        );
 
         // Hash the config object so later on we can easily find
         // all the views with the same config/access rights
         $config['accesslist'] = $fullaccesslist;
-        $accessconf = substr(md5(serialize($config)), 0, 10);
 
         foreach ($viewids as $viewid) {
             $v = new View((int) $viewid);
@@ -1018,7 +1035,6 @@ class View {
             if (isset($config['copynewgroups'])) {
                 $v->set('copynewgroups', $config['copynewgroups']);
             }
-            $v->set('accessconf', $accessconf);
             $v->commit();
         }
 
@@ -1391,6 +1407,7 @@ class View {
 
         $unique = array();
         foreach ($access as &$a) {
+            unset($a->id);
             unset($a->view);
             $k = serialize($a);
             if (!isset($unique[$k])) {
@@ -1449,6 +1466,7 @@ class View {
                 foreach ($firstviewaccess as &$a) {
                     $a->view = $id;
                     $a->ctime = db_format_timestamp(time());
+                    unset($a->id);
                     insert_record('view_access', $a);
                 }
             }
@@ -1717,7 +1735,7 @@ class View {
         $blocktypes = PluginBlockType::get_blocktypes_for_category($category, $this);
 
         $smarty = smarty_core();
-        $smarty->assign_by_ref('blocktypes', $blocktypes);
+        $smarty->assign('blocktypes', $blocktypes);
         $smarty->assign('javascript', $javascript);
         return $smarty->fetch('view/blocktypelist.tpl');
     }
@@ -1845,7 +1863,7 @@ class View {
             );
 
             if (!defined('JSON')) {
-                $message = $this->get_viewcontrol_ok_string($action);
+                $message = get_string('success.' . $action, 'view');
             }
             $success = true;
         }
@@ -1855,7 +1873,7 @@ class View {
             if (defined('JSON')) {
                 throw $e;
             }
-            $message = $this->get_viewcontrol_err_string($action) . ': ' . $e->getMessage();
+            $message = get_string('err.' . $action, 'view');
         }
         if (!defined('JSON')) {
             // set stuff in the session and redirect
@@ -1986,25 +2004,6 @@ class View {
     }
 
     // ******** functions to do with the view creation ui ************** //
-
-    /**
-     * small wrapper around get_string to return a success string
-     * for the given view control function
-     * @param string $functionname the functionname that was called
-     */
-    public function get_viewcontrol_ok_string($functionname) {
-        return get_string('success.' . $functionname, 'view');
-    }
-
-    /**
-     * small wrapper around get_string to return an error string
-     * for the given view control function
-     * @param string $functionname the functionname that was called
-     */
-    public function get_viewcontrol_err_string($functionname) {
-        return get_string('err.' . $functionname, 'view');
-    }
-
 
     /**
      * Build_rows - for each row build_columms
@@ -2277,6 +2276,15 @@ class View {
         $this->dirtycolumns[$values['row']][$bi->get('column')] = 1;
         $this->dirtycolumns[$values['row']][$values['column']] = 1;
         db_commit();
+        // Because embedly externalvideo blocks have their original content changed
+        // by the cdn.embedly.com/widgets/platform.js file to use iframe data the info
+        // is lost on block move so we need to referesh the block with its original content
+        $configdata = $bi->get('configdata');
+        $html = null;
+        if ($bi->get('blocktype') == 'externalvideo' && $configdata['embed']['service'] == 'embedly') {
+            $html = PluginBlocktypeExternalvideo::render_instance($bi, true);
+        }
+        return array('html' => $html);
     }
 
     /**
@@ -2338,12 +2346,14 @@ class View {
     public function get_all_blocktype_css() {
         global $THEME;
         $cssfiles = array();
+        $checkedplugins = array();
         $view_data = $this->get_row_datastructure();
         foreach ($view_data as $row_data) {
             foreach ($row_data as $column) {
                 foreach ($column['blockinstances'] as $blockinstance) {
                     $pluginname = $blockinstance->get('blocktype');
-                    if (!safe_require_plugin('blocktype', $pluginname)) {
+                    if (!empty($checkedplugins[$pluginname]) ||
+                        !safe_require_plugin('blocktype', $pluginname)) {
                         continue;
                     }
                     $artefactdir = '';
@@ -2356,6 +2366,7 @@ class View {
                     foreach ($hrefs as $href) {
                         $cssfiles[] = '<link rel="stylesheet" type="text/css" href="' . append_version_number($href) . '">';
                     }
+                    $checkedplugins[$pluginname] = 1;
                 }
             }
         }
@@ -2785,7 +2796,7 @@ class View {
     public function set_user_theme() {
         global $THEME;
         if ($this->theme && $THEME->basename != $this->theme) {
-            $THEME = new Theme($this->theme);
+            $THEME = new Theme($this);
         }
         return $this->theme;
     }
@@ -3217,7 +3228,21 @@ class View {
                     $formcontrols .= ' class="artefactid-checkbox checkbox">';
                     $formcontrols .= '<input type="hidden" name="' . hsc($elementname) . '_onpage[]" value="' . hsc($artefact->id) . '" class="artefactid-onpage">';
                 }
-
+                if (!empty($artefact->group)) {
+                    $group = get_record('group', 'id', $artefact->group);
+                    $artefact->groupname = !empty($group->shortname) ? $group->shortname : $group->name;
+                    $artefact->groupurl = get_config('wwwroot') . 'group/view.php?id=' . $group->id;
+                }
+                else if (!empty($artefact->institution)) {
+                    $institution = new Institution($artefact->institution);
+                    if ($institution->name == 'mahara') {
+                        $artefact->institutionname = get_config('sitename');
+                    }
+                    else {
+                        $artefact->institutionname = $institution->displayname;
+                    }
+                    $artefact->institutionurl = get_config('wwwroot') . 'institution/index.php?institution=' . $institution->name;
+                }
                 $smarty = smarty_core();
                 $smarty->assign('artefact', $artefact);
                 $smarty->assign('elementname', $elementname);
@@ -3301,7 +3326,7 @@ class View {
         else if ($owner instanceof User) {
             $user = $owner;
         }
-        else if (intval($owner) != 0 || $owner == "0") {
+        else if (intval($owner) != 0) {
             $user = new User();
             $user->find_by_id(intval($owner));
         }
@@ -3408,21 +3433,22 @@ class View {
             safe_require('artefact', 'file');
 
             $public = (int) ArtefactTypeFolder::admin_public_folder_id();
-            $select = '(
-                a.owner = ?
-                OR a.id IN (
+            $select = ' a.id IN (
+                    SELECT id
+                    FROM {artefact}
+                        WHERE owner = ?
+                    UNION
                     SELECT id
                     FROM {artefact}
                         WHERE (path = ? OR path LIKE ?) AND institution = \'mahara\'
-                )
-                OR a.id IN (
+                    UNION
                     SELECT aar.artefact
                     FROM {group_member} m
                         JOIN {artefact} aa ON m.group = aa.group
                         JOIN {artefact_access_role} aar ON aar.role = m.role AND aar.artefact = aa.id
                     WHERE m.member = ? AND aar.can_republish = 1
-                )
-                OR a.id IN (SELECT artefact FROM {artefact_access_usr} WHERE usr = ? AND can_republish = 1)';
+                    UNION
+                    SELECT artefact FROM {artefact_access_usr} WHERE usr = ? AND can_republish = 1';
 
             $ph = array($user->get('id'), "/$public", db_like_escape("/$public/") . '%', $user->get('id'), $user->get('id'));
 
@@ -3434,12 +3460,13 @@ class View {
 
             if ($institutions) {
                 $select .= '
-                OR a.institution IN (' . join(',', array_fill(0, count($institutions), '?')) . ')';
+                    UNION
+                    SELECT id FROM {artefact} WHERE institution IN (' . join(',', array_fill(0, count($institutions), '?')) . ')';
                 $ph = array_merge($ph, $institutions);
             }
 
             $select .= "
-            )";
+                )";
         }
 
         if (!empty($data['artefacttypes']) && is_array($data['artefacttypes'])) {
@@ -3543,6 +3570,11 @@ class View {
         $where = '
             WHERE ' . self::owner_sql((object) array('owner' => $userid, 'group' => $groupid, 'institution' => $institution));
 
+        // We use institution='mahara' and template=2 for the default site template
+        if (isset($institution) && $institution === 'mahara') {
+            $where .= ' AND v.template != ' . self::SITE_TEMPLATE;
+        }
+
         $order = '';
         $groupby = '';
         if (!empty($orderby)) {
@@ -3562,7 +3594,7 @@ class View {
                 case 'mostcomments':
                     $select .= ', COUNT(DISTINCT acc.artefact) AS commentcount';
                     $from .= '
-                        LEFT OUTER JOIN {artefact_comment_comment} acc ON (v.id = acc.onview)';
+                        LEFT OUTER JOIN {artefact_comment_comment} acc ON (v.id = acc.onview AND acc.hidden=0)';
                     $groupby = ' GROUP BY v.id';
                     $order = 'COUNT(DISTINCT acc.artefact) DESC,';
                     break;
@@ -3699,13 +3731,7 @@ class View {
         // Pagination configuration
         $setlimit = true;
         $limit = param_integer('limit', 0);
-        $userlimit = get_account_preference($USER->get('id'), 'viewsperpage');
-        if ($limit > 0 && $limit != $userlimit) {
-            $USER->set_account_preference('viewsperpage', $limit);
-        }
-        else {
-            $limit = $userlimit;
-        }
+        $limit = user_preferred_limit($limit);
         $offset = param_integer('offset', 0);
         // load default page order from user settings as default and overwrite, if changed
         $usersettingorderby = get_account_preference($USER->get('id'), 'orderpagesby');
@@ -3773,7 +3799,7 @@ class View {
                                                'latestmodified' => get_string('latestmodified', 'view'),
                                                'latestviewed' => get_string('latestviewed', 'view'),
                                                'mostvisited' => get_string('mostvisited', 'view'),
-                                               'mostcomments' => get_string('mostcomments', 'view'),
+                                               'mostcomments' => get_string('mostcomments1', 'view'),
                                                ),
                             'defaultvalue' => $orderby,
                         ),
@@ -3817,28 +3843,11 @@ class View {
     }
 
 
-    public function get_user_views($userid=null) {
-        if (is_null($userid)) {
-            global $USER;
-            $userid = $USER->get('id');
-        }
-        if ($views = get_records_sql_assoc(
-            "SELECT v.*
-            FROM {view} v
-            WHERE v.owner = ?
-            AND v.type NOT IN ('profile', 'dashboard')
-            ORDER BY v.title, v.id
-            ", array($userid))) {
-            return $views;
-        }
-        return array();
-    }
-
-    public function get_template_views() {
+    public function get_site_template_views() {
         $views = get_records_sql_array(
             "SELECT v.*
                FROM {view} v
-              WHERE v.owner = 0
+              WHERE v.institution = 'mahara' AND v.template = " . self::SITE_TEMPLATE . "
               ORDER BY v.title, v.id", array());
         $results = array();
         if ($views) {
@@ -4000,7 +4009,8 @@ class View {
             LEFT OUTER JOIN {collection_view} cv ON cv.view = v.id
             LEFT OUTER JOIN {collection} c ON cv.collection = c.id
             LEFT OUTER JOIN {usr} qu ON (v.owner = qu.id)
-            ';
+            LEFT OUTER JOIN {group} sg ON sg.id = v.group
+        ';
         $where = '';
         if ($excludeowner) {
             $where .= ' WHERE (v.owner IS NULL OR (v.owner > 0 AND v.owner != ?))';
@@ -4009,8 +4019,9 @@ class View {
         else {
             $where .= ' WHERE (v.owner IS NULL OR v.owner > 0)';
         }
+        $where .= ' AND v.template != ' . self::SITE_TEMPLATE;
         $where .= '
-                AND (v.group IS NULL OR v.group NOT IN (SELECT id FROM {group} WHERE deleted = 1))
+                AND (v.group IS NULL OR (v.group > 0 AND sg.deleted <> 1))
                 AND (qu.suspendedctime is null OR v.owner = ?)';
 
         $whereparams[] = $viewerid;
@@ -4146,10 +4157,18 @@ class View {
 
         if ($editableviews) {
             $editablesql = "v.owner = ?      -- user owns the view
-                    OR v.group IN (  -- group view, editable by the user
+                    OR EXISTS (  -- group view, editable by the user
                         SELECT m.group
-                        FROM {group_member} m JOIN {group} g ON m.member = ? AND m.group = g.id
-                        WHERE m.role = 'admin' OR g.editroles = 'all' OR (g.editroles != 'admin' AND m.role != 'member')
+                        FROM {group_member} m
+                        WHERE
+                            sg.id IS NOT NULL
+                            AND m.group = sg.id
+                            AND m.member = ?
+                            AND (
+                                m.role = 'admin'
+                                OR sg.editroles = 'all'
+                                OR (sg.editroles != 'admin' AND m.role != 'member')
+                            )
                     )";
             $whereparams[] = $viewerid;
             $whereparams[] = $viewerid;
@@ -4280,7 +4299,7 @@ class View {
                     // We need the date of the last comment on each view
                     $from .= 'LEFT OUTER JOIN (
                 SELECT c.onview, MAX(a.mtime) AS lastcomment
-                FROM {artefact_comment_comment} c JOIN {artefact} a ON c.artefact = a.id AND c.deletedby IS NULL AND c.private = 0
+                FROM {artefact_comment_comment} c JOIN {artefact} a ON c.artefact = a.id AND c.deletedby IS NULL AND c.private = 0 AND c.hidden=0
                 GROUP BY c.onview
             ) l ON v.id = l.onview
             ';
@@ -4289,7 +4308,6 @@ class View {
                 else if ($item['column'] == 'ownername') {
                     // Join on usr, group, and institution and order by name
                     $from .= 'LEFT OUTER JOIN {usr} su ON su.id = v.owner
-            LEFT OUTER JOIN {group} sg ON sg.id = v.group
             LEFT OUTER JOIN {institution} si ON si.name = v.institution
             ';
                     $orderby .= "COALESCE(sg.name, si.displayname, CASE WHEN su.preferredname IS NOT NULL AND su.preferredname != '' THEN su.preferredname ELSE su.firstname || ' ' || su.lastname END)";
@@ -4347,7 +4365,7 @@ class View {
         }
         $select .= '
                 v.owner, v.ownerformat, v.group, v.institution, v.template, v.mtime, v.ctime,
-                c.id as collid, c.name, v.type, v.urlid, v.submittedtime, v.submittedgroup, v.submittedhost
+                c.id as collid, c.name, c.framework, v.type, v.urlid, v.submittedtime, v.submittedgroup, v.submittedhost
         ';
 
         $viewdata = get_records_sql_assoc(
@@ -4472,7 +4490,7 @@ class View {
                     a.id AS commentid,
                     a.description AS commenttext,
                     acc.onview AS lastcommentviewid,
-                    (SELECT COUNT(*) FROM {artefact_comment_comment} c WHERE c.onview = acc.onview AND c.deletedby IS NULL AND c.private=0) AS commentcount
+                    (SELECT COUNT(*) FROM {artefact_comment_comment} c WHERE c.onview = acc.onview AND c.deletedby IS NULL AND c.private=0 AND c.hidden=0) AS commentcount
                 FROM
                     {artefact_comment_comment} acc
                     inner join {artefact} a
@@ -4490,6 +4508,7 @@ class View {
                             acc2.onview = acc.onview
                             AND acc2.deletedby IS NULL
                             AND acc2.private = 0
+                            AND acc2.hidden = 0
                         ORDER BY a3.mtime DESC, acc2.artefact ASC
                         LIMIT 1
                     )
@@ -4524,6 +4543,7 @@ class View {
                             cv2.collection = cv.collection
                             AND c.deletedby IS NULL
                             AND c.private=0
+                            AND c.hidden=0
                     ) AS commentcount
                 FROM
                     {artefact_comment_comment} acc
@@ -4545,6 +4565,7 @@ class View {
                         WHERE
                             acc2.deletedby IS NULL
                             AND acc2.private = 0
+                            AND acc2.hidden = 0
                             AND cv2.collection = cv.collection
                         ORDER BY a3.mtime DESC, acc2.artefact ASC
                         LIMIT 1
@@ -4583,77 +4604,6 @@ class View {
 
 
     /**
-     * Search view owners.
-     */
-    public static function search_view_owners($query=null, $template=null, $limit=null, $offset=0) {
-        if ($template) {
-            $tsql = ' AND v.template = 1';
-        }
-        else if ($template === false) {
-            $tsql = ' AND v.template = 0';
-        }
-        else {
-            $tsql = '';
-        }
-
-        if ($query) {
-            $ph = array($query);
-            $qsql = ' WHERE display ' . db_ilike() . " '%' || ? || '%' ";
-        }
-        else {
-            $ph = array();
-            $qsql = '';
-        }
-
-        if (is_mysql()) {
-            $uid = 'u.id';
-            $gid = 'g.id';
-        }
-        else {
-            $uid = 'CAST (u.id AS TEXT)';
-            $gid = 'CAST (g.id AS TEXT)';
-        }
-
-        $sql = "
-                SELECT
-                    'user' AS ownertype,
-                    CASE WHEN u.preferredname IS NULL OR u.preferredname = '' THEN u.firstname || ' ' || u.lastname
-                    ELSE u.preferredname END AS display,
-                    $uid, COUNT(v.id)
-                FROM {usr} u INNER JOIN {view} v ON (v.owner = u.id AND v.type = 'portfolio')
-                WHERE u.deleted = 0 $tsql
-                GROUP BY ownertype, display, u.id
-            UNION
-                SELECT 'group' AS ownertype, g.name AS display, $gid, COUNT(v.id)
-                FROM {group} g INNER JOIN {view} v ON (g.id = v.group)
-                WHERE g.deleted = 0 $tsql
-                GROUP BY ownertype, display, g.id
-            UNION
-                SELECT 'institution' AS ownertype, i.displayname AS display, i.name AS id, COUNT(v.id)
-                FROM {institution} i INNER JOIN {view} v ON (i.name = v.institution)
-                WHERE TRUE $tsql
-                GROUP BY ownertype, display, i.name ORDER BY display";
-
-        $count = count_records_sql("SELECT COUNT(*) FROM ($sql) q $qsql", $ph);
-        $data = get_records_sql_array("SELECT * FROM ($sql) q $qsql ORDER BY ownertype != 'institution', id != 'mahara', ownertype", $ph, $offset, $limit);
-
-        foreach ($data as &$r) {
-            if ($r->ownertype == 'institution' && $r->id == 'mahara') {
-                $r->display = get_config('sitename');
-            }
-        }
-
-        return array(
-            'data'  => array_values($data),
-            'count' => $count,
-            'limit' => $limit,
-            'offset' => $offset,
-        );
-
-    }
-
-
-    /**
      * Get views which have been explicitly shared to a group and are
      * not owned by the group excluding the view in collections
      *
@@ -4662,9 +4612,10 @@ class View {
      * @param int $groupid
      * @param boolean $membersonly Only return pages owned by members of the group
      * @param string $orderby Columns to sort by (defaults to (title, id) if empty)
+     * @param boolean $hidesubmitted Do not return pages submitted to the group
      * @throws AccessDeniedException
      */
-    public static function get_sharedviews_data($limit=10, $offset=0, $groupid, $membersonly = false, $orderby = null) {
+    public static function get_sharedviews_data($limit=10, $offset=0, $groupid, $membersonly = false, $orderby = null, $hidesubmitted = false) {
         global $USER;
         $userid = $USER->get('id');
         require_once(get_config('libroot') . 'group.php');
@@ -4683,11 +4634,17 @@ class View {
                AND (v.stopdate > CURRENT_TIMESTAMP OR v.stopdate IS NULL)
                AND NOT EXISTS (SELECT 1 FROM {collection_view} cv WHERE cv.view = v.id)';
         $ph = array($groupid, $userid, $groupid);
+        if ($hidesubmitted) {
+            $where .= 'AND (v.submittedgroup IS NULL OR v.submittedgroup != ?)';
+            $ph[] = $groupid;
+        }
+
         if ($membersonly) {
             $from .= ' INNER JOIN {group_member} m2 ON m2.member = v.owner ';
             $where .= ' AND m2.group = ? ';
             $ph[] = $groupid;
         }
+
         $count = count_records_sql('SELECT COUNT(DISTINCT(v.id)) ' . $from . $where, $ph);
         if ($orderby === null) {
             $ordersql = ' ORDER BY v.title, v.id';
@@ -4704,7 +4661,6 @@ class View {
             $offset,
             $limit
         );
-
         if ($viewdata) {
             View::get_extra_view_info($viewdata, false);
         }
@@ -5036,9 +4992,10 @@ class View {
      * @param integer $groupid
      * @param boolean $membersonly Only return collections owned by members of the gorup
      * @param array $sort Columns to sort by (defaults to (title, id) if empty)
+     * @param boolean $hidesubmitted Do not return collections submitted to the group
      * @return array of collections
      */
-    public static function get_sharedcollections_data($limit=10, $offset=0, $groupid, $membersonly = false, $sort = null) {
+    public static function get_sharedcollections_data($limit=10, $offset=0, $groupid, $membersonly = false, $sort = null, $hidesubmitted = false) {
         global $USER;
 
         $userid = $USER->get('id');
@@ -5068,6 +5025,11 @@ class View {
         if ($membersonly) {
             $from .= ' INNER JOIN {group_member} m2 ON m2.member = c.owner ';
             $where .= ' AND m2.group = ? ';
+            $ph[] = $groupid;
+        }
+
+        if ($hidesubmitted) {
+            $where .= 'AND (v.submittedgroup IS NULL OR v.submittedgroup != ?)';
             $ph[] = $groupid;
         }
 
@@ -5242,6 +5204,7 @@ class View {
                 else if (!empty($v->group)) {
                     $v->sharedby = $groups[$v->group]->name;
                     $v->groupdata = $groups[$v->group];
+                    $v->groupdata->homeurl = group_homepage_url($v->groupdata);
                 }
                 else if (!empty($v->institution)) {
                     $v->sharedby = $institutions[$v->institution]->displayname;
@@ -5330,6 +5293,7 @@ class View {
                 else if (!empty($c->group)) {
                     $c->sharedby = $groups[$c->group]->name;
                     $c->groupdata = $groups[$c->group];
+                    $c->groupdata->homeurl = group_homepage_url($c->groupdata);
                 }
                 else if (!empty($c->institution)) {
                     $c->sharedby = $institutions[$c->institution]->displayname;
@@ -5382,7 +5346,7 @@ class View {
             define('GROUP', $this->group);
             define('NOGROUPMENU', 1);
         }
-        else if ($this->institution == 'mahara' || $this->owner == "0") {
+        else if ($this->institution == 'mahara') {
             define('ADMIN', 1);
             define('MENUITEM', 'configsite/siteviews');
         }
@@ -5409,12 +5373,11 @@ class View {
     }
 
 
-    public function copy_contents($template) {
-        $artefactcopies = array(); // Correspondence between original artefact ids and id of the copy
-        $this->set('numcolumns', $template->get('numcolumns'));
+    public function copy_contents($template, &$artefactcopies) {
+
         $this->set('numrows', $template->get('numrows'));
         $this->set('layout', $template->get('layout'));
-        if ($template->get('owner') == 0
+        if ($template->get('template') == self::SITE_TEMPLATE
             && $template->get('type') == 'portfolio') {
             $this->set('description', '');
         }
@@ -5425,12 +5388,14 @@ class View {
         $this->set('columnsperrow', $template->get('columnsperrow'));
         $blocks = get_records_array('block_instance', 'view', $template->get('id'));
         $numcopied = array('blocks' => 0);
+
         if ($blocks) {
             foreach ($blocks as $b) {
-                safe_require('blocktype', $b->blocktype);
-                $oldblock = new BlockInstance($b->id, $b);
-                if ($oldblock->copy($this, $template, $artefactcopies)) {
-                    $numcopied['blocks']++;
+                if (safe_require('blocktype', $b->blocktype, 'lib.php', 'require_once', true) !== false) {
+                    $oldblock = new BlockInstance($b->id, $b);
+                    if ($oldblock->copy($this, $template, $artefactcopies)) {
+                        $numcopied['blocks']++;
+                    }
                 }
             }
         }
@@ -5480,6 +5445,7 @@ class View {
      * @return string updated description
      */
     private function copy_description(View $template, array &$artefactcopies) {
+        safe_require('artefact', 'file');
         $new_description = $template->get('description');
         if (!empty($new_description)
             && strpos($new_description, 'artefact/file/download.php?file=') !== false) {
@@ -5556,11 +5522,13 @@ class View {
     }
 
     public static function get_templatesearch_data(&$search) {
-        require_once(get_config('libroot') . 'pieforms/pieform.php');
         $search->sort = (isset($search->sort)) ? $search->sort : null; // for backwards compatibility
         $results = self::view_search($search->query, $search->ownerquery, null, $search->copyableby, $search->limit, $search->offset, true, $search->sort, null, true);
         $oldcollid = null;
         foreach ($results->data as &$r) {
+            if (!empty($r['groupdata'])) {
+                $r['groupdata']->homeurl = group_homepage_url($r['groupdata'], true, true);
+            }
             if (!empty($search->sort)) {
                 $collid = ($r['collid'] == $oldcollid) ? null : $r['collid'];
             }
@@ -5587,10 +5555,10 @@ class View {
         if (!empty($search->collection)) {
             $params['searchcollection'] = $search->collection;
         }
-        $params['viewlimit'] = $search->limit;
+        $params['limit'] = $search->limit;
 
         $smarty = smarty_core();
-        $smarty->assign_by_ref('results', $results->data);
+        $smarty->assign('results', $results->data);
         $search->html = $smarty->fetch('view/templatesearchresults.tpl');
         $search->count = $results->count;
 
@@ -5608,6 +5576,7 @@ class View {
             'previoustext' => '',
             'nexttext' => '',
             'lasttext' => '',
+            'setlimit' => true,
             'resultcounttextsingular' => get_string('view', 'view'),
             'resultcounttextplural' => get_string('views', 'view'),
         ));
@@ -5793,8 +5762,9 @@ class View {
      * @return string
      */
     public function get_url($full=true, $useid=false) {
-        if ($this->owner == "0") {
-            return null;
+        // No url for a default site template
+        if ($this->template == self::SITE_TEMPLATE) {
+            return '';
         }
         else if ($this->type == 'profile') {
             if (!$useid) {
@@ -5899,6 +5869,8 @@ class View {
         $allowcomments = false;
         $approvecomments = true;
 
+        // TODO: The "mviewaccess" cookie is used by the old token-based Mahara assignment submission
+        // access system, which is now deprecated. Remove eventually.
         $mnettoken = get_cookie('mviewaccess:'.$this->id);
         $usertoken = get_cookie('viewaccess:'.$this->id);
         $cid = $this->collection_id();
@@ -5950,12 +5922,13 @@ class View {
     /**
      * Determine whether the current view is of a type which can be themed.
      * Certain view types do not respect themes when displayed.
+     * Templates do not respect themes as well
      *
      * @return boolean whether the view type may be themed
      */
     function is_themeable() {
         $unthemable_types = array('grouphomepage', 'dashboard');
-        return !in_array($this->type, $unthemable_types);
+        return !$this->get('template') && !in_array($this->type, $unthemable_types);
     }
 
     /**
@@ -5965,25 +5938,21 @@ class View {
      * @param mixed   $owner integer userid or array of userids
      * @param mixed   $group integer groupid or array of groupids
      * @param mixed   $institution string institution name or array of institution names
-     * @param string  $matchconfig record all matches with given config hash (see set_access)
+     * @param null    $obsoleteparam Former "$matchconfig" parameter, value now ignored, param kept only to avoid breaking back-compatibility.
      * @param boolean $includeprofile include profile view
      * @param integer $submittedgroup return only views & collections submitted to this group
      * @param $string $sort Order to sort by (defaults to 'c.name, v.title')
      *
      * @return array, array
      */
-    function get_views_and_collections($owner=null, $group=null, $institution=null, $matchconfig=null, $includeprofile=true, $submittedgroup=null, $sort=null) {
+    function get_views_and_collections($owner=null, $group=null, $institution=null, $obsoleteparam=null, $includeprofile=true, $submittedgroup=null, $sort=null) {
 
         $excludelocked = $group && group_user_access($group) != 'admin';
-        // Anonymous public viewing of a group with 'Allow submissions' checked needs to avoid including the dummy root profile page.
-        if ($owner == '0') {
-            $includeprofile = false;
-        }
         $sql = "
-            SELECT v.id, v.type, v.title, v.accessconf, v.ownerformat, v.startdate, v.stopdate, v.template,
+            SELECT v.id, v.type, v.title, v.ownerformat, v.startdate, v.stopdate, v.template,
                 v.owner, v.group, v.institution, v.urlid, v.submittedgroup, v.submittedhost, " .
                 db_format_tsfield('v.submittedtime', 'submittedtime') . ", v.submittedstatus,
-                c.id AS cid, c.name AS cname,
+                c.id AS cid, c.name AS cname, c.framework,
                 c.submittedgroup AS csubmitgroup, c.submittedhost AS csubmithost, " .
                 db_format_tsfield('c.submittedtime', 'csubmittime') . ", c.submittedstatus AS csubmitstatus
             FROM {view} v
@@ -6069,17 +6038,17 @@ class View {
                         $collections[$cid]['ownername'] = $v['ownername'];
                         $collections[$cid]['ownerurl'] = $v['ownerurl'];
                     }
-                    if ($matchconfig && $matchconfig == $r['accessconf']) {
-                        $collections[$cid]['match'] = true;
+                    if (!empty($r['framework'])) {
+                        require_once('collection.php');
+                        $coll = new StdClass();
+                        $coll->id = $cid;
+                        $collections[$cid]['url'] = Collection::get_framework_url($coll);
                     }
                 }
                 $collections[$cid]['views'][$vid] = $v;
             }
             else {
                 $views[$vid] = $v;
-                if ($matchconfig && $matchconfig == $r['accessconf']) {
-                    $views[$vid]['match'] = true;
-                }
             }
         }
 
@@ -6091,20 +6060,20 @@ class View {
     public static function access_override_description($v) {
         if ($v['startdate'] && $v['stopdate']) {
             return get_string(
-                'accessbetweendates2', 'view',
+                'accessbetweendates3', 'view',
                 format_date(strtotime($v['startdate']), 'strftimedate'),
                 format_date(strtotime($v['stopdate']), 'strftimedate')
             );
         }
         if ($v['startdate']) {
             return get_string(
-                'accessfromdate2', 'view',
+                'accessfromdate3', 'view',
                 format_date(strtotime($v['startdate']), 'strftimedate')
             );
         }
         if ($v['stopdate']) {
             return get_string(
-                'accessuntildate2', 'view',
+                'accessuntildate3', 'view',
                 format_date(strtotime($v['stopdate']), 'strftimedate')
             );
         }
@@ -6113,7 +6082,7 @@ class View {
 
     /**
      * Get all views & collections for a (user,group), grouped
-     * by their accesslists as defined by the accessconf column
+     * by their accesslists
      *
      * @param integer $owner
      * @param integer $group
@@ -6122,6 +6091,7 @@ class View {
      */
     public static function get_accesslists($owner=null, $group=null, $institution=null) {
         require_once('institution.php');
+        require_once('group.php');
 
         if (!is_null($owner) && !is_array($owner) && $owner > 0) {
             $ownerobj = new User();
@@ -6130,7 +6100,11 @@ class View {
 
         $data = array();
         list($data['collections'], $data['views']) = self::get_views_and_collections($owner, $group, $institution);
-
+        foreach ($data['views'] as $k => $view) {
+            if ($view['template'] == self::SITE_TEMPLATE) {
+                unset($data['views'][$k]);
+            }
+        }
         // Remember one representative viewid in each collection
         $viewindex = array();
 
@@ -6322,6 +6296,17 @@ class View {
         ArtefactType::update_locked($userid);
         db_commit();
     }
+
+    /**
+     * Indicates whether this view is a site template. (A site template is a special
+     * template page which is copied as the starting point whenever a new page is
+     * created.)
+     *
+     * @return boolean
+     */
+    public function is_site_template() {
+        return ($this->get('template') == View::SITE_TEMPLATE);
+    }
 }
 
 class ViewSubmissionException extends UserException {
@@ -6351,15 +6336,15 @@ function create_view_form($group=null, $institution=null, $template=null, $colle
                 'type' => 'hidden',
                 'value' => true,
             ),
+            'submitcollection' => array(
+                'type'  => 'hidden',
+                'value' => false,
+            ),
             'submit' => array(
                 'type'  => 'button',
                 'usebuttontag' => true,
                 'class' => 'btn-default',
                 'value' => '<span class="icon icon-plus icon-lg left" role="presentation" aria-hidden="true"></span>' . get_string('createview', 'view'),
-            ),
-            'submitcollection' => array(
-                'type'  => 'hidden',
-                'value' => false,
             )
         )
     );
@@ -6389,7 +6374,7 @@ function create_view_form($group=null, $institution=null, $template=null, $colle
         $form['elements']['submitcollection'] = array(
             'type'  => 'button',
             'usebuttontag' => true,
-            'class' => 'btn-default',
+            'class' => 'btn-default btn-xs btn-group-item',
             'value' => get_string('copycollection', 'collection'),
         );
     }
@@ -6398,8 +6383,11 @@ function create_view_form($group=null, $institution=null, $template=null, $colle
             'type'  => 'hidden',
             'value' => $template,
         );
-        $form['elements']['submit']['value'] = '<span class="icon icon-lg icon-files-o" role="presentation"></span><span class="sr-only">' . get_string('copyview', 'view') . '</span>';
-        $form['elements']['submit']['class'] = 'btn-default';
+        $form['elements']['submit']['value'] = get_string('copyview', 'view');
+        $form['elements']['submit']['class'] = 'btn-default btn-xs btn-group-item';
+        if ($collection !== null) {
+            $form['elements']['submit']['class'] .= ' last';
+        }
         $form['name'] .= $template;
     }
     return $form;
@@ -6432,7 +6420,8 @@ function createview_submit(Pieform $form, $values) {
     else if (isset($values['usetemplate'])) {
         $templateid = $values['usetemplate'];
         unset($values['usetemplate']);
-        list($view, $template, $copystatus) = View::create_from_template($values, $templateid);
+        $artefactcopies = array();
+        list($view, $template, $copystatus) = View::create_from_template($values, $templateid, null, true, false, $artefactcopies);
         if (isset($copystatus['quotaexceeded'])) {
             $SESSION->add_error_msg(get_string('viewcopywouldexceedquota', 'view'));
             redirect(get_config('wwwroot') . 'view/choosetemplate.php');
@@ -6445,9 +6434,10 @@ function createview_submit(Pieform $form, $values) {
     }
     else {
         // Use the site default portfolio page to create a new page
-        $sitedefaultviewid = get_field('view', 'id', 'owner', 0, 'type', 'portfolio');
+        $sitedefaultviewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'portfolio');
         if (!empty($sitedefaultviewid)) {
-            list($view, $template, $copystatus) = View::create_from_template($values, $sitedefaultviewid);
+            $artefactcopies = array();
+            list($view, $template, $copystatus) = View::create_from_template($values, $sitedefaultviewid, null, true, false, $artefactcopies);
             if (isset($copystatus['quotaexceeded'])) {
                 $SESSION->add_error_msg(get_string('viewcreatewouldexceedquota', 'view'));
                 redirect(get_config('wwwroot') . 'view/index.php');
@@ -6489,6 +6479,8 @@ function copyview($id, $istemplate = false, $groupid = null, $collectionid = nul
         $values['group'] = $groupid;
     }
 
+    require_once(get_config('docroot') . 'artefact/lib.php');
+
     if (!empty($collectionid)) {
         require_once(get_config('libroot') . 'collection.php');
         list($collection, $template, $copystatus) = Collection::create_from_template($values, $collectionid);
@@ -6505,7 +6497,8 @@ function copyview($id, $istemplate = false, $groupid = null, $collectionid = nul
         redirect(get_config('wwwroot') . 'collection/edit.php?copy=1&id=' . $collection->get('id'));
     }
     else {
-        list($view, $template, $copystatus) = View::create_from_template($values, $id);
+        $artefactcopies = array();
+        list($view, $template, $copystatus) = View::create_from_template($values, $id, null, true, false, $artefactcopies);
         if (isset($copystatus['quotaexceeded'])) {
             $SESSION->add_error_msg(get_string('viewcopywouldexceedquota', 'view'));
             redirect(get_config('wwwroot') . 'view/view.php?id=' . $id);
@@ -6646,18 +6639,18 @@ function view_group_submission_form_submit(Pieform $form, $values) {
  *
  */
 function install_system_portfolio_view() {
-    $viewid = get_field('view', 'id', 'owner', 0, 'type', 'portfolio');
+    $viewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'portfolio');
     if ($viewid) {
         log_info('A site default portfolio page already seems to be installed');
         return $viewid;
     }
     $view = View::create(array(
         'type'        => 'portfolio',
-        'owner'       => 0,
-        'template'    => 1,
+        'institution' => 'mahara',
+        'template'    => 2,
         'title'       => get_string('templateportfoliotitle', 'view'),
         'description' => get_string('templateportfoliodescription', 'view'),
-    ));
+    ), 0);
     $view->set_access(array(array(
         'type' => 'loggedin'
     )));

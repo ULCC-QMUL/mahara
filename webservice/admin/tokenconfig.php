@@ -11,10 +11,9 @@
 
 define('INTERNAL', 1);
 define('ADMIN', 1);
-define('MENUITEM', 'configextensions/webservices');
+define('MENUITEM', 'webservices');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('pluginadmin', 'admin'));
-require_once('pieforms/pieform.php');
 require_once(get_config('docroot') . 'api/xmlrpc/lib.php');
 
 $token  = param_variable('token', 0);
@@ -95,14 +94,14 @@ $token_details['elements']['service'] = array(
 $token_details['elements']['enabled'] = array(
     'title'        => get_string('enabled'),
     'defaultvalue' => (($dbservice->enabled == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => true,
 );
 
 $token_details['elements']['restricted'] = array(
     'title'        => get_string('restrictedusers', 'auth.webservice'),
     'defaultvalue' => (($dbservice->restrictedusers == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => true,
 );
 
@@ -122,7 +121,7 @@ $token_details['elements']['functions'] = array(
 
 $token_details['elements']['wssigenc'] = array(
     'defaultvalue' => (($dbtoken->wssigenc == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => false,
     'title'        => get_string('wssigenc', 'auth.webservice'),
 );
@@ -178,8 +177,6 @@ $form = pieform($form);
 
 $smarty = smarty(array(), array('<link rel="stylesheet" type="text/css" href="' . $THEME->get_url('style/webservice.css', false, 'auth/webservice') . '">',));
 safe_require('auth', 'webservice');
-$webservice_menu = PluginAuthWebservice::admin_menu_items();
-$smarty->assign('SUBPAGENAV', $webservice_menu);
 $smarty->assign('token', $dbtoken->token);
 $smarty->assign('form', $form);
 $heading = get_string('tokens', 'auth.webservice');

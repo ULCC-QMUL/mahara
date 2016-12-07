@@ -17,6 +17,9 @@ require_once(get_config('libroot') . 'group.php');
 
 $owner = param_integer('owner', 0);;
 $groupid = param_integer('group', null);
+if (!empty($groupid)) {
+    define('SUBSECTIONHEADING', get_string('Views', 'view'));
+}
 $institution = param_alphanum('institution', null);
 $searchcollection = param_integer('searchcollection', false);
 View::set_nav($groupid, $institution, false, $searchcollection);
@@ -40,13 +43,13 @@ else {
     define('TITLE', get_string('copyvieworcollection', 'view'));
 }
 
-define('SUBTITLE', get_string('copyvieworcollection', 'view'));
+$subtitle = get_string('copyvieworcollection', 'view');
 
 $views = new StdClass;
 $views->query      = trim(param_variable('viewquery', ''));
 $views->ownerquery = trim(param_variable('ownerquery', ''));
 $views->offset     = param_integer('viewoffset', 0);
-$views->limit      = param_integer('viewlimit', 10);
+$views->limit      = param_integer('limit', 10);
 $views->copyableby = (object) array('group' => $groupid, 'institution' => $institution, 'owner' => null);
 if ($groupid) {
     $views->group = $groupid;
@@ -69,9 +72,9 @@ $sort[] = array('column' => 'title',
                 'desc' => 0,
                 );
 if ($searchcollection) {
-    array_unshift($sort, array('column' => 'collection',
+    array_unshift($sort, array('column' => 'name',
                                'desc' => 0,
-                               'tablealias' => 'cv'
+                               'tablealias' => 'c'
                                ));
     $views->collection = $searchcollection;
 }
@@ -131,21 +134,20 @@ addLoadEvent(function() {
 EOF;
 
 $smarty = smarty(
-    array('js/preview.js', 'searchtable'),
+    array('js/preview.js', 'searchtable', 'paginator'),
     array(),
     array('stylesheets' => array('style/views.css'))
 );
 $smarty->assign('INLINEJAVASCRIPT', $js);
 if (!empty($groupid)) {
-    $smarty->assign('PAGESUBHEADING', SUBTITLE);
+    $smarty->assign('PAGESUBHEADING', $subtitle);
     $smarty->assign('PAGEHELPNAME', '0');
     $smarty->assign('SUBPAGEHELPNAME', '1');
-    $smarty->assign('subsectionheading', get_string('Views', 'view'));
 
     $smarty->assign('headingclass', 'page-header');
 }
 else {
-    $smarty->assign('PAGEHEADING', SUBTITLE);
+    $smarty->assign('PAGEHEADING', $subtitle);
 }
 $smarty->assign('helptext', $helptext);
 $smarty->assign('views', $views);

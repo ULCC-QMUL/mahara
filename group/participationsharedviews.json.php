@@ -14,20 +14,13 @@ define('JSON', 1);
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once(get_config('libroot') . 'view.php');
 require_once(get_config('libroot') . 'group.php');
-require_once(get_config('libroot') . 'pieforms/pieform.php');
 
 define('GROUP', param_integer('group'));
 
 $wwwroot = get_config('wwwroot');
 
 $limit = param_integer('limit', 0);
-$userlimit = get_account_preference($USER->get('id'), 'viewsperpage');
-if ($limit > 0 && $limit != $userlimit) {
-    $USER->set_account_preference('viewsperpage', $limit);
-}
-else {
-    $limit = $userlimit;
-}
+$limit = user_preferred_limit($limit, 'itemsperpage');
 $offset = param_integer('offset', 0);
 $sort = param_variable('sort', 'title');
 $direction = param_variable('direction', 'asc');

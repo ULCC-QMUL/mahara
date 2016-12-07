@@ -8,10 +8,12 @@
           <FIELDS>
             <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="true" SEQUENCE="true"/>
             <FIELD NAME="name" TYPE="char" LENGTH="200" NOTNULL="true" SEQUENCE="false"/>
+            <FIELD NAME="shortname" TYPE="char" LENGTH="200" NOTNULL="false" SEQUENCE="false"/>
             <FIELD NAME="enabled" TYPE="int" LENGTH="1" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="restrictedusers" TYPE="int" LENGTH="1" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="tokenusers" TYPE="int" LENGTH="1" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="component" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+            <FIELD NAME="apiversion" TYPE="int" LENGTH="10" NOTNULL="false" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="ctime" TYPE="datetime" NOTNULL="true"/>
             <FIELD NAME="mtime" TYPE="datetime" NOTNULL="false"/>
           </FIELDS>
@@ -20,6 +22,7 @@
           </KEYS>
           <INDEXES>
             <INDEX NAME="nameuk" UNIQUE="true" FIELDS="name"/>
+            <INDEX NAME="shortnamecompix" UNIQUE="false" FIELDS="shortname,component"/>
           </INDEXES>
         </TABLE>
         <TABLE NAME="external_functions" COMMENT="list of all external functions">
@@ -55,7 +58,7 @@
             <FIELD NAME="token" TYPE="char" LENGTH="128" NOTNULL="true" SEQUENCE="false" COMMENT="security token, aka private access key"/>
             <FIELD NAME="tokentype" TYPE="int" LENGTH="4" NOTNULL="true" UNSIGNED="true" SEQUENCE="false" COMMENT="type of token: 0=permanent, no session; 1=linked to current browser session via sid; 2=permanent, with emulated session"/>
             <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="false" SEQUENCE="false" COMMENT="owner of the token"/>
-            <FIELD NAME="institution" TYPE="char" LENGTH="255" NOTNULL="true"/>
+            <FIELD NAME="institution" TYPE="char" LENGTH="255" NOTNULL="false"/>
             <FIELD NAME="externalserviceid" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="sid" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false" COMMENT="link to browser or emulated session"/>
             <FIELD NAME="creatorid" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="false" DEFAULT="1" SEQUENCE="false" COMMENT="user id of the token creator (useful to know when the administrator created a token and so display the token to a specific administrator)"/>
@@ -66,6 +69,9 @@
             <FIELD NAME="publickey" TYPE="text" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="created timestamp"/>
             <FIELD NAME="publickeyexpires" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="created timestamp"/>
             <FIELD NAME="wssigenc" TYPE="int" LENGTH="1" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
+            <FIELD NAME="clientname" TYPE="char" LENGTH="200" NOTNULL="false" SEQUENCE="false" COMMENT="Name of client program that generated and uses client."/>
+            <FIELD NAME="clientenv" TYPE="char" LENGTH="200" NOTNULL="false" SEQUENCE="false" COMMENT="Brief description of the environment of the client program (OS, browser, etc)"/>
+            <FIELD NAME="clientguid" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false" COMMENT="Optional unique ID for the client program."/>
           </FIELDS>
           <KEYS>
             <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -169,7 +175,7 @@
             <FIELD NAME="timelogged" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="true" SEQUENCE="false"/>
             <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" UNSIGNED="false" SEQUENCE="false" COMMENT="usr ref"/>
             <FIELD NAME="externalserviceid" TYPE="int" LENGTH="10" NOTNULL="false" UNSIGNED="true" SEQUENCE="false"/>
-            <FIELD NAME="institution" TYPE="char" LENGTH="255" NOTNULL="true"/>
+            <FIELD NAME="institution" TYPE="char" LENGTH="255" NOTNULL="false"/>
             <FIELD NAME="protocol" TYPE="char" LENGTH="10" NOTNULL="true"/>
             <FIELD NAME="auth" TYPE="char" LENGTH="10" NOTNULL="true"/>
             <FIELD NAME="functionname" TYPE="char" LENGTH="200" NOTNULL="false" SEQUENCE="false"/>

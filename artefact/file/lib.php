@@ -168,6 +168,7 @@ class PluginArtefactFile extends PluginArtefact {
                 'mahara' => array(
                     'remove',
                     'cancel',
+                    'defaulthint',
                 ),
                 'artefact.file' => array(
                     'confirmdeletefile',
@@ -185,6 +186,7 @@ class PluginArtefactFile extends PluginArtefact {
                     'foldernamerequired',
                     'foldernotempty',
                     'maxuploadsize',
+                    'fileisfolder',
                     'nametoolong',
                     'namefieldisrequired',
                     'upload',
@@ -1478,7 +1480,7 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
                 ),
                 'updateuserquotas' => array(
                     'title'        => get_string('updateuserquotas', 'artefact.file'),
-                    'description'  => get_string('updateuserquotasdesc1', 'artefact.file'),
+                    'description'  => get_string('updateuserquotasdesc2', 'artefact.file'),
                     'type'         => 'switchbox',
                 )
             ),
@@ -1517,7 +1519,7 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
         $elements['userquotafieldset']['elements']['quotanotifyadmin'] = array(
             'type'          => 'switchbox',
             'title'         => get_string('quotanotifyadmin1', 'artefact.file'),
-            'description'   => get_string('quotanotifyadmindescr2', 'artefact.file'),
+            'description'   => get_string('quotanotifyadmindescr3', 'artefact.file'),
             'defaultvalue'  => get_config_plugin('artefact', 'file', 'quotanotifyadmin'),
         );
 
@@ -1526,7 +1528,7 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
             'type'         => 'switchbox',
             'title'        => get_string('institutionoverride1', 'artefact.file'),
             'defaultvalue' => $override,
-            'description'  => get_string('institutionoverridedescription1', 'artefact.file')
+            'description'  => get_string('institutionoverridedescription2', 'artefact.file')
         );
 
         $defaultgroupquota = get_config_plugin('artefact', 'file', 'defaultgroupquota');
@@ -1543,11 +1545,12 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
                 'defaultgroupquota' => array(
                     'title'        => get_string('defaultgroupquota', 'artefact.file'),
                     'type'         => 'bytes',
+                    'class'        => 'form-inline',
                     'defaultvalue' => $defaultgroupquota,
                 ),
                 'updategroupquotas' => array(
                     'title'        => get_string('updategroupquotas', 'artefact.file'),
-                    'description'  => get_string('updategroupquotasdesc1', 'artefact.file'),
+                    'description'  => get_string('updategroupquotasdesc2', 'artefact.file'),
                     'type'         => 'switchbox',
                 )
             ),
@@ -1619,13 +1622,13 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
                     'type'         => 'switchbox',
                     'title'        => get_string('resizeonuploadenable1', 'artefact.file'),
                     'defaultvalue' => $resizeonuploadenable,
-                    'description'  => get_string('resizeonuploadenabledescription2', 'artefact.file'),
+                    'description'  => get_string('resizeonuploadenabledescription3', 'artefact.file'),
                 ),
                 'resizeonuploaduseroption' => array(
                     'title'        => get_string('resizeonuploaduseroption1', 'artefact.file'),
                     'type'         => 'switchbox',
                     'defaultvalue' => $resizeonuploaduseroption,
-                    'description'  => get_string('resizeonuploaduseroptiondescription2', 'artefact.file'),
+                    'description'  => get_string('resizeonuploaduseroptiondescription3', 'artefact.file'),
                 ),
                 'resizeonuploadmaxwidth' => array(
                      'type' => 'text',
@@ -1740,7 +1743,8 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
 
         return array(
             'elements' => $elements,
-            'renderer' => 'div'
+            // Don't apply "panel panel-body" style to this form.
+            'class' => null,
         );
     }
 
@@ -2041,7 +2045,7 @@ class ArtefactTypeFolder extends ArtefactTypeFileBase {
             foreach ($childrecords as &$child) {
                 $c = artefact_instance_from_id($child->id);
                 $child->title = $child->hovertitle = $c->get('title');
-                $child->date = format_date(strtotime($child->mtime), 'strfdaymonthyearshort');
+                $child->date = format_date(strtotime($child->mtime), 'strftimedaydatetime');
                 $child->iconsrc = call_static_method(generate_artefact_class_name($child->artefacttype), 'get_icon', array('id' => $child->id, 'viewid' => isset($options['viewid']) ? $options['viewid'] : 0));
             }
             $smarty->assign('children', $childrecords);
@@ -2389,6 +2393,9 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
     public static function get_icon($options=null) {
         $url = get_config('wwwroot') . 'thumb.php?type=profileiconbyid&id=' . hsc($options['id']);
 
+        if (isset($options['viewid'])) {
+            $url .= '&view=' . $options['viewid'];
+        }
         if (isset($options['size'])) {
             $url .= '&size=' . $options['size'];
         }
@@ -2416,14 +2423,152 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
     public static function get_title_progressbar() {
         return get_string('profileicon','artefact.file');
     }
+
+    /**
+     * Render's the icon thumbnail for the specified user
+     */
+    public static function download_thumbnail_for_user($userid) {
+        $size = get_imagesize_parameters();
+        $earlyexpiry = param_boolean('earlyexpiry', false);
+
+        // Convert ID of user to the ID of a profileicon
+        $data = get_record_sql('
+            SELECT u.profileicon, u.email, f.filetype
+            FROM {usr} u LEFT JOIN {artefact_file_files} f ON u.profileicon = f.artefact
+            WHERE u.id = ?',
+            array($userid)
+        );
+
+        // User has a profile icon file selected. Use it.
+        if (!empty($data->profileicon)) {
+            $id = $data->profileicon;
+            $mimetype = $data->filetype;
+
+            // Try to print the specified icon
+            static::download_thumbnail($id);
+            exit();
+        }
+
+        // No profile icon file selected. Go through fallback icons.
+
+        // Look for an appropriate image on gravatar.com
+        $useremail = $data->email;
+        if ($useremail and $gravatarurl = remote_avatar_url($useremail, $size)) {
+            redirect($gravatarurl);
+        }
+
+        // We couldn't find an image for this user. Attempt to use the 'no user
+        // photo' image for the current theme
+
+        if (!get_config('nocache')) {
+            // We can cache such images
+            $maxage = 604800; // 1 week
+            if ($earlyexpiry) {
+                $maxage = 600; // 10 minutes
+            }
+            header('Expires: '. gmdate('D, d M Y H:i:s', time() + $maxage) .' GMT');
+            header('Cache-Control: max-age=' . $maxage);
+            header('Pragma: public');
+        }
+
+        if ($path = get_dataroot_image_path('artefact/file/profileicons/no_userphoto/' . $THEME->basename, 0, $size)) {
+            header('Content-type: ' . 'image/png');
+            readfile($path);
+            perf_to_log();
+            exit;
+        }
+
+        // If we couldn't find the no user photo picture, we put it into
+        // dataroot if we can
+        $nouserphotopic = $THEME->get_path('images/no_userphoto.png');
+        if ($nouserphotopic) {
+            // Move the file into the correct place.
+            $directory = get_config('dataroot') . 'artefact/file/profileicons/no_userphoto/' . $THEME->basename . '/originals/0/';
+            check_dir_exists($directory);
+            copy($nouserphotopic, $directory . '0');
+            // Now we can try and get the image in the correct size
+            if ($path = get_dataroot_image_path('artefact/file/profileicons/no_userphoto/' . $THEME->basename, 0, $size)) {
+                header('Content-type: ' . 'image/png');
+                readfile($path);
+                perf_to_log();
+                exit;
+            }
+        }
+
+        // Emergency fallback
+        header('Content-type: ' . 'image/png');
+        readfile($THEME->get_path('images/no_userphoto.png'));
+        perf_to_log();
+        exit;
+    }
+
+    /**
+     * Render's the icon's thumbnail and exits
+     */
+    public static function download_thumbnail($artefactid) {
+        global $USER;
+        $id = $artefactid;
+        $size = get_imagesize_parameters();
+        $earlyexpiry = param_boolean('earlyexpiry', false);
+
+        $mimetype = get_field('artefact_file_files', 'filetype', 'artefact', $id);
+
+        if ($id && $fileid = get_field('artefact_file_files', 'fileid', 'artefact', $id)) {
+            // Check that the profile icon is allowed to be seen
+            // Any profileiconbyid file that has been set as a user's default icon is ok
+            // But icons that are not should only be seen by their owner
+            // Unless that owner places them in a view that the user can see
+            if (!get_field('usr', 'id', 'profileicon', $id)) {
+                $viewid = param_integer('view', 0);
+                $ok = false;
+                if ($viewid) {
+                    $ok = artefact_in_view($id, $viewid);
+                }
+                if (!$ok) {
+                    if (
+                        ($USER && !$USER->is_logged_in()) ||
+                        ($USER->is_logged_in() && $USER->get('id') != get_field('artefact', 'owner', 'id', $id))
+                       ) {
+                        exit;
+                    }
+                }
+            }
+            if ($path = get_dataroot_image_path('artefact/file/profileicons', $fileid, $size)) {
+                if ($mimetype) {
+                    header('Content-type: ' . $mimetype);
+
+                    if (!get_config('nocache')) {
+                        // We can't cache 'profileicon' for as long, because the
+                        // user can change it at any time. But we can cache
+                        // 'profileiconbyid' for quite a while, because it will
+                        // never change
+                        if ($type == 'profileiconbyid' and !$earlyexpiry) {
+                            $maxage = 604800; // 1 week
+                        }
+                        else {
+                            $maxage = 600; // 10 minutes
+                        }
+                        header('Expires: '. gmdate('D, d M Y H:i:s', time() + $maxage) .' GMT');
+                        header('Cache-Control: max-age=' . $maxage);
+                        header('Pragma: public');
+                    }
+
+                    readfile($path);
+                    perf_to_log();
+                    exit;
+                }
+            }
+        }
+    }
 }
 
 class ArtefactTypeArchive extends ArtefactTypeFile {
 
     protected $archivetype;
-    protected $handle;
+    protected $handle = null;   // Handle for the temporary archive file
     protected $info;
     protected $data = array();
+    protected $temparchivepathlength = 0;  // The length of the phar path to the temporary archive
 
     public function __construct($id = 0, $data = null) {
         parent::__construct($id, $data);
@@ -2444,50 +2589,46 @@ class ArtefactTypeArchive extends ArtefactTypeFile {
 
         $type = $descriptions[$validtypes[$data->filetype]->description];
 
+        // Add tmp extension
+        $path = self::copy_to_temp($path);
+        if ($path === false) {
+            return false;
+        }
+        try {
+            $archive_obj = new PharData($path);
+        }
+        catch (UnexpectedValueException $e) {
+            $path = self::delete_from_temp($path);
+            return false;
+        }
+
+        $is_valid = false;
         if (is_null($type)) {
-            if (self::is_zip($path)) {
+            if ($archive_obj->isFileFormat(Phar::ZIP)) {
                 $data->filetype = 'application/zip';
                 $data->archivetype = 'zip';
-                return true;
+                $is_valid = true;
             }
-            if ($data->filetype = self::is_tar($path)) {
+            if ($archive_obj->isFileFormat(Phar::TAR)) {
+                switch ($archive_obj->isCompressed()) {
+                    case Phar::GZ: $data->filetype = 'application/x-gzip';
+                    case Phar::BZ2: $data->filetype = 'application/x-bzip2';
+                    default: $data->filetype = 'application/x-tar';
+                }
                 $data->archivetype = 'tar';
-                return true;
+                $is_valid = true;
             }
         }
-        else if ($type == 'zip' && self::is_zip($path) || $type == 'tar' && self::is_tar($path)) {
+        else if ($type == 'zip' && ($archive_obj->isFileFormat(Phar::ZIP))
+                || $type == 'tar' && ($archive_obj->isFileFormat(Phar::TAR))) {
             $data->archivetype = $type;
-            return true;
+            $is_valid = true;
         }
-        return false;
-    }
 
-    public static function is_zip($path) {
-        if (function_exists('zip_read')) {
-            $zip = zip_open($path);
-            if (is_resource($zip)) {
-                zip_close($zip);
-                return true;
-            }
-        }
-        return false;
-    }
+        // Remove the temporary after validate the archive file
+        self::delete_from_temp($path);
 
-    public static function is_tar($path) {
-        require_once('Archive/Tar.php');
-        if (!$tar = new Archive_Tar($path)) {
-            return false;
-        }
-        $list = $tar->listContent();
-        if (empty($list)) {
-            return false;
-        }
-        switch ($tar->_compress_type) {
-        case 'gz': return 'application/x-gzip';
-        case 'bz2': return 'application/x-bzip2';
-        case 'none': return 'application/x-tar';
-        }
-        return false;
+        return $is_valid;
     }
 
     public static function archive_file_descriptions() {
@@ -2512,19 +2653,45 @@ class ArtefactTypeArchive extends ArtefactTypeFile {
         return false;
     }
 
-    public function open_archive() {
-        if ($this->archivetype == 'zip') {
-            $this->handle = zip_open($this->get_path());
-            if (!is_resource($this->handle)) {
-                $this->handle = null;
-                throw new NotFoundException();
-            }
+    /**
+     * Copy the archive file to the system temporary directory
+     * and add .tmp to a file name and return the new filename
+     * This is a workaround for read and extract a zip/tar file using PharData
+     *
+     * THIS FUNCTION MUST BE PAIRED WITH delete_from_temp()
+     *
+     * @param String $path: path to the archive file
+     * @return String new path
+     * @throws SystemException if can not copy
+     */
+    public static function copy_to_temp($path) {
+        $tempdir = get_config('dataroot') . 'artefact/file/temp';
+        check_dir_exists($tempdir);
+        $name = tempnam($tempdir, '');
+        unlink($name);
+        $name .= '.tmp';
+        if (file_exists($path)
+            && copy($path, $name)) {
+            return $name;
         }
-        else if ($this->archivetype == 'tar') {
-            require_once('Archive/Tar.php');
-            if (!$this->handle = new Archive_Tar($this->get_path())) {
-                throw new NotFoundException();
-            }
+        else {
+            throw new SystemException(get_string('cannotcopytemparchive', 'artefact/file', $path, $name));
+        }
+    }
+
+    /**
+     * Delete the temporary archive
+     * @param String $path: path to the temporary file
+     * @return void
+     * @throws SystemException if can not delete
+     */
+    public static function delete_from_temp($path) {
+        if (file_exists($path)
+            && unlink($path)) {
+            return;
+        }
+        else {
+            throw new SystemException(get_string('cannotdeletetemparchive', 'artefact/file', $path));
         }
     }
 
@@ -2532,67 +2699,91 @@ class ArtefactTypeArchive extends ArtefactTypeFile {
         $this->info = $zipinfo;
     }
 
-    private function read_entry($name, $isfolder, $size) {
-        $path = explode('/', $name);
-        if ($isfolder) {
-            array_pop($path);
+    /**
+     * Recursively read the content of an archive
+     * and update $this->info
+     *
+     * @param string $dir
+     *      = null : read the content of $this->handle
+     * @throws ArchiveException
+     */
+    private function read_archive_folder($dir=null) {
+        if ($this->temparchivepathlength === 0) {
+            throw new ArchiveException(get_string('invalidtemparchivepathlength', 'artefact.file'));
         }
+        try {
+            if (!isset($dir) && !empty($this->handle)) {
+                $a = $this->handle;
+            }
+            else if (isset($dir)) {
+                $a = new PharData($dir, RecursiveDirectoryIterator::KEY_AS_PATHNAME);
+            }
+            else {
+                throw new Exception(get_string('invalidarchivehandle', 'artefact.file'));
+            }
+            foreach ($a as $i) {
+                $name = substr($i->getPathName(), $this->temparchivepathlength + 1);
+                if ($i->isDir()) {
+                    $this->info->foldernames[$name] = 1;
+                    $this->info->names[] = $name;
+                    $this->info->folders++;
 
-        $folder = '';
-        for ($i = 0; $i < count($path) - 1; $i++) {
-            $folder .= $path[$i] . '/';
-            if (!isset($this->foldernames[$folder])) {
-                $this->foldernames[$folder] = 1;
-                $this->info->names[] = $folder;
-                $this->info->folders++;
+                    $this->read_archive_folder($i->getPathName());
+                }
+                else {
+                    $this->info->names[] = $name;
+                    $this->info->files++;
+                    $this->info->totalsize += $i->getCompressedSize();
+                }
             }
         }
-
-        if (!$isfolder) {
-            $this->info->names[] = $name;
-            $this->info->files++;
-            $this->info->totalsize += $size;
+        catch (Exception $e) {
+            throw new ArchiveException(get_string('cannotreadarchivecontent', 'artefact.file') . $e->getMessage());
         }
     }
 
-    public function read_archive() {
-        if (!$this->handle) {
-            $this->open_archive();
+    /**
+     * Read the archive content from a temporary archive file
+     * and update $this->info
+     *
+     * @param Bool $keeptemphandle = true: the temporary file and handle
+     *                                      will NOT be deleted for later use
+     * @return Object archive info
+     * @throws ArchiveException
+     */
+    public function read_archive($keeptemphandle=false) {
+        // In mahara all physical file is stored without extension.
+        // For some reasons, PharData can not properly read a file without extension
+        // We create a temporary file with an extension 'tmp' from the original archive
+        // We will delete the file after read/extract actions
+        $tmparchivepath = self::copy_to_temp($this->get_path());
+        try {
+            $this->handle = new PharData($tmparchivepath, RecursiveDirectoryIterator::KEY_AS_PATHNAME);
+            $this->temparchivepathlength = strlen('phar://' . $tmparchivepath);
         }
-        if ($this->info) {
-            return $this->info;
+        catch (UnexpectedValueException $e) {
+            self::delete_from_temp($tmparchivepath);
+            throw new ArchiveException(get_string('cannotopenarchive', 'artefact.file', $tmparchivepath));
         }
-        $this->info = (object) array(
-            'files'     => 0,
-            'folders'   => 0,
-            'totalsize' => 0,
-            'names'     => array(),
-        );
+        if (empty($this->info)) {
+            $this->info = (object) array(
+                'files'     => 0,
+                'folders'   => 0,
+                'totalsize' => 0,
+                'names'     => array(),
+                'foldernames' => array()
+            );
 
-        $this->foldernames = array();
+            $this->read_archive_folder();
+        }
 
-        if ($this->archivetype == 'zip') {
-            while ($entry = zip_read($this->handle)) {
-                $name = zip_entry_name($entry);
-                $isfolder = substr($name, -1) == '/';
-                $size = $isfolder ? 0 : zip_entry_filesize($entry);
-                $this->read_entry($name, $isfolder, $size);
-            }
+        if (!$keeptemphandle) {
+            // Delete the temporary file
+            self::delete_from_temp($tmparchivepath);
+            $this->handle = null;
+            $this->temparchivepathlength = 0;
         }
-        else if ($this->archivetype == 'tar') {
-            $list = $this->handle->listContent();
-            if (empty($list)) {
-                throw new SystemException("Unknown archive type");
-            }
-            foreach ($list as $entry) {
-                $isfolder = substr($entry['filename'], -1) == '/';
-                $size = $isfolder ? 0 : $entry['size'];
-                $this->read_entry($entry['filename'], $isfolder, $size);
-            }
-        }
-        else {
-            throw new SystemException("Unknown archive type");
-        }
+
         $this->info->displaysize = ArtefactTypeFile::short_size($this->info->totalsize);
         return $this->info;
     }
@@ -2634,13 +2825,7 @@ class ArtefactTypeArchive extends ArtefactTypeFile {
     public function create_folder($folder) {
         $newfolder = new ArtefactTypeFolder(0, $this->data['template']);
         $newfolder->commit();
-        if ($this->archivetype == 'zip') {
-            $folderindex = ($folder == '.' ? ($this->data['template']->title . '/') : ($folder . $this->data['template']->title . '/'));
-        }
-        else {
-            $folderindex = ($folder == '.' ? '' : ($folder . '/')) . $this->data['template']->title;
-        }
-        $this->data['folderids'][$folderindex] = $newfolder->get('id');
+        $this->data['folderids'][$folder] = $newfolder->get('id');
         $this->data['folderscreated']++;
     }
 
@@ -2662,90 +2847,53 @@ class ArtefactTypeArchive extends ArtefactTypeFile {
         $tempdir = get_config('dataroot') . 'artefact/file/temp';
         check_dir_exists($tempdir);
 
-        if ($this->archivetype == 'tar') {
+        $this->read_archive($keeptemphandle=true);
 
-            $this->read_archive();
-
-            // Untar everything into a temp directory first
-            $tempsubdir = tempnam($tempdir, '');
-            unlink($tempsubdir);
-            mkdir($tempsubdir, get_config('directorypermissions'));
-            if (!$this->handle->extract($tempsubdir)) {
-                throw new SystemException("Unable to extract archive into $tempsubdir");
-            }
-
-            $i = 0;
-            foreach ($this->info->names as $name) {
-                $folder = dirname($name);
-                $this->data['template']->parent = $this->data['folderids'][$folder];
-                $this->data['template']->title = basename($name);
-
-                // set the file extension for later use (eg by flowplayer)
-                $this->data['template']->extension = pathinfo($this->data['template']->title, PATHINFO_EXTENSION);
-                $this->data['template']->oldextension = $this->data['template']->extension;
-
-                if (substr($name, -1) == '/') {
-                    $this->create_folder($folder);
-                }
-                else {
-                    ArtefactTypeFile::save_file($tempsubdir . '/' . $name, $this->data['template'], $quotauser, true);
-                    $this->data['filescreated']++;
-                }
-                if ($progresscallback && ++$i % 5 == 0) {
-                    call_user_func($progresscallback, $i);
-                }
-            }
-
-        } else if ($this->archivetype == 'zip') {
-
-            $this->open_archive();
-
-            $tempfile = tempnam($tempdir, '');
-            $i = 0;
-
-            while ($entry = zip_read($this->handle)) {
-                $name = zip_entry_name($entry);
-                $folder = dirname($name);
-
-                // Create parent folders if necessary
-                if (!isset($this->data['folderids'][$folder])) {
-                    $parent = '.';
-                    $child = '';
-                    $path = explode('/', $folder);
-                    for ($i = 0; $i < count($path); $i++) {
-                        $child .= $path[$i] . '/';
-                        if (!isset($this->data['folderids'][$child])) {
-                            $this->data['template']->parent = $this->data['folderids'][$parent];
-                            $this->data['template']->title = $path[$i];
-
-                            $this->create_folder($parent);
-                        }
-                        $parent = $child;
-                    }
-                }
-
-                $this->data['template']->parent = $this->data['folderids'][($folder == '.' ? '.' : ($folder . '/'))];
-                $this->data['template']->title = basename($name);
-
-                // set the file extension for later use (eg by flowplayer)
-                $this->data['template']->extension = pathinfo($this->data['template']->title, PATHINFO_EXTENSION);
-                $this->data['template']->oldextension = $this->data['template']->extension;
-
-                if (substr($name, -1) != '/') {
-                    $h = fopen($tempfile, 'w');
-                    $size = zip_entry_filesize($entry);
-                    $contents = zip_entry_read($entry, $size);
-                    fwrite($h, $contents);
-                    fclose($h);
-
-                    ArtefactTypeFile::save_file($tempfile, $this->data['template'], $quotauser, true);
-                    $this->data['filescreated']++;
-                }
-                if ($progresscallback && ++$i % 5 == 0) {
-                    call_user_func($progresscallback, $i);
-                }
+        // This is a workaround to extract correctly files in an archive using PharData
+        foreach ($this->info->names as $name) {
+            if (empty($this->info->foldernames[$name])) {
+                file_get_contents($this->handle[$name], null, null, 0, 0);
             }
         }
+
+        // Untar everything into a temp directory first
+        $tempsubdir = tempnam($tempdir, '');
+        unlink($tempsubdir);
+        mkdir($tempsubdir, get_config('directorypermissions'));
+        if (!$this->handle->extractTo($tempsubdir)) {
+            throw new ArchiveException(get_string('cannotextractarchive', 'artefact.file', $tempsubdir));
+        }
+
+        if (!$keeptemphandle) {
+            // Delete the temporary file
+            self::delete_from_temp($tmparchivepath);
+            $this->handle = null;
+            $this->temparchivepathlength = 0;
+        }
+
+        // Store extracted folders and files into mahara
+        $i = 0;
+        foreach ($this->info->names as $name) {
+            $this->data['template']->parent = $this->data['folderids'][dirname($name)];
+            $this->data['template']->title = basename($name);
+
+            // set the file extension for later use (eg by flowplayer)
+            $this->data['template']->extension = pathinfo($this->data['template']->title, PATHINFO_EXTENSION);
+            $this->data['template']->oldextension = $this->data['template']->extension;
+
+            if (!empty($this->info->foldernames[$name])) {
+                $this->create_folder($name);
+            }
+            else {
+                ArtefactTypeFile::save_file($tempsubdir . '/' . $name, $this->data['template'], $quotauser, true);
+                $this->data['filescreated']++;
+            }
+
+            if ($progresscallback && ++$i % 5 == 0) {
+                call_user_func($progresscallback, $i);
+            }
+        }
+
         return $this->data;
     }
 
@@ -2794,8 +2942,11 @@ class ArtefactTypeVideo extends ArtefactTypeFile {
                 'wmv'       => 'wmv',
                 'quicktime' => 'quicktime',
                 'sgi_movie' => 'sgi_movie',
-                'mp4_video' => 'mp4_video',
                 'asf'       => 'wmv',
+                'ogv'       => 'ogv',
+                'mp4'       => 'mp4',
+                '3gp'       => '3gp',
+                'webm'      => 'webm',
             );
         }
         return $descriptions;
@@ -2843,7 +2994,6 @@ class ArtefactTypeAudio extends ArtefactTypeFile {
         if (is_null($descriptions)) {
             $descriptions = array(
                 'mp3',
-                'mp4_audio',
                 'mp4',
                 'wav',
                 'ra',
@@ -2851,6 +3001,8 @@ class ArtefactTypeAudio extends ArtefactTypeFile {
                 'aiff',
                 'm3u',
                 'asf',
+                'oga',
+                'ogg',
             );
         }
         return $descriptions;

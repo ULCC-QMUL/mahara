@@ -38,12 +38,10 @@ define('LOG_LEVEL_INFO', 4);
 define('LOG_LEVEL_WARN', 8);
 
 // developermodes,  also bitmaps
-/** inlude debug.js */
-define('DEVMODE_DEBUGJS', 1);
 /** include debug.css */
-define('DEVMODE_DEBUGCSS', 2);
+define('DEVMODE_DEBUGCSS', 1);
 /** include unpacked mochikit */
-define('DEVMODE_UNPACKEDJS', 8);
+define('DEVMODE_UNPACKEDJS', 2);
 // more here.. start at 16 :)
 
 /**#@-*/
@@ -126,7 +124,7 @@ function log_environ ($message, $escape=true, $backtrace=true) {
 function log_message ($message, $loglevel, $escape, $backtrace, $file=null, $line=null, $trace=null) {
     global $SESSION, $CFG;
     if (!$SESSION && function_exists('get_config') && $CFG) {
-        require_once(get_config('docroot') . 'auth/lib.php');
+        require_once(get_config('docroot') . 'auth/session.php');
         $SESSION = Session::singleton();
     }
 
@@ -290,6 +288,7 @@ function log_message ($message, $loglevel, $escape, $backtrace, $file=null, $lin
  * @access private
  */
 function log_build_backtrace($backtrace) {
+    global $CFG;
     $calls = array();
 
     // Remove the call to log_message
@@ -308,6 +307,19 @@ function log_build_backtrace($backtrace) {
 
         $args = '';
         if ($bt['args']) {
+            // Determine whether or not to print the values of the function's
+            // arguments (which may contain sensitive data).
+            // Still always print the values of the "include" pseudofunctions,
+            // though, so the stacktrace will make sense.
+            $showvalues = ($CFG->log_backtrace_print_args === true || in_array(
+                    $bt['function'],
+                    array(
+                        'require',
+                        'include',
+                        'require_once',
+                        'include_once'
+                    )
+            ));
             foreach ($bt['args'] as $arg) {
                 if (!empty($args)) {
                     $args .= ', ';
@@ -315,11 +327,21 @@ function log_build_backtrace($backtrace) {
                 switch (gettype($arg)) {
                     case 'integer':
                     case 'double':
-                        $args .= $arg;
+                        if ($showvalues) {
+                            $args .= $arg;
+                        }
+                        else {
+                            $args .= (gettype($arg));
+                        }
                         break;
                     case 'string':
-                        $arg = substr($arg, 0, 50) . ((strlen($arg) > 50) ? '...' : '');
-                        $args .= '"' . $arg . '"';
+                        if ($showvalues) {
+                            $arg = substr($arg, 0, 50) . ((strlen($arg) > 50) ? '...' : '');
+                            $args .= '"' . $arg . '"';
+                        }
+                        else {
+                            $args .= 'string(size ' . strlen($arg) . ')';
+                        }
                         break;
                     case 'array':
                         $args .= 'array(size ' . count($arg) . ')';
@@ -425,6 +447,14 @@ function censor_password_parameters(&$backtraceline) {
  * @todo this function should go away
  */
 function die_info($message) {
+
+    // Produce JSON output
+    if (defined('JSON')) {
+        $e = new SystemException($message);
+        $e->handle_exception();
+        exit;
+    }
+
     $smarty = smarty(array(), array(), array(), array('sidebars' => false));
     $smarty->assign('message', $message);
     $smarty->assign('type', 'info');
@@ -501,17 +531,16 @@ function error ($code, $message, $file, $line, $vars) {
  * @access private
  */
 function exception ($e) {
-    global $USER;
-    if ($USER) {
-        if (!($e instanceof MaharaException) || get_class($e) == 'MaharaException') {
-            log_warn("An exception was thrown of class " . get_class($e) . ". \nTHIS IS BAD "
-                     . "and should be changed to something extending MaharaException,\n"
-                     . "unless the exception is from a third party library.\n"
-                     . "Original trace follows", true, false);
-            log_message($e->getMessage(), LOG_LEVEL_WARN, true, true, $e->getFile(), $e->getLine(), $e->getTrace());
-            $e = new SystemException($e->getMessage());
-            $e->set_log_off();
-        }
+    $classname = get_class($e);
+    if (!($e instanceof MaharaException)) {
+        $e = new SystemException("[{$classname}]: " . $e->getMessage(), $e->getCode());
+    }
+    else if ($classname == 'MaharaException') {
+        // Mahara coding practice says not to use MaharaException directly, but for more
+        // graceful error handling we have chosen not to make it abstract. Instead, make
+        // it print like a SystemException.
+        /* @var MaharaException $e */
+        $e = new SystemException($e->getMessage(), $e->getCode());
     }
 
     // Display the message and die
@@ -519,25 +548,25 @@ function exception ($e) {
 }
 
 
-interface MaharaThrowable {
-
-    public function render_exception();
-
-}
-
-// Standard exceptions  - top level exception class.
-// all exceptions should extend one of these three.
 
 /**
- * Very top of the tree for exceptions in Mahara.
- * Nothing should extend this directly.
- * Contains a few helper functions for all exceptions.
+ * Generic Mahara exception. Use a more specific exception class where possible, because
+ * this one doesn't print its message very gracefully. "SystemException" is a good
+ * generic one.
+ *
+ * I'd make this an abstract class... except that inexperienced devs are likely to
+ * attempt to instantiate it anyway, and if they do so, PHP will throw a fatal error
+ * that won't become apparent until the rare occasion when an exception actually happens.
  */
 class MaharaException extends Exception {
 
     protected $log = true;
+    const DEFAULT_ERRCODE = 500;
 
-    public function __construct($message='', $code=0) {
+    public function __construct($message='', $code=null) {
+        if ($code === null) {
+            $code = static::DEFAULT_ERRCODE;
+        }
         parent::__construct($message, $code);
         if (!defined('MAHARA_CRASHING')) {
             define('MAHARA_CRASHING', true);
@@ -587,6 +616,32 @@ class MaharaException extends Exception {
         return $this->getMessage();
     }
 
+    /**
+     * Returns an array that will be JSON-encoded,
+     * for when there's an exception in a script
+     * that should give a JSON response.
+     */
+    public function render_json_exception() {
+        return array(
+            'error' => true,
+            'error_number' => $this->getCode(),
+            'error_name' => $this->get_error_name(),
+            'error_class' => get_class($this),
+            'error_message' => $this->getMessage(),
+            'error_rendered' => $this->render_exception()
+        );
+    }
+
+    /**
+     * A machine-readable, non-localized name for this error.
+     * (Defaults to the name of the exception class.)
+     *
+     * @return string
+     */
+    public function get_error_name() {
+        return get_class($this);
+    }
+
     public final function handle_exception() {
 
         if (!empty($this->log)) {
@@ -596,7 +651,7 @@ class MaharaException extends Exception {
         if (defined('JSON')) { // behave differently
             @header('Content-type: text/plain');
             @header('Pragma: no-cache');
-            echo json_encode(array('error' => true, 'message' => $this->render_exception()));
+            echo json_encode($this->render_json_exception());
             exit;
         }
 
@@ -633,7 +688,9 @@ class MaharaException extends Exception {
             catch (Exception $e) {
                 // If an exception is thrown in smarty(), ignore it
                 // and print the message out the ugly way
-                log_warn("Exception thrown by smarty call while handling exception");
+                log_debug("Exception thrown by smarty call while handling exception:\n".
+                        '[' . get_class($e) . ']: ' . $e->getMessage(), true, false
+                );
             }
         }
 
@@ -691,11 +748,13 @@ EOF;
 
 
 
+// Standard exceptions  - top level exception class.
+// all exceptions should extend one of these three.
 
 /**
  * SystemException - this is basically a bug in the system.
  */
-class SystemException extends MaharaException implements MaharaThrowable {
+class SystemException extends MaharaException {
 
     public function __construct($message, $code=0) {
         parent::__construct($message, $code);
@@ -718,7 +777,7 @@ class SystemException extends MaharaException implements MaharaThrowable {
  * ConfigException - something is misconfigured that's causing a problem.
  * Generally these will be the fault of admins
  */
-class ConfigException extends MaharaException  implements MaharaThrowable {
+class ConfigException extends MaharaException {
 
     public function render_exception () {
         return $this->get_string('message') . "\n\n" . $this->getMessage();
@@ -736,9 +795,10 @@ class ConfigException extends MaharaException  implements MaharaThrowable {
 /**
  * UserException - the user has done something they shouldn't (or tried to)
  */
-class UserException extends MaharaException implements MaharaThrowable {
+class UserException extends MaharaException {
 
     protected $log = false;
+    const DEFAULT_ERRCODE = 400;
 
     public function render_exception() {
         return $this->get_string('message') . "\n\n" . $this->getMessage();
@@ -757,6 +817,7 @@ class UserException extends MaharaException implements MaharaThrowable {
  * that doesn't exist
  */
 class NotFoundException extends UserException {
+    const DEFAULT_ERRCODE = 404;
     public function strings() {
         return array_merge(parent::strings(),
                            array('message' => get_string('notfoundexception', 'error'),
@@ -797,6 +858,22 @@ class SQLException extends SystemException {
         if (empty($DB_IGNORE_SQL_EXCEPTIONS) && !defined('TESTSRUNNING')) {
             log_warn($this->getMessage());
         }
+    }
+
+    /**
+     * Returns an array that will be JSON-encoded,
+     * for when there's an exception in a script
+     * that should give a JSON response.
+     */
+    public function render_json_exception() {
+        return array(
+            'error' => true,
+            'error_number' => $this->getCode(),
+            'error_name' => $this->get_error_name(),
+            'error_class' => get_class($this),
+            'error_message' => get_config('productionmode') ? '' : $this->getMessage(),
+            'error_rendered' => get_config('productionmode') ? '' : $this->render_exception(),
+        );
     }
 }
 
@@ -936,6 +1013,7 @@ class SkinNotFoundException extends NotFoundException {}
  * Exception - Access denied. Throw this if a user is trying to view something they can't
  */
 class AccessDeniedException extends UserException {
+    const DEFAULT_ERRCODE = 403;
     public function strings() {
         return array_merge(parent::strings(),
                            array('message' => get_string('accessdeniedexception', 'error'),
@@ -995,6 +1073,7 @@ class GroupAccessDeniedException extends AccessDeniedException {
  * as the administrator
  */
 class AccessTotallyDeniedException extends UserException {
+    const DEFAULT_ERRCODE = 403;
     public function strings() {
         return array_merge(parent::strings(),
                            array('message' => get_string('accessdeniedexception', 'error'),
@@ -1037,6 +1116,20 @@ class ExportException extends SystemException {
         parent::__construct($message, $code);
     }
 
+    public function render_exception() {
+        return $this->getMessage();
+    }
+}
+
+/**
+ * An exception related to read/write/extract archive artefact
+ */
+class ArchiveException extends SystemException {
+    public function strings() {
+        return array_merge(parent::strings(),
+                array('message' => get_string('invalidarchive1', 'artefact.file'),
+                    'title'   => get_string('invalidarchive1', 'artefact.file')));
+    }
     public function render_exception() {
         return $this->getMessage();
     }

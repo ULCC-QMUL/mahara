@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('group.php');
 $groupid = param_integer('id');
 $returnto = param_alpha('returnto', 'mygroups');
@@ -81,7 +80,8 @@ function requestjoingroup_submit(Pieform $form, $values) {
         else {
             $message = get_string_from_language($adminlang, 'grouprequestmessage', 'group', display_name($USER, get_record('usr', 'id', $groupadmin)), $group->name);
         }
-        activity_occurred('maharamessage', array(
+        activity_occurred('groupmessage', array(
+            'group'   => $group->id,
             'users'   => array($groupadmin),
             'subject' => get_string_from_language($adminlang, 'grouprequestsubject', 'group'),
             'message' => $message,

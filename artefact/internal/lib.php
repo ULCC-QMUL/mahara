@@ -613,7 +613,6 @@ class ArtefactTypeProfile extends ArtefactType {
         }
 
         $form = array(
-            'class'     => 'panel panel-body',
             'elements'   => array(
                 'mandatory' =>  array(
                     'title'        => get_string('mandatoryfields', 'artefact.internal'),
@@ -789,8 +788,14 @@ class ArtefactTypeEmail extends ArtefactTypeProfileField {
 
 class ArtefactTypeStudentid extends ArtefactTypeCachedProfileField {}
 class ArtefactTypeIntroduction extends ArtefactTypeProfileField {
+    public function commit() {
+        $this->set('description', $this->title);
+        $this->set('title', 'introduction');
+        parent::commit();
+    }
+
     public function render_self($options) {
-        return array('html' => clean_html($this->title), 'javascript' => null);
+        return array('html' => clean_html($this->description), 'javascript' => null);
     }
 }
 class ArtefactTypeWebAddress extends ArtefactTypeProfileField {
@@ -924,8 +929,8 @@ class ArtefactTypeHtml extends ArtefactType {
             foreach ($artefactcopies[$oldid]->oldembeds as $a) {
                 if (isset($artefactcopies[$a])) {
                     // Change the old image id to the new one
-                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '(&|&amp;)embedded=1(.*?"[^>]+)#';
-                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2embedded=1$3';
+                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '([^0-9])#';
+                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2';
                 }
             }
             require_once('embeddedimage.php');

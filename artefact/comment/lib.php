@@ -15,7 +15,8 @@ require_once('activity.php');
 require_once('license.php');
 
 define('MIN_RATING', 1);
-define('MAX_RATING', 5);
+$maxrating = get_config_plugin('artefact', 'comment', 'ratinglength');
+define('MAX_RATING', $maxrating ? $maxrating : 5);
 
 function valid_rating($ratingstr) {
     if (empty($ratingstr)) {
@@ -86,7 +87,7 @@ class PluginArtefactComment extends PluginArtefact {
         if (!$artefacts = get_column_sql("
             SELECT artefact
             FROM {artefact_comment_comment}
-            WHERE deletedby IS NULL AND onview IN (" . join(',', array_map('intval', $viewids)) . ')', array())) {
+            WHERE deletedby IS NULL AND hidden=0 AND onview IN (" . join(',', array_map('intval', $viewids)) . ')', array())) {
             return array();
         }
         if ($attachments = get_column_sql('
@@ -102,7 +103,7 @@ class PluginArtefactComment extends PluginArtefact {
         if (!$artefacts = get_column_sql("
             SELECT artefact
             FROM {artefact_comment_comment}
-            WHERE deletedby IS NULL AND onartefact IN (" . join(',', $artefactids) . ')', array())) {
+            WHERE deletedby IS NULL AND hidden=0 AND onartefact IN (" . join(',', $artefactids) . ')', array())) {
             return array();
         }
         if ($attachments = get_column_sql('
@@ -141,7 +142,7 @@ class PluginArtefactComment extends PluginArtefact {
         return array(
             (object)array(
                     'name' => 'feedback',
-                    'title' => get_string('placefeedback', 'artefact.comment'),
+                    'title' => get_string('addcomment', 'artefact.comment'),
                     'plugin' => 'comment',
                     'active' => true,
                     'iscountable' => true,
@@ -181,6 +182,7 @@ class ArtefactTypeComment extends ArtefactType {
     protected $rating;
     protected $lastcontentupdate;
     protected $threadedposition;
+    protected $hidden;
 
     public function __construct($id = 0, $data = null) {
         parent::__construct($id, $data);
@@ -235,6 +237,7 @@ class ArtefactTypeComment extends ArtefactType {
             'requestpublic' => $this->get('requestpublic'),
             'rating'        => $this->get('rating'),
             'threadedposition'        => $this->get('threadedposition'),
+            'hidden'        => $this->get('hidden'),
         );
         if ($this->get('lastcontentupdate')) {
             $data->lastcontentupdate = db_format_timestamp($this->get('lastcontentupdate'));
@@ -375,9 +378,17 @@ class ArtefactTypeComment extends ArtefactType {
             $artefactid = $artefact->get('id');
         }
         else {
-            $canedit = $USER->can_moderate_view($view);
-            $owner = $view->get('owner');
-            $isowner = $userid && $userid == $owner;
+            if ($group = $view->get('group')) {
+                $group_admins = group_get_admin_ids($group);
+                $canedit = (array_search($userid, $group_admins) !== false) ? true : false;
+                $owner = null;
+                $isowner = null;
+            }
+            else {
+                $canedit = $USER->can_moderate_view($view);
+                $owner = $view->get('owner');
+                $isowner = $userid && $userid == $owner;
+            }
             $artefactid = null;
         }
 
@@ -403,11 +414,12 @@ class ArtefactTypeComment extends ArtefactType {
             'data'     => array(),
         );
 
+        $where = 'c.hidden = 0';
         if (!empty($artefactid)) {
-            $where = 'c.onartefact = ' . (int)$artefactid;
+            $where .= ' AND c.onartefact = ' . (int)$artefactid;
         }
         else {
-            $where = 'c.onview = ' . (int)$viewid;
+            $where .= ' AND c.onview = ' . (int)$viewid;
         }
         if (!$canedit) {
             $where .= ' AND (';
@@ -442,7 +454,7 @@ class ArtefactTypeComment extends ArtefactType {
             // If pagination is in use, see if we want to get a page with particular comment
             if ($limit) {
                 if ($showcomment == 'last') {
-                    // If we have limit (pagination is used) ignore $offset and just get the last page of feedback.
+                    // If we have limit (pagination is used) ignore $offset and just get the last page of comments.
                     $result->forceoffset = $offset = (ceil($result->count / $limit) - 1) * $limit;
                 }
                 else if (is_numeric($showcomment)) {
@@ -522,7 +534,7 @@ class ArtefactTypeComment extends ArtefactType {
             $result->data = array_values($comments);
         }
 
-        // check to see if the feedback is to be displayed in a block instance
+        // check to see if the comments are to be displayed in a block instance
         // or the base of the page
         $result->position = 'base';
         $blocks = get_records_array('block_instance', 'view', $viewid);
@@ -623,7 +635,7 @@ class ArtefactTypeComment extends ArtefactType {
             return get_records_sql_assoc('
                 SELECT c.onview, COUNT(c.artefact) AS comments
                 FROM {artefact_comment_comment} c
-                WHERE c.onview IN (' . join(',', array_map('intval', $viewids)) . ') AND c.deletedby IS NULL
+                WHERE c.onview IN (' . join(',', array_map('intval', $viewids)) . ') AND c.deletedby IS NULL AND c.hidden=0
                 GROUP BY c.onview',
                 array()
             );
@@ -632,7 +644,7 @@ class ArtefactTypeComment extends ArtefactType {
             return get_records_sql_assoc('
                 SELECT c.onartefact, COUNT(c.artefact) AS comments
                 FROM {artefact_comment_comment} c
-                WHERE c.onartefact IN (' . join(',', array_map('intval', $artefactids)) . ') AND c.deletedby IS NULL
+                WHERE c.onartefact IN (' . join(',', array_map('intval', $artefactids)) . ') AND c.deletedby IS NULL AND c.hidden=0
                 GROUP BY c.onartefact',
                 array()
             );
@@ -651,7 +663,7 @@ class ArtefactTypeComment extends ArtefactType {
         $newest = get_records_sql_array('
             SELECT a.id, a.ctime
             FROM {artefact} a INNER JOIN {artefact_comment_comment} c ON a.id = c.artefact
-            WHERE c.private = 0 AND ' . $where . '
+            WHERE c.private = 0 AND c.hidden = 0 AND ' . $where . '
             ORDER BY a.ctime DESC', $values, 0, 1
         );
         return $newest[0];
@@ -721,7 +733,6 @@ class ArtefactTypeComment extends ArtefactType {
     public static function build_html(&$data, $onview) {
         global $USER, $THEME;
 
-        require_once('pieforms/pieform.php');
         $candelete = $data->canedit || $USER->get('admin');
         $deletedmessage = array();
         foreach (self::deleted_messages() as $k => $v) {
@@ -733,9 +744,11 @@ class ArtefactTypeComment extends ArtefactType {
         foreach ($data->data as &$item) {
 
             $item->ts = strtotime($item->ctime);
-            $item->date = format_date($item->ts, 'strftimedatetime');
+            $timelapse = format_timelapse($item->ts);
+            $item->date = ($timelapse) ? $timelapse : format_date($item->ts, 'strftimedatetime');
             if ($item->ts < strtotime($item->lastcontentupdate)) {
-                $item->updated = format_date(strtotime($item->lastcontentupdate), 'strftimedatetime');
+                $timelapseupdated = format_timelapse(strtotime($item->lastcontentupdate));
+                $item->updated = ($timelapseupdated) ? $timelapseupdated : format_date(strtotime($item->lastcontentupdate), 'strftimedatetime');
             }
             $item->isauthor = $item->author && $item->author == $USER->get('id');
             if (!empty($item->attachments)) {
@@ -855,12 +868,16 @@ class ArtefactTypeComment extends ArtefactType {
         }
 
         $smarty = smarty_core();
-        $smarty->assign_by_ref('data', $data->data);
+        $smarty->assign('data', $data->data);
         $smarty->assign('canedit', $data->canedit);
         $smarty->assign('position', $data->position);
         $smarty->assign('viewid', $data->view);
         $smarty->assign('baseurl', $data->baseurl);
         $smarty->assign('onview', $onview);
+        $icon = get_config_plugin('artefact', 'comment', 'ratingicon');
+        $smarty->assign('star', $icon ? $icon : 'star');
+        $colour = get_config_plugin('artefact', 'comment', 'ratingcolour');
+        $smarty->assign('colour', $colour ? $colour : '#DBB80E');
 
         $data->tablerows = $smarty->fetch('artefact:comment:commentlist.tpl');
 
@@ -925,10 +942,8 @@ class ArtefactTypeComment extends ArtefactType {
         );
         if (get_config_plugin('artefact', 'comment', 'commentratings')) {
             $form['elements']['rating'] = array(
-                'type'  => 'radio',
+                'type'  => 'ratings',
                 'title' => get_string('rating', 'artefact.comment'),
-                'options' => array('1' => '', '2' => '', '3' => '', '4' => '', '5' => ''),
-                'class' => 'star',
             );
         }
         $form['elements']['ispublic'] = array(
@@ -997,7 +1012,8 @@ class ArtefactTypeComment extends ArtefactType {
     public static function delete_comment_form($id) {
         global $THEME;
         return array(
-            'name'     => 'delete_comment',
+            'name'     => 'delete_comment' . $id,
+            'successcallback' => 'delete_comment_submit',
             'renderer' => 'div',
             'class' => 'form-as-button pull-left delete-comment btn-group-item',
             'elements' => array(
@@ -1072,6 +1088,10 @@ class ArtefactTypeComment extends ArtefactType {
     }
 
     public static function get_config_options() {
+        $length = get_config_plugin('artefact', 'comment', 'ratinglength');
+        $length = empty($length) ? 5 : $length;
+        $colour = get_config_plugin('artefact', 'comment', 'ratingcolour');
+        $colour = empty($colour) ? '#DBB80E' : $colour;
         $elements =  array(
             'commentratings' => array(
                 'type'  => 'switchbox',
@@ -1079,17 +1099,58 @@ class ArtefactTypeComment extends ArtefactType {
                 'defaultvalue' => get_config_plugin('artefact', 'comment', 'commentratings'),
                 'help'  => true,
             ),
+            'ratingicon' => array(
+                'type' => 'select',
+                'title' => get_string('ratingicons', 'artefact.comment'),
+                'defaultvalue' => get_config_plugin('artefact', 'comment', 'ratingicon'),
+                'options' => array(
+                    'star' => get_string('star', 'artefact.comment'),
+                    'heart' => get_string('heart', 'artefact.comment'),
+                    'thumbs-up' => get_string('thumbsup', 'artefact.comment'),
+                    'check-circle' => get_string('ok', 'artefact.comment'),
+                ),
+            ),
+            'ratinglength' => array(
+                'type' => 'select',
+                'title' => get_string('ratinglength', 'artefact.comment'),
+                'defaultvalue' => $length,
+                'options' => array(
+                    '3' => '3',
+                    '4' => '4',
+                    '5' => '5',
+                    '6' => '6',
+                    '7' => '7',
+                    '8' => '8',
+                    '9' => '9',
+                    '10' => '10',
+                    '11' => '11',
+                    '12' => '12',
+                ),
+            ),
+            'ratingcolour' => array(
+                'type' => 'color',
+                'title' => get_string('ratingcolour', 'artefact.comment'),
+                'defaultvalue' => $colour,
+                'description' => get_string('ratingcolourdesc', 'artefact.comment'),
+            ),
+            'ratingexample' => array(
+                'type'  => 'ratings',
+                'title' => get_string('ratingexample', 'artefact.comment'),
+                'readonly' => true,
+                'defaultvalue' => ceil($length / 2),
+                'iconempty' => true,
+                'officon' => 'dummy',
+            ),
         );
         return array(
-            'name'     => 'commentconfig',
             'elements' => $elements,
-            'class'    => 'panel panel-body',
-            'renderer' => 'div'
         );
     }
 
     public static function save_config_options(Pieform $form, $values) {
-        foreach (array('commentratings') as $settingname) {
+        $valid = array('commentratings', 'ratingicon', 'ratinglength',
+                       'ratingcolour');
+        foreach ($valid as $settingname) {
             set_config_plugin('artefact', 'comment', $settingname, $values[$settingname]);
         }
     }
@@ -1126,6 +1187,93 @@ class ArtefactTypeComment extends ArtefactType {
         }
         else {
             return array();
+        }
+    }
+
+    /**
+     * Determine whether there are visible comments below this one. This determines
+     * whether or not we need to keep a "comment deleted" placeholder to provide
+     * context if we delete this comment.
+     *
+     * @return boolean
+     */
+    public function has_visible_descendants() {
+        $sql = 'SELECT 1 FROM {artefact_comment_comment} acc INNER JOIN {artefact} a ON acc.artefact = a.id WHERE ';
+        $params = array();
+        if ($this->get('onview')) {
+            $sql .= 'acc.onview = ?';
+            $params[] = $this->get('onview');
+        }
+        else {
+            $sql .= 'acc.onartefact = ?';
+            $params[] = $this->get('onartefact');
+        }
+        $sql .= ' AND acc.hidden = 0 AND (a.parent = ?';
+        $params[] = $this->get('id');
+
+        // If this is a top-level comment, we also need to check whether there are
+        // any other comments below it that aren't its direct children.
+        if (!$this->get('parent')) {
+            $sql .= ' OR acc.threadedposition > ?';
+            $params[] = $this->get('threadedposition');
+        }
+
+        $sql .= ')';
+        return record_exists_sql($sql, $params);
+    }
+
+    /**
+     * Recursively check all the ancestors of a hidden comment to see if they
+     * too now meet the criteria to be hidden.
+     */
+    public function hide_deleted_parents() {
+
+        // If this comment is in a thread, first traverse up the thread.
+        $parentid = $this->get('parent');
+        while ($parentid) {
+            $parent = new ArtefactTypeComment($parentid);
+            if ($parent->get('deletedby') && !$parent->has_visible_descendants()) {
+                if (!$parent->get('hidden')) {
+                    $parent->set('hidden', 1);
+                    $parent->commit();
+                }
+                $parentid = $parent->get('parent');
+                unset($parent);
+            }
+            else {
+                break;
+            }
+        }
+
+        // Now we're at top-level (or unthreaded) comments, so we traverse up
+        // the threadedposition order.
+        $where = 'hidden = 0 AND threadedposition < ?';
+        $params = array($this->get('threadedposition'));
+        if ($this->get('onview')) {
+            $where .= ' AND onview = ?';
+            $params[] = $this->get('onview');
+        }
+        else {
+            $where .= ' AND onartefact = ?';
+            $params[] = $this->get('onartefact');
+        }
+        $prev = get_records_select_array('artefact_comment_comment', $where, $params, 'threadedposition DESC', 'artefact');
+        if ($prev) {
+            foreach ($prev as $c) {
+                $parent = new ArtefactTypeComment($c->artefact);
+                if ($parent->get('deletedby') && !$parent->has_visible_descendants()) {
+                    // Already hidden. (Maybe a fluke?)
+                    if ($parent->get('hidden')) {
+                        continue;
+                    }
+                    $parent->set('hidden', 1);
+                    $parent->commit();
+                    unset($parent);
+                }
+                else {
+                    break;
+                }
+            }
         }
     }
 }
@@ -1247,6 +1395,7 @@ function make_public_submit(Pieform $form, $values) {
     redirect($url);
 }
 
+
 function delete_comment_submit(Pieform $form, $values) {
     global $SESSION, $USER, $view;
     require_once('embeddedimage.php');
@@ -1274,7 +1423,18 @@ function delete_comment_submit(Pieform $form, $values) {
     db_begin();
 
     $comment->set('deletedby', $deletedby);
+
+    if (!$comment->has_visible_descendants()) {
+        $comment->set('hidden', 1);
+    }
+
     $comment->commit();
+
+    // If this comment was hidden, check to see if its parent now also needs to be
+    // hidden (i.e. has no visible replies). And then its grandparent, etc
+    if ($comment->get('hidden')) {
+        $comment->hide_deleted_parents();
+    }
 
     if ($deletedby != 'author') {
         // Notify author
@@ -1360,7 +1520,8 @@ function add_feedback_form_validate(Pieform $form, $values) {
                 acc.private,
                 a.author,
                 p.author as grandparentauthor,
-                acc.deletedby
+                acc.deletedby,
+                acc.hidden
             FROM
                 {artefact} a
                 INNER JOIN {artefact_comment_comment} acc
@@ -1379,7 +1540,7 @@ function add_feedback_form_validate(Pieform $form, $values) {
         }
 
         // Can't reply to a deleted comment
-        if ($parent->deletedby) {
+        if ($parent->deletedby || $parent->hidden) {
             $form->set_error('message', get_string('replytodeletednotallowed', 'artefact.comment'));
         }
 
@@ -1580,7 +1741,7 @@ function add_feedback_form_submit(Pieform $form, $values) {
             'parent'        => $folderid,
             'description'   => get_string_from_language(
                 $ownerlang,
-                'feedbackonviewbyuser',
+                'commentonviewbyuser',
                 'artefact.comment',
                 $view->get('title'),
                 display_name($USER)
@@ -1650,15 +1811,15 @@ function add_feedback_form_submit(Pieform $form, $values) {
 
     // If you're anonymous and your message is moderated or private, then you won't
     // be able to tell what happened to it. So we'll provide some more explanation in
-    // the feedback message.
+    // the comment message.
     if ($anonymous && $moderated) {
-        $message = get_string('feedbacksubmittedmoderatedanon', 'artefact.comment');
+        $message = get_string('commentsubmittedmoderatedanon', 'artefact.comment');
     }
     else if ($anonymous && $private) {
-        $message = get_string('feedbacksubmittedprivateanon', 'artefact.comment');
+        $message = get_string('commentsubmittedprivateanon', 'artefact.comment');
     }
     else {
-        $message = get_string('feedbacksubmitted', 'artefact.comment');
+        $message = get_string('commentsubmitted', 'artefact.comment');
     }
 
     $form->reply(PIEFORM_OK, array(
@@ -1692,7 +1853,7 @@ class ActivityTypeArtefactCommentFeedback extends ActivityTypePlugin {
 
         $this->overridemessagecontents = true;
 
-        if ($onartefact = $comment->get('onartefact')) { // feedback on artefact
+        if ($onartefact = $comment->get('onartefact')) { // comment on artefact
             $userid = null;
             require_once(get_config('docroot') . 'artefact/lib.php');
             $artefactinstance = artefact_instance_from_id($onartefact);
@@ -1705,7 +1866,7 @@ class ActivityTypeArtefactCommentFeedback extends ActivityTypePlugin {
                 $this->url = 'artefact/artefact.php?artefact=' . $onartefact . '&view=' . $this->viewid;
             }
         }
-        else { // feedback on view.
+        else { // comment on page.
             $onview = $comment->get('onview');
             if (!$viewrecord = get_record('view', 'id', $onview)) {
                 throw new ViewNotFoundException(get_string('viewnotfound', 'error', $onview));
@@ -1816,7 +1977,7 @@ class ActivityTypeArtefactCommentFeedback extends ActivityTypePlugin {
 
         $this->strings = (object) array(
             'subject' => (object) array(
-                'key'     => 'newfeedbacknotificationsubject',
+                'key'     => 'newcommentnotificationsubject',
                 'section' => 'artefact.comment',
                 'args'    => array($title),
             ),

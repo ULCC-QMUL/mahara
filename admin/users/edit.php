@@ -16,7 +16,6 @@ require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('accountsettings', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
-require_once('pieforms/pieform.php');
 require_once('activity.php');
 require_once(get_config('docroot') . 'lib/antispam.php');
 
@@ -32,7 +31,8 @@ if (!$USER->is_admin_for_user($user)) {
 
 if ($user->deleted) {
     $smarty = smarty();
-    $smarty->assign('PAGEHEADING', TITLE . ': ' . display_name($user));
+    $smarty->assign('PAGEHEADING', display_name($user));
+    $smarty->assign('SUBSECTIONHEADING', TITLE);
     $smarty->assign('message', get_string('thisuserdeleted', 'admin'));
     $smarty->display('message.tpl');
     exit;
@@ -399,10 +399,10 @@ function edituser_site_submit(Pieform $form, $values) {
         }
         $notified = get_field('usr_account_preference', 'value', 'field', 'quota_exceeded_notified', 'usr', $user->id);
         if ($overlimit && '1' !== $notified) {
-            require_once(get_config('docroot') . 'artefact/file/lib.php');
+            safe_require('artefact', 'file');
             ArtefactTypeFile::notify_users_threshold_exceeded(array($user), false);
             // no need to email admin as we can alert them right now
-            $SESSION->add_error_msg(get_string('useroverquotathreshold', 'artefact.file', display_name($user)));
+            $SESSION->add_error_msg(get_string('useroverquotathreshold', 'artefact.file', display_name($user), ceil((int) $user->quotausedpercent), display_size($user->quota)));
         }
         else if ($notified && !$overlimit) {
             set_account_preference($user->id, 'quota_exceeded_notified', false);
@@ -926,7 +926,8 @@ $smarty->assign('institutions', count($allinstitutions) > 1);
 $smarty->assign('institutionform', $institutionform);
 
 $smarty->assign('loginas', $id != $USER->get('id') && is_null($USER->get('parentuser')));
-$smarty->assign('PAGEHEADING', TITLE . ': ' . display_name($user));
+$smarty->assign('PAGEHEADING', display_name($user));
+$smarty->assign('SUBSECTIONHEADING', TITLE);
 
 # Only allow deletion and suspension of a user if the viewed user is not
 # the current user; or if they are the current user, they're not the only

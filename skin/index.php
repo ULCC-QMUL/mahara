@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'index');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once('skin.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('myskins', 'skin'));
 
 if (!can_use_skins()) {
@@ -82,7 +81,6 @@ $smarty->assign('id', $id);
 $smarty->assign('metadata', $metadata);
 $smarty->assign('filter', $filter);
 $smarty->assign('pagination', $pagination['html']);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('skin/index.tpl');
 
 function filter_submit(Pieform $form, $values) {

@@ -17,6 +17,7 @@ define('TITLE', get_string('usersearch', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'usersearch');
+define('IGNORE_FETCH_REMOTE_AVATAR', 1);
 require_once('searchlib.php');
 
 $search = (object) array(
@@ -28,6 +29,7 @@ $search = (object) array(
     'loggedin'       => param_alpha('loggedin', 'any'),
     'loggedindate'   => param_variable('loggedindate', strftime(get_string('strftimedatetimeshort'))),
     'duplicateemail' => param_boolean('duplicateemail', false),
+    'authname'       => param_alpha('authname', null),
 );
 
 $offset  = param_integer('offset', 0);
@@ -67,7 +69,7 @@ $calendar = array(
         'showsTime'      => true,
     ),
 );
-$calendarform = new Pieform(array(
+$calendarform = pieform_instance(array(
     'name' => 'loggedinform',
     'elements' => array(
         'loggedindate' => $calendar,
@@ -104,5 +106,4 @@ $smarty->assign('searchurl', $search['url']);
 $smarty->assign('sortby', $search['sortby']);
 $smarty->assign('sortdir', $search['sortdir']);
 $smarty->assign('INLINEJAVASCRIPT', $js);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/search.tpl');

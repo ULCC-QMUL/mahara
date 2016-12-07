@@ -15,12 +15,11 @@ define('SECTION_PLUGINNAME', 'view');
 define('SECTION_PAGE', 'editaccess');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('pieforms/pieform/elements/calendar.php');
 require_once(get_config('libroot') . 'view.php');
 require_once(get_config('libroot') . 'collection.php');
 require_once(get_config('libroot') . 'group.php');
-
+define('SUBSECTIONHEADING', get_string('share'));
 $collection = null;
 if ($collectionid = param_integer('collection', null)) {
     $collection = new Collection($collectionid);
@@ -48,7 +47,7 @@ $group = $view->get('group');
 $institution = $view->get('institution');
 View::set_nav($group, $institution, true);
 
-if (!$USER->can_edit_view($view) || $view->get('owner') == "0") {
+if (!$USER->can_edit_view($view)) {
     throw new AccessDeniedException();
 }
 if ($group && !group_within_edit_window($group)) {
@@ -81,6 +80,15 @@ if ($view->get('type') != 'profile') {
     list($collections, $views) = View::get_views_and_collections(
         $view->get('owner'), $group, $institution, false, false
     );
+
+    if ($institution === 'mahara') {
+        // Remove site templates from the list
+        foreach ($views as $k => $v) {
+            if ((int)$v['template'] === View::SITE_TEMPLATE) {
+                unset($views[$k]);
+            }
+        }
+    }
 }
 
 if (!empty($collections) || !empty($views)) {
@@ -166,19 +174,19 @@ $form['elements']['more'] = array(
         'allowcomments' => array(
             'type'         => 'switchbox',
             'title'        => get_string('allowcomments','artefact.comment'),
-            'description'  => get_string('allowcommentsonview','view'),
+            'description'  => get_string('allowcommentsonview1','view'),
             'defaultvalue' => $view->get('allowcomments'),
         ),
         'approvecomments' => array(
             'type'         => 'switchbox',
             'title'        => get_string('moderatecomments', 'artefact.comment'),
-            'description'  => get_string('moderatecommentsdescription', 'artefact.comment'),
+            'description'  => get_string('moderatecommentsdescription1', 'artefact.comment'),
             'defaultvalue' => $view->get('approvecomments'),
         ),
         'template' => array(
             'type'         => 'switchbox',
             'title'        => get_string('allowcopying', 'view'),
-            'description'  => get_string('templatedescriptionplural1', 'view'),
+            'description'  => get_string('templatedescriptionplural2', 'view'),
             'defaultvalue' => $view->get('template'),
         ),
     ),
@@ -199,7 +207,7 @@ if ($institution) {
         $form['elements']['more']['elements']['copynewuser'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('copyfornewusers', 'view'),
-            'description'  => get_string('copyfornewusersdescription1', 'view'),
+            'description'  => get_string('copyfornewusersdescription2', 'view'),
             'defaultvalue' => $view->get('copynewuser'),
         );
         $form['elements']['more']['elements']['copyfornewgroups'] = array(
@@ -226,7 +234,7 @@ if ($institution) {
         $form['elements']['more']['elements']['copynewuser'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('copyfornewmembers', 'view'),
-            'description'  => get_string('copyfornewmembersdescription1', 'view', $instname),
+            'description'  => get_string('copyfornewmembersdescription2', 'view', $instname),
             'defaultvalue' => $view->get('copynewuser'),
         );
     }
@@ -234,7 +242,7 @@ if ($institution) {
     $form['elements']['more']['elements']['retainview'] = array(
         'type'         => 'switchbox',
         'title'        => get_string('retainviewrights1', 'view'),
-        'description'  => $group ? get_string('retainviewrightsgroupdescription1', 'view') : get_string('retainviewrightsdescription1', 'view'),
+        'description'  => $group ? get_string('retainviewrightsgroupdescription2', 'view') : get_string('retainviewrightsdescription2', 'view'),
         'defaultvalue' => $view->get('template') && $view->get('retainview'),
     );
     $js .= <<< EOF
@@ -404,19 +412,32 @@ function editaccess_validate(Pieform $form, $values) {
                 break;
             }
 
-            if ($item['type'] == 'loggedin' && !$item['startdate'] && !$item['stopdate']) {
+            if ($item['type'] == 'loggedin' && empty($item['startdate']) && empty($item['stopdate'])) {
                 $loggedinaccess = true;
             }
 
             $now = time();
-            if ($item['stopdate'] && $now > $item['stopdate']) {
+            if (!empty($item['stopdate']) && $now > $item['stopdate']) {
                 $SESSION->add_error_msg(get_string('newstopdatecannotbeinpast', 'view', $accesstypestrings[$item['type']]));
                 $form->set_error('accesslist', '');
                 break;
             }
-            if ($item['startdate'] && $item['stopdate'] && $item['startdate'] > $item['stopdate']) {
+            if (!empty($item['startdate']) && !empty($item['stopdate']) && $item['startdate'] > $item['stopdate']) {
                 $SESSION->add_error_msg(get_string('newstartdatemustbebeforestopdate', 'view', $accesstypestrings[$item['type']]));
                 $form->set_error('accesslist', '');
+                break;
+            }
+            // $values['startdate'] and $values['stopdate'] from override
+            // check if there is a conflict
+            if (($item['startdate'] && $values['startdate'] && $item['startdate'] < $values['startdate'])
+                ||
+                ($item['stopdate'] && $values['stopdate'] && $values['stopdate'] < $item['stopdate'])
+                ||
+                ($item['stopdate'] && $values['startdate'] && $item['stopdate'] < $values['startdate'])
+                ||
+                ($item['startdate'] && $values['stopdate'] && $values['stopdate'] < $item['startdate'])
+            ) {
+                $SESSION->add_error_msg(get_string('overrideconflict', 'view', $accesstypestrings[$item['type']]));
                 break;
             }
         }
@@ -530,7 +551,7 @@ function editaccess_submit(Pieform $form, $values) {
         }
     }
 
-    $SESSION->add_ok_msg(get_string('updatedaccessfornumviews', 'view', count($toupdate)));
+    $SESSION->add_ok_msg(get_string('updatedaccessfornumviews1', 'view', count($toupdate)));
 
     if ($view->get('owner')) {
         redirect('/view/share.php');
@@ -557,8 +578,6 @@ $smarty = smarty(
     array('sidebars' => false)
 );
 $smarty->assign('INLINEJAVASCRIPT', $js);
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign('subsectionheading', get_string('share'));
 $smarty->assign('form', $form);
 $smarty->assign('shareurl', $shareurl);
 $smarty->assign('group', $group);

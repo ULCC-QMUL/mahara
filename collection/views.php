@@ -16,7 +16,6 @@ define('SECTION_PLUGINNAME', 'collection');
 define('SECTION_PAGE', 'views');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('collection.php');
 require_once('view.php');
 
@@ -40,6 +39,8 @@ if ($accesschanged = $SESSION->get('pageaccesschanged')) {
     }
     $alertstr = substr($alertstr, 0, -1) . '.';
     $alertstr = get_string('viewsaddedtocollection1', 'collection', $SESSION->get('pagesadded')) . ' ' . $alertstr;
+    $hassecreturl = $SESSION->get('hassecreturl');
+    $alertstr .= ($hassecreturl) ? get_string('viewaddedsecreturl', 'collection') : '';
     $inlinejs = <<<EOF
 jQuery(function($) {
     var message = $('<div id="changestatusline" class="alert alert-dismissible alert-warning" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button><p>$alertstr</p></div>');
@@ -48,6 +49,7 @@ jQuery(function($) {
 EOF;
     $SESSION->set('pageaccesschanged', false);
     $SESSION->set('pagesadded', false);
+    $SESSION->set('hassecreturl', false);
 }
 $owner = $collection->get('owner');
 $groupid = $collection->get('group');
@@ -57,7 +59,7 @@ if (!empty($groupid)) {
     define('MENUITEM', 'groups/collections');
     define('GROUP', $groupid);
     $group = group_current_group();
-    define('TITLE', $group->name . ' - ' . get_string('editcollection', 'collection'));
+    define('TITLE', $group->name . ' - ' . get_string('editviews', 'collection'));
     $urlparams['group'] = $groupid;
 }
 else if (!empty($institutionname)) {
@@ -69,14 +71,14 @@ else if (!empty($institutionname)) {
         define('INSTITUTIONALADMIN', 1);
         define('MENUITEM', 'manageinstitutions/institutioncollections');
     }
-    define('TITLE', get_string('editcollection', 'collection'));
+    define('TITLE', get_string('editviews', 'collection'));
     $urlparams['institution'] = $institutionname;
 }
 else {
     define('MENUITEM', 'myportfolio/collection');
-    define('TITLE', get_string('editcollection', 'collection'));
+    define('TITLE', get_string('editviews', 'collection'));
 }
-define('SUBTITLE', $collection->get('name'). ': ' . get_string('editviews', 'collection'));
+define('SUBSECTIONHEADING', $collection->get('name'));
 $baseurl = get_config('wwwroot') . 'collection/index.php';
 if ($urlparams) {
     $baseurl .= '?' . http_build_query($urlparams);
@@ -160,23 +162,13 @@ $noviewsavailable = get_string('noviewsavailable', 'collection');
 $smarty = smarty(array('jquery','js/jquery/jquery-ui/js/jquery-ui.min.js','js/jquery/jquery-ui/js/jquery-ui.touch-punch.min.js', 'manage-collection-pages'));
 setpageicon($smarty, 'icon-folder-open');
 
-if (!empty($groupid)) {
-
-    $smarty->assign('PAGESUBHEADING', SUBTITLE);
-    $smarty->assign('PAGEHELPNAME', '0');
-    $smarty->assign('SUBPAGEHELPNAME', '1');
-}
-else {
-    $smarty->assign('PAGEHEADING', SUBTITLE);
-}
-
 $smarty->assign('id', $id);
 $smarty->assign('INLINEJAVASCRIPT', $inlinejs);
 $smarty->assign('baseurl', $baseurl);
 $smarty->assign('displayurl', get_config('wwwroot') . 'collection/views.php?id=' . $id);
 $smarty->assign('removeurl', get_config('wwwroot') . 'collection/deleteview.php?id=' . $id);
-$smarty->assign_by_ref('views', $views);
-$smarty->assign_by_ref('viewsform', $viewsform);
+$smarty->assign('views', $views);
+$smarty->assign('viewsform', $viewsform);
 $smarty->display('collection/views.tpl');
 
 function addviews_validate(Pieform $form, $values) {
@@ -247,22 +239,34 @@ function addviews_submit(Pieform $form, $values) {
         }
     }
     $count = $collection->add_views($values);
+    // Check if the collection has a secret url token for any of the existing views
+    $hassecreturl = false;
+    if (!empty(array_merge($differentarray, $viewids))) {
+        if (count_records_sql("SELECT token FROM {view_access} WHERE view IN (" . join(',', array_merge($differentarray, $viewids)) . ") AND (token IS NOT NULL AND token !='')")) {
+            $hassecreturl = true;
+        }
+    }
+
     if ($collectiondifferent) {
         $differentarray = array_merge($differentarray, $viewids);
     }
     if ($different) {
         $SESSION->set('pageaccesschanged', $differentarray);
         $SESSION->set('pagesadded', $count);
+        $SESSION->set('hassecreturl', $hassecreturl);
     }
     else {
         $SESSION->add_ok_msg(get_string('viewsaddedtocollection1', 'collection', $count));
+        if ($hassecreturl) {
+            $SESSION->add_error_msg(get_string('viewaddedsecreturl', 'collection'));
+        }
     }
-    redirect('/collection/views.php?id='.$collection->get('id'));
+    redirect('/collection/views.php?id=' . $collection->get('id'));
 }
 
 function removeview_submit(Pieform $form, $values) {
     global $SESSION, $collection;
     $collection->remove_view((int)$values['view']);
     $SESSION->add_ok_msg(get_string('viewremovedsuccessfully','collection'));
-    redirect('/collection/views.php?id='.$collection->get('id'));
+    redirect('/collection/views.php?id=' . $collection->get('id'));
 }

@@ -16,7 +16,6 @@ define('SECTION_PLUGINNAME', 'account');
 define('SECTION_PAGE', 'institutions');
 require(dirname(dirname(__FILE__)) . '/init.php');
 define('TITLE', get_string('institutionmembership'));
-require_once('pieforms/pieform.php');
 
 $institutions = get_records_assoc('institution', '', '', '', 'name,displayname,registerallowed');
 
@@ -236,5 +235,4 @@ $smarty->assign('memberform', $memberform);
 $smarty->assign('requestedform', $requestedform);
 $smarty->assign('invitedform', $invitedform);
 $smarty->assign('joinform', $joinform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('account/institutions.tpl');

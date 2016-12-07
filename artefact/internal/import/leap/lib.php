@@ -393,7 +393,8 @@ class LeapImportInternal extends LeapImportArtefactPlugin {
             switch ($entrydata['type']) {
                 case 'introduction':
                     $introduction = new ArtefactTypeIntroduction(0, array('owner' => $importer->get('usr')));
-                    $introduction->set('title', $entrydata['content']['title']);
+                    $introduction->set('title', 'introduction');
+                    $introduction->set('description', $entrydata['content']['title']);
                     $introduction->commit();
                     $artefactmapping[(string)$entry->id] = array($introduction->get('id'));
                     break;
@@ -1179,8 +1180,8 @@ class LeapImportInternal extends LeapImportArtefactPlugin {
             $profilegroups[] = $profilegroup;
         }
         $smarty = smarty_core();
-        $smarty->assign_by_ref('displaydecisions', $importer->get('displaydecisions'));
-        $smarty->assign_by_ref('profilegroups', $profilegroups);
+        $smarty->assign('displaydecisions', $importer->get('displaydecisions'));
+        $smarty->assign('profilegroups', $profilegroups);
         return $smarty->fetch('artefact:internal:import/profilefields.tpl');
     }
 

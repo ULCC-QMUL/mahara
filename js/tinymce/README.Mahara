@@ -2,7 +2,7 @@ TinyMCE
 ========
 
 Website: http://tinymce.moxiecode.com/
-Version: 4.1.9
+Version: 4.3.3
 
 Based on development version
 
@@ -15,3 +15,5 @@ Changes:
  * Added code to spellchecker/spellchecker.rpc to use $CFG->spellcheckerengine
  * Adjusted the charmap plugin to contain Māori macrons
  * Adding the 'aria-hidden="true"' to presentation icons
+ * Bug 1605110: Modified the "table" plugin to style the table through CSS instead of HTML attributes
+ * Add TinyMCE imagebrowser plugin: plugins/imagebrowser/plugin.js

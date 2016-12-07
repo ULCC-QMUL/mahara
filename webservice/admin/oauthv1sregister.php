@@ -11,14 +11,13 @@
 
 define('INTERNAL', 1);
 define('ADMIN', 1);
-define('MENUITEM', 'configextensions/webservices/oauthconfig');
+define('MENUITEM', 'webservices/oauthconfig');
 define('SECTION_PAGE', 'oauth');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 
 define('TITLE', get_string('webservices_title', 'auth.webservice'));
+define('SUBSECTIONHEADING', get_string('oauthv1sregister', 'auth.webservice'));
 
-
-require_once('pieforms/pieform.php');
 require_once(get_config('docroot') . 'webservice/libs/oauth-php/OAuthServer.php');
 require_once(get_config('docroot') . 'webservice/libs/oauth-php/OAuthStore.php');
 OAuthStore::instance('Mahara');
@@ -133,7 +132,7 @@ function webservice_oauth_server_submit(Pieform $form, $values) {
     redirect('/webservice/admin/oauthv1sregister.php');
 }
 
-$pieform = new Pieform($form);
+$pieform = pieform_instance($form);
 $form = $pieform->build(false);
 
 $smarty = smarty();
@@ -141,11 +140,7 @@ setpageicon($smarty, 'icon-puzzle-piece');
 safe_require('auth', 'webservice');
 PluginAuthWebservice::menu_items($smarty, 'webservice/oauthconfig');
 $smarty->assign('form', $form);
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign('subsectionheading',  get_string('oauthv1sregister', 'auth.webservice'));
 
-$webservice_menu = PluginAuthWebservice::admin_menu_items();
-$smarty->assign('SUBPAGENAV', $webservice_menu);
 $smarty->display('form.tpl');
 
 function webservice_main_submit(Pieform $form, $values) {
@@ -173,10 +168,15 @@ function webservice_server_edit_form($dbserver, $sopts, $iopts) {
                     ),
                 ),
             );
-
+    $server_details['elements']['consumer_key_html'] = array(
+        'title'        => get_string('consumer_key', 'auth.webservice'),
+        'type'         => 'html',
+        'value'        => $dbserver->consumer_key,
+    );
     $server_details['elements']['consumer_secret'] = array(
         'title'        => get_string('consumer_secret', 'auth.webservice'),
-        'value'        =>  $dbserver->consumer_secret,
+        'type'         => 'html',
+        'value'        => $dbserver->consumer_secret,
     );
 
     $server_details['elements']['application_title'] = array(
@@ -220,7 +220,7 @@ function webservice_server_edit_form($dbserver, $sopts, $iopts) {
     $server_details['elements']['enabled'] = array(
         'title'        => get_string('enabled'),
         'defaultvalue' => (($dbserver->enabled == 1) ? 'checked' : ''),
-        'type'         => 'checkbox',
+        'type'         => 'switchbox',
         'disabled'     => true,
     );
 
@@ -250,7 +250,6 @@ function webservice_server_edit_form($dbserver, $sopts, $iopts) {
             'token_details' => array(
                     'type' => 'fieldset',
                     'class' => 'with-padding',
-                    'legend' => get_string('serverkey', 'auth.webservice', $dbserver->consumer_key),
                     'elements' => array(
                         'sflist' => array(
                             'value' =>     pieform($server_details),
@@ -442,7 +441,7 @@ function webservice_server_list_form($sopts, $iopts) {
                 'class' => 'webserviceconfigcontrols btn-group icon-cell',
             );
         }
-        $pieform = new Pieform($form);
+        $pieform = pieform_instance($form);
         $form = $pieform->build(false);
     }
 

@@ -18,18 +18,10 @@ define('SECTION_PAGE', 'onlineusers');
 
 $offset = param_integer('offset', 0);
 $limit  = param_integer('limit', 10);
-$userlimit = get_account_preference($USER->get('id'), 'viewsperpage');
-if ($limit > 0 && $limit != $userlimit) {
-    $USER->set_account_preference('viewsperpage', $limit);
-}
-else {
-    $limit = $userlimit;
-}
 $data = get_onlineusers($limit, $offset);
 build_onlinelist_html($data, 'online');
 
 $smarty = smarty(array('paginator'));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('lastminutes', floor(get_config('accessidletimeout') / 60));
 $smarty->assign('data', $data);
 $smarty->display('user/online.tpl');

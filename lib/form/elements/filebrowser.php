@@ -10,7 +10,7 @@
  */
 
 defined('INTERNAL') || die();
-
+define('FILEBROWSERS', 1);
 /**
  * Browser for files area.
  *
@@ -158,7 +158,14 @@ function pieform_element_filebrowser(Pieform $form, $element) {
     $filters = isset($element['filters']) ? $element['filters'] : null;
     $filedata = ArtefactTypeFileBase::get_my_files_data($folder, $userid, $group, $institution, $filters);
     $smarty->assign('filelist', $filedata);
-
+    // Only allow 'Download folder content as zip' link if theres some kind of content (file or subfolder with content)
+    $addzipdownloadlink = false;
+    foreach ($filedata as $k => $v) {
+        if (empty($v->isparent) && ($v->artefacttype != 'folder' || ($v->artefacttype == 'folder' && !empty($v->childcount)))) {
+            $addzipdownloadlink = true;
+        }
+    }
+    $smarty->assign('downloadfolderaszip', $addzipdownloadlink);
     $configstr = json_encode($config);
     $fileliststr = json_encode($filedata);
 
@@ -180,7 +187,13 @@ function pieform_element_filebrowser(Pieform $form, $element) {
 
     $initjs .= "addLoadEvent({$prefix}.init);";
     $initjs .= "upload_max_filesize = '" . get_real_size(ini_get('upload_max_filesize')) . "';";
-
+    if ($form->is_submitted() && $form->has_errors()) {
+        // need to reapply bootstrap file browser stuff
+        $initjs .= "jQuery('.js-filebrowser').each(function() {";
+        $initjs .= "  jQuery(this).wrapInner('<div class=\"modal-dialog modal-lg\"><div class=\"modal-content modal-filebrowser\"></div></div>');";
+        $initjs .= "  jQuery(this).modal('hide');";
+        $initjs .= "});";
+    }
     $smarty->assign('initjs', $initjs);
     $smarty->assign('querybase', $element['page'] . (strpos($element['page'], '?') === false ? '?' : '&'));
 
@@ -305,6 +318,14 @@ function pieform_element_filebrowser_build_filelist($form, $element, $folder, $h
 
     $filters = isset($element['filters']) ? $element['filters'] : null;
     $filedata = ArtefactTypeFileBase::get_my_files_data($folder, $userid, $group, $institution, $filters);
+    // Only allow 'Download folder content as zip' link if theres some kind of content (file or subfolder with content)
+    $addzipdownloadlink = false;
+    foreach ($filedata as $k => $v) {
+        if (empty($v->isparent) && ($v->artefacttype != 'folder' || ($v->artefacttype == 'folder' && !empty($v->childcount)))) {
+            $addzipdownloadlink = true;
+        }
+    }
+    $smarty->assign('downloadfolderaszip', $addzipdownloadlink);
 
     $switchwidth = ArtefactTypeFileBase::get_switch_width();
 
@@ -561,7 +582,7 @@ function pieform_element_filebrowser_doupdate(Pieform $form, $element) {
             'artefact'    => $artefactid,
             'title'       => $edit_title,
             'description' => param_variable($prefix . '_edit_description'),
-            'tags'        => param_variable($prefix . '_edit_tags'),
+            'tags'        => param_variable($prefix . '_edit_tags', ''),
             'folder'      => $element['folder'],
             'allowcomments' => param_boolean($prefix . '_edit_allowcomments'),
         );
@@ -1169,7 +1190,7 @@ function pieform_element_filebrowser_update(Pieform $form, $element, $data) {
     $artefact->set('allowcomments', (int) $data['allowcomments']);
 
     $oldtags = $artefact->get('tags');
-    $newtags = preg_split("/\s*,\s*/", trim($data['tags']));
+    $newtags = $data['tags'];
     $updatetags = $oldtags != $newtags;
     if ($updatetags) {
         $artefact->set('tags', $newtags);

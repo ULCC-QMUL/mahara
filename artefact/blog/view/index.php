@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'view');
 require(dirname(dirname(dirname(dirname(__FILE__)))) . '/init.php');
 
 safe_require('artefact', 'blog');
-require_once(get_config('libroot') . 'pieforms/pieform.php');
 if (!PluginArtefactBlog::is_active()) {
     throw new AccessDeniedException(get_string('plugindisableduser', 'mahara', get_string('Blog','artefact.blog')));
 }
@@ -75,7 +74,7 @@ if ($institutionname === false) {
     exit;
 }
 if ($groupid) {
-    $subsectionheading = $title;
+    define('SUBSECTIONHEADING', $title);
     define('TITLE', $group->name);
 }
 else {
@@ -211,11 +210,8 @@ else if (!$USER->get_account_preference('multipleblogs')) {
     }
 }
 
-$smarty->assign_by_ref('blog', $blog);
-$smarty->assign_by_ref('posts', $posts);
-if (!empty($subsectionheading)) {
-    $smarty->assign('subsectionheading', $subsectionheading);
-}
+$smarty->assign('blog', $blog);
+$smarty->assign('posts', $posts);
 $smarty->display('artefact:blog:view.tpl');
 exit;
 

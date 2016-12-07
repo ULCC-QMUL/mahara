@@ -103,6 +103,21 @@ class BehatForms extends BehatBase {
         $this->getSession()->executeScript("jQuery('#{$field}').val({$values}).trigger('change');");
     }
     /**
+     * Clears the Select2 field
+     *
+     * @When /^(?:|I )clear value "(?P<textValues>(?:[^"]|\\")*)" from select2 field "(?P<field>(?:[^"]|\\")*)"$/
+     */
+    public function iClearSelect2Field($textValues, $field) {
+        $page = $this->getSession()->getPage();
+        foreach(preg_split('/,\s*/', $textValues) as $value) {
+            $option = $page->find('xpath', '//select[@id="' . $field . '"]//option[text()="' . $value . '"]');
+            $value = $option->getAttribute('value');
+            $value = json_encode($value);
+            $this->getSession()->executeScript("jQuery('#{$field} option[value=" . $value . "]').remove();");
+        }
+        $this->getSession()->executeScript("jQuery('#{$field}').trigger('change');");
+    }
+    /**
      * Fill Select2 input field
      *
      * @When /^(?:|I )fill in select2 input "(?P<field>(?:[^"]|\\")*)" with "(?P<value>(?:[^"]|\\")*)"$/
@@ -160,6 +175,7 @@ class BehatForms extends BehatBase {
         $select2Input->postValue(array('value' => array($value)));
         $this->getSession()->wait(10000, "(jQuery('#select2-{$field}-results .loading-results').length === 0)");
     }
+
     /**
      * Select value in choice list
      *
@@ -396,6 +412,27 @@ class BehatForms extends BehatBase {
     }
 
     /**
+     * Checks if a field is present
+     *
+     * @When /^I should not see the field "(?P<fieldlabel>(?:[^"]|\\")*)"$/
+     *
+     * @param string $fieldlabel the label of the field
+     * @throws ExpectationException
+     */
+    public function field_not_found($fieldlabel) {
+        $fieldlocator = $this->unescapeDoubleQuotes($fieldlabel);
+        try {
+            $field = BehatFieldManager::get_form_field_from_label($fieldlocator, $this);
+            // Field exists so we need to thow exception
+            throw new ExpectationException(
+                "The '" . $fieldlabel . "' field exists, expected to be absent", $this->getSession());
+        }
+        catch (ElementNotFoundException $fieldexception) {
+            // field doesn't exist so all is good
+        }
+    }
+
+    /**
      * Generic field setter.
      *
      * Internal API method, a generic *I set "VALUE" to "FIELD" field*
@@ -408,6 +445,7 @@ class BehatForms extends BehatBase {
     protected function set_field_value($fieldlocator, $value) {
 
         $fieldlocator = $this->unescapeDoubleQuotes($fieldlocator);
+        $value = $this->escapeDoubleQuotes($value);
         $field = BehatFieldManager::get_form_field_from_label($fieldlocator, $this);
         $field->set_value($value);
     }
@@ -506,4 +544,92 @@ class BehatForms extends BehatBase {
         }
     }
 
+    /**
+     * Fills in TinyMCE editor with specified label.
+     *
+     * @Given /^(?:|I )fill in "(?P<text>[^"]*)" in editor "(?P<fieldlabel>[^"]*)"$/
+     */
+    public function iFillInWYSIWYGEditor($text, $fieldlabel) {
+        $exception = new ElementNotFoundException($this->getSession(), 'field', null, $fieldlabel);
+        $label = $this->find('xpath', "//div[contains(concat(' ', normalize-space(@class), ' '), ' wysiwyg ')]//label[contains(normalize-space(.), " . $fieldlabel . ")]", $exception);
+        $id = $label->getAttribute('for');
+        $iframe = $id . '_ifr';
+
+        // Use javascript to update the tinyMCE editor
+        if ($this->find('xpath', "//iframe[@id='" . $iframe . "']")) {
+            $this->getSession()->executeScript("tinymce.get('" . $id . "').setContent('" . $text . "');");
+        }
+        else {
+            throw new ElementNotFoundException("TinyMCE with label '" . $fieldlabel);
+        }
+    }
+
+    /**
+     * Fills in first TinyMCE editor on the page.
+     *
+     * @Given /^(?:|I )fill in "(?P<text>[^"]*)" in first editor$/
+     */
+    public function iFillInFirstWYSIWYGEditor($text) {
+        $iframe = $this->find('css', '.mce-edit-area > iframe')->getAttribute('id');
+        $id = substr($iframe, 0, -4); // remove '_ifr'
+        // Use javascript to update the tinyMCE editor
+        if ($this->find('xpath', "//iframe[@id='" . $iframe . "']")) {
+            $this->getSession()->executeScript("tinymce.get('" . $id . "').setContent('" . $text . "');");
+        }
+        else {
+            throw new \NotFoundException("TinyMCE not found on this page");
+        }
+    }
+
+    /**
+     * Click a button in the TinyMCE editor toolbar
+     *
+     * @Given I click the :action button in the editor
+     */
+    public function i_click_button_editor_toolbar($action) {
+        $exception = new ElementNotFoundException($this->getSession(), 'button', null, 'the action button "' . $action . '" in the editor toolbar');
+
+        $actionbutton = $this->find('css', "div.wysiwyg div[aria-label='" . $action . "'] > button", $exception);
+        $this->ensure_node_is_visible($actionbutton);
+        $actionbutton->click();
+    }
+
+    /**
+     * Press a submit button with a confirm event attached
+     *
+     * @When /^I press and confirm "(?P<fieldlabel>(?:[^"]|\\")*)"$/
+     * @param string $button The submit element name
+     */
+    public function i_press_and_confirm($fieldlabel) {
+        $textliteral = $this->escaper->escapeLiteral($fieldlabel);
+        $exception = new ElementNotFoundException($this->getSession(), 'field', null, $textliteral);
+        $xpath = "//button[@type='submit']" .
+                 "//span[normalize-space(.)=" . $textliteral . "]";
+        $deletenode = $this->find('xpath', $xpath, $exception);
+        $this->ensure_node_is_visible($deletenode);
+        $deletenode->press();
+        $this->getSession()->getDriver()->getWebDriverSession()->accept_alert();
+    }
+
+    /**
+     * Tick the radio button
+     *
+     * @When /^I select the radio "(?P<fieldlabel>(?:[^"]|\\")*)"$/
+     * @param string $fieldlabel the label of the field
+     * @throws ElementNotFoundException
+     */
+    public function i_check_radio($fieldlabel) {
+        $textliteral = $this->escaper->escapeLiteral($fieldlabel);
+        $page = $this->getSession()->getPage();
+        foreach ($page->findAll('css', 'label') as $label) {
+            if ($textliteral === "'" . $label->getText() . "'" ||
+                $textliteral === $this->escaper->escapeLiteral(preg_replace('/"/', '\"', $label->getHtml()))) {
+                $radioButton = $page->find('css', '#' . $label->getAttribute('for'));
+                $radioButton->click();
+                return;
+            }
+
+        }
+        throw new ElementNotFoundException($this->getSession(), 'form field', 'id|name|label|value', $textliteral);
+    }
 }

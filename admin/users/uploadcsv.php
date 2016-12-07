@@ -14,9 +14,7 @@ define('INSTITUTIONALADMIN', 1);
 define('MENUITEM', 'configusers/uploadcsv');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('uploadcsv', 'admin'));
-require_once('pieforms/pieform.php');
 require_once('institution.php');
-require_once('phpmailer/class.phpmailer.php');
 safe_require('artefact', 'internal');
 
 // Turn on autodetecting of line endings, so mac newlines (\r) will work
@@ -291,7 +289,7 @@ function uploadcsv_validate(Pieform $form, $values) {
             // Duplicate email within this file.
             $csverrors->add($i, get_string('uploadcsverroremailaddresstaken', 'admin', $i, $email));
         }
-        else if (!PHPMailer::ValidateAddress($email)) {
+        else if (!sanitize_email($email)) {
             $csverrors->add($i, get_string('uploadcsverrorinvalidemail', 'admin', $i, $email));
         }
         else if (!$values['updateusers']) {
@@ -636,5 +634,4 @@ $smarty = smarty(array('adminuploadcsv'));
 setpageicon($smarty, 'icon-user');
 $smarty->assign('uploadcsvpagedescription', $uploadcsvpagedescription);
 $smarty->assign('uploadcsvform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/uploadcsv.tpl');

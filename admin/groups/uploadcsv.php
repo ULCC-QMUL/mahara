@@ -14,7 +14,6 @@ define('INSTITUTIONALADMIN', 1);
 define('MENUITEM', 'managegroups/uploadcsv');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('uploadgroupcsv', 'admin'));
-require_once('pieforms/pieform.php');
 require_once(get_config('libroot') . 'group.php');
 require_once(get_config('libroot') . 'institution.php');
 safe_require('artefact', 'internal');
@@ -23,28 +22,8 @@ safe_require('artefact', 'internal');
 ini_set('auto_detect_line_endings', 1);
 
 $FORMAT = array();
-$ALLOWEDKEYS = array(
-    'shortname',
-    'displayname',
-    'description',
-    'open',
-    'controlled',
-    'request',
-    'roles',
-    'public',
-    'submitpages',
-    'allowarchives',
-    'editroles',
-    'hidden',
-    'hidemembers',
-    'hidemembersfrommembers',
-    'invitefriends',
-    'suggestfriends',
-);
-if ($USER->get('admin')) {
-    $ALLOWEDKEYS[] = 'usersautoadded';
-    $ALLOWEDKEYS[] = 'quota';
-}
+$ALLOWEDKEYS = group_get_allowed_group_csv_keys();
+
 $MANDATORYFIELDS = array(
     'shortname',
     'displayname',
@@ -71,7 +50,7 @@ $form = array(
             'type' => 'switchbox',
             'class' => 'last',
             'title' => get_string('updategroups', 'admin'),
-            'description' => get_string('updategroupsdescription1', 'admin'),
+            'description' => get_string('updategroupsdescription2', 'admin'),
             'defaultvalue' => false,
         ),
         'progress_meter_token' => array(
@@ -166,18 +145,31 @@ function uploadcsv_validate(Pieform $form, $values) {
             $editroles = $line[$formatkeylookup['editroles']];
         }
 
+        // Make sure these three mandatory fields are populated.
+        if (empty($shortname)) {
+            $csverrors->add($i, get_string('uploadcsverrormandatoryfieldnotspecified', 'admin', $i, 'shortname'));
+        }
+        if (empty($displayname)) {
+            $csverrors->add($i, get_string('uploadcsverrormandatoryfieldnotspecified', 'admin', $i, 'displayname'));
+        }
+        if (empty($grouptype)) {
+            $csverrors->add($i, get_string('uploadcsverrormandatoryfieldnotspecified', 'admin', $i, 'roles'));
+        }
+
         if (!preg_match('/^[a-zA-Z0-9_.-]{2,255}$/', $shortname)) {
             $csverrors->add($i, get_string('uploadgroupcsverrorinvalidshortname', 'admin', $i, $shortname));
         }
 
         if (isset($shortnames[$shortname])) {
             // Duplicate shortname within this file.
-            $csverrors->add($i, get_string('uploadgroupcsverrorshortnamealreadytaken', 'admin', $i, $shortname));
+            $validshortname = group_generate_shortname($displayname);
+            $csverrors->add($i, get_string('uploadgroupcsverrorshortnamealreadytaken1', 'admin', $i, $shortname, $validshortname));
         }
         else if (!$values['updategroups']) {
             // The groupname must be new
-            if (record_exists('group', 'shortname', $shortname, 'institution', $institution)) {
-                $csverrors->add($i, get_string('uploadgroupcsverrorshortnamealreadytaken', 'admin', $i, $shortname));
+            if (record_exists('group', 'shortname', $shortname)) {
+                $validshortname = group_generate_shortname($displayname);
+                $csverrors->add($i, get_string('uploadgroupcsverrorshortnamealreadytaken1', 'admin', $i, $shortname, $validshortname));
             }
         }
         else if ($values['updategroups']) {
@@ -196,12 +188,12 @@ function uploadcsv_validate(Pieform $form, $values) {
 
         if (isset($displaynames[strtolower($displayname)])) {
             // Duplicate displayname within this file
-            $csverrors->add($i, get_string('uploadgroupcsverrorsgroupnamealreadyexists', 'admin', $i, $displayname));
+            $csverrors->add($i, get_string('uploadgroupcsverrordisplaynamealreadyexists', 'admin', $i, $displayname));
         }
         else if (!$values['updategroups']) {
             // The displayname must be new
             if (get_records_sql_array('SELECT id FROM {group} WHERE LOWER(TRIM(name)) = ?', array(strtolower(trim($displayname))))) {
-                $csverrors->add($i, get_string('uploadgroupcsverrorgroupnamealreadyexists', 'admin', $i, $displayname));
+                $csverrors->add($i, get_string('uploadgroupcsverrordisplaynamealreadyexists', 'admin', $i, $displayname));
             }
         }
         else {
@@ -215,7 +207,7 @@ function uploadcsv_validate(Pieform $form, $values) {
                         $shortname,
                         $institution
                     ))) {
-                $csverrors->add($i, get_string('uploadgroupcsverrorgroupnamealreadyexists', 'admin', $i, $displayname));
+                $csverrors->add($i, get_string('uploadgroupcsverrordisplaynamealreadyexists', 'admin', $i, $displayname));
             }
         }
         $displaynames[strtolower($displayname)] = 1;
@@ -249,7 +241,7 @@ function uploadcsv_validate(Pieform $form, $values) {
     }
 
     if ($errors = $csverrors->process()) {
-        $form->set_error('file', clean_html($errors));
+        $form->set_error('file', clean_html($errors), false);
         return;
     }
 
@@ -302,11 +294,16 @@ function uploadcsv_submit(Pieform $form, $values) {
                 $group->submittableto = $record[$formatkeylookup[$field]];
                 continue;
             }
+            if ($field == 'quota') {
+                $group->quota = get_real_size($record[$formatkeylookup[$field]]);
+                continue;
+            }
             $group->{$field} = $record[$formatkeylookup[$field]];
         }
 
         if (!$values['updategroups'] || !isset($UPDATES[$group->shortname])) {
             $group->members = array($USER->id => 'admin');
+            $group->retainshortname = true;
             $group->id = group_create((array)$group);
 
             $addedgroups[] = $group;
@@ -382,5 +379,4 @@ $smarty = smarty(array('adminuploadcsv'));
 setpageicon($smarty, 'icon-users');
 $smarty->assign('uploadcsvpagedescription', $uploadcsvpagedescription);
 $smarty->assign('uploadcsvform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/groups/uploadcsv.tpl');

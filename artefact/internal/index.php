@@ -17,7 +17,6 @@ define('SECTION_PAGE', 'index');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('profile','artefact.internal'));
-require_once('pieforms/pieform.php');
 safe_require('artefact', 'internal');
 
 $fieldset = param_alpha('fs', 'aboutme');
@@ -32,7 +31,12 @@ $profile_data = get_records_select_array('artefact', "owner=? AND artefacttype I
 
 if ($profile_data) {
     foreach ($profile_data as $field) {
-        $profilefields[$field->artefacttype] = $field->title;
+        if ($field->artefacttype == 'introduction') {
+            $profilefields[$field->artefacttype] = $field->description;
+        }
+        else {
+            $profilefields[$field->artefacttype] = $field->title;
+        }
     }
 }
 
@@ -234,9 +238,8 @@ function profileform_validate(Pieform $form, $values) {
     }
 
     if (isset($values['email']['unsent']) && is_array($values['email']['validated'])) {
-        require_once('phpmailer/class.phpmailer.php');
         foreach ($values['email']['unsent'] as $email) {
-            if (!PHPMailer::ValidateAddress($email)) {
+            if (!sanitize_email($email)) {
                 $form->set_error('email', get_string('invalidemailaddress', 'artefact.internal') . ': ' . hsc($email));
                 break;
             }
@@ -385,6 +388,7 @@ function profileform_submit(Pieform $form, $values) {
                         'id' => $USER->get('id'),
                     )
                 );
+                delete_records('usr_password_request', 'usr', $USER->get('id'));
                 $USER->email = $values['email']['default'];
                 $USER->commit();
             }
@@ -445,7 +449,7 @@ function profileform_reply($form, $code, $message) {
 }
 
 
-$smarty = smarty(array('tabs'), array(), array(
+$smarty = smarty(array(), array(), array(
     'mahara' => array(
         'cannotremovedefaultemail',
         'emailtoolong',
@@ -459,7 +463,6 @@ $smarty = smarty(array('tabs'), array(), array(
 ));
 
 $smarty->assign('profileform', $profileform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('artefact:internal:index.tpl');
 
 

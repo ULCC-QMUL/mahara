@@ -32,6 +32,14 @@ if (param_integer('finished', 0)) {
     redirect();
 }
 
+// Check if we have come via browser and have the right urlsecret
+if (php_sapi_name() != 'cli' && get_config('urlsecret') !== null) {
+    $urlsecret = param_alphanumext('urlsecret', -1);
+    if ($urlsecret !== get_config('urlsecret')) {
+        die_info(get_string('accessdeniednourlsecret', 'error'));
+    }
+}
+
 $smarty = smarty();
 
 $upgrades = check_upgrades();
@@ -50,9 +58,6 @@ else {
     $smarty->assign('upgradeheading', get_string('performingupgrades', 'admin'));
 }
 
-if (empty($upgrades['settings']['disablelogin'])) {
-    auth_setup();
-}
 // Remove the "settings" component, which is not a real component (see check_upgrades())
 unset($upgrades['settings']);
 
@@ -94,18 +99,8 @@ $failureicon = 'icon icon-exclamation-triangle left';
 $warningicon = 'icon icon-exclamation-triangle left';
 
 
-// Remove all files in the smarty and dwoo caches
-// TODO post 1.2 remove the smarty part
+// Remove all files in the dwoo cache
 require_once('file.php');
-$basedir = get_config('dataroot') . 'smarty/compile/';
-$dh = new DirectoryIterator($basedir);
-foreach ($dh as $themedir) {
-    if ($themedir->isDot()) continue;
-    $themedirname = $basedir . $themedir->getFilename();
-    rmdirr($themedirname);
-    clearstatcache();
-    check_dir_exists($themedirname);
-}
 $basedir = get_config('dataroot') . 'dwoo/compile/';
 $dh = new DirectoryIterator($basedir);
 foreach ($dh as $themedir) {
@@ -215,7 +210,7 @@ uksort($upgrades, 'sort_upgrades');
 $js .= "\n" . 'var todo = ' . json_encode(array_keys($upgrades)) . ";\n";
 $smarty->assign('INLINEJAVASCRIPT', $js);
 
-$smarty->assign_by_ref('upgrades', $upgrades);
+$smarty->assign('upgrades', $upgrades);
 if (isset($upgrades['core'])) {
     $smarty->assign('releaseargs', array($upgrades['core']->torelease, $upgrades['core']->to));
 }

@@ -25,7 +25,22 @@ require_once('group.php');
 safe_require('artefact', 'comment');
 safe_require('artefact', 'file');
 
+// Used by the Mahara assignment submission plugin for Moodle, to indicate that a user
+// coming over from mnet should be able to view a certain page (i.e. a teacher viewing
+// an assignmnet submission)
+$mnetviewid = param_integer('mnetviewid', false);
+$mnetcollid = param_integer('mnetcollid', false);
+if (
+        ($mnetviewid || $mnetcollid)
+        && $SESSION->get('mnetuser')
+        && safe_require_plugin('auth', 'xmlrpc')
+) {
+    auth_xmlrpc_mnet_view_access($mnetviewid, $mnetcollid);
+}
+
 // access key for roaming teachers
+// TODO: The mt token is used by the old token-based Mahara assignment submission
+// access system, which is now deprecated. Remove eventually.
 $mnettoken = $SESSION->get('mnetuser') ? param_alphanum('mt', null) : null;
 
 // access key for logged out users
@@ -81,12 +96,12 @@ else {
     $view->commit();
 }
 
-// Feedback list pagination requires limit/offset params
+// Comment list pagination requires limit/offset params
 $limit       = param_integer('limit', 10);
 $offset      = param_integer('offset', 0);
 $showcomment = param_integer('showcomment', null);
 
-// Create the "make feedback private form" now if it's been submitted
+// Create the "make comment private form" now if it's been submitted
 if (param_variable('make_public_submit', null)) {
     pieform(ArtefactTypeComment::make_public_form(param_integer('comment')));
 }
@@ -193,6 +208,9 @@ function releaseview_submit() {
 $javascript = array('paginator', 'viewmenu', 'js/collection-navigation.js');
 $blocktype_js = $view->get_all_blocktype_javascript();
 $javascript = array_merge($javascript, $blocktype_js['jsfiles']);
+if (is_plugin_active('externalvideo', 'blocktype')) {
+    $javascript = array_merge($javascript, array((is_https() ? 'https:' : 'http:') . '//cdn.embedly.com/widgets/platform.js'));
+}
 $inlinejs = "addLoadEvent( function() {\n" . join("\n", $blocktype_js['initjs']) . "\n});";
 
 // If the view has comments turned off, tutors can still leave
@@ -220,7 +238,7 @@ $feedback = ArtefactTypeComment::get_comments($commentoptions);
 // Set up theme
 $viewtheme = $view->get('theme');
 if ($viewtheme && $THEME->basename != $viewtheme) {
-    $THEME = new Theme($viewtheme);
+    $THEME = new Theme($view);
 }
 $headers = array();
 $headers[] = '<link rel="stylesheet" type="text/css" href="' . append_version_number(get_config('wwwroot') . 'js/jquery/jquery-ui/css/smoothness/jquery-ui.min.css') . '">';
@@ -319,7 +337,11 @@ if ($collection) {
     $shownav = $collection->get('navigation');
     if ($shownav) {
         if ($views = $collection->get('views')) {
-            $smarty->assign('collection', $views['views']);
+            $viewnav = $views['views'];
+            if ($collection->has_framework()) {
+                array_unshift($viewnav, $collection->collection_nav_framework_option());
+            }
+            $smarty->assign('collection', $viewnav);
         }
     }
 }
@@ -331,7 +353,7 @@ $smarty->assign('viewtype', $viewtype);
 $smarty->assign('feedback', $feedback);
 $smarty->assign('owner', $owner);
 $smarty->assign('tags', $view->get('tags'));
-
+$smarty->assign('PAGEHEADING', null);
 if ($view->is_anonymous()) {
   $smarty->assign('PAGEAUTHOR', get_string('anonymoususer'));
   $smarty->assign('author', get_string('anonymoususer'));
@@ -360,16 +382,32 @@ $title = hsc(TITLE);
 $smarty->assign('maintitle', $titletext);
 
 // Provide a link for roaming teachers to return
-if ($mnetviewlist = $SESSION->get('mnetviewaccess')) {
-    if (isset($mnetviewlist[$view->get('id')])) {
-        $returnurl = $SESSION->get('mnetuserfrom');
-        require_once(get_config('docroot') . 'api/xmlrpc/lib.php');
-        if ($peer = get_peer_from_instanceid($SESSION->get('authinstance'))) {
-            $smarty->assign('mnethost', array(
-                'name'      => $peer->name,
-                'url'       => $returnurl ? $returnurl : $peer->wwwroot,
-            ));
-        }
+$showmnetlink = false;
+// Old token-based access list
+if (
+    $mnetviewlist = $SESSION->get('mnetviewaccess')
+    && isset($mnetviewlist[$view->get('id')])
+) {
+    $showmnetlink = true;
+}
+
+// New mnet-based access list
+if (
+    $SESSION->get('mnetviews')
+    && in_array($view->get('id'), $SESSION->get('mnetviews'))
+) {
+    $showmnetlink = true;
+}
+
+
+if ($showmnetlink) {
+    $returnurl = $SESSION->get('mnetuserfrom');
+    require_once(get_config('docroot') . 'api/xmlrpc/lib.php');
+    if ($peer = get_peer_from_instanceid($SESSION->get('authinstance'))) {
+        $smarty->assign('mnethost', array(
+            'name'      => $peer->name,
+            'url'       => $returnurl ? $returnurl : $peer->wwwroot,
+        ));
     }
 }
 
@@ -393,6 +431,8 @@ if ($viewgroupform) {
 if ($titletext !== $title) {
     $smarty->assign('title', $title);
 }
+
+$smarty->assign('userisowner', ($owner && $owner == $USER->get('id')));
 
 $smarty->display('view/view.tpl');
 

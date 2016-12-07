@@ -310,7 +310,7 @@ class User {
     public function create() {
         $this->set('ctime', time());
         if (get_config('cleanurls') && is_null($this->urlid)) {
-            $desiredurlid = generate_urlid($this->username, get_config('cleanurluserdefault'), 3, 30);
+            $desiredurlid = generate_urlid(get_raw_user_urlid($this), get_config('cleanurluserdefault'), 3, 30);
             $this->set('urlid', get_new_profile_urlid($desiredurlid));
         }
     }
@@ -507,17 +507,17 @@ class User {
         static $systemprofileviewid = null;
 
         db_begin();
-        if (is_null($systemprofileviewid)) {
-            $systemprofileviewid = get_field('view', 'id', 'owner', 0, 'type', 'profile');
-        }
-
         require_once(get_config('libroot') . 'view.php');
+        if (is_null($systemprofileviewid)) {
+            $systemprofileviewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'profile');
+        }
+        $artefactcopies = array();
         list($view) = View::create_from_template(array(
             'owner' => $this->get('id'),
             'title' => get_field('view', 'title', 'id', $systemprofileviewid),
             'description' => get_string('profiledescription'),
             'type'  => 'profile',
-        ), $systemprofileviewid, $this->get('id'), false);
+        ), $systemprofileviewid, $this->get('id'), false, false, $artefactcopies);
 
         // Set view access
         $access = array(
@@ -561,17 +561,17 @@ class User {
         static $systemdashboardviewid = null;
 
         db_begin();
-        if (is_null($systemdashboardviewid)) {
-            $systemdashboardviewid = get_field('view', 'id', 'owner', 0, 'type', 'dashboard');
-        }
-
         require_once(get_config('libroot') . 'view.php');
+        if (is_null($systemdashboardviewid)) {
+            $systemdashboardviewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'dashboard');
+        }
+        $artefactcopies = array();
         list($view) = View::create_from_template(array(
             'owner' => $this->get('id'),
             'title' => get_field('view', 'title', 'id', $systemdashboardviewid),
             'description' => get_string('dashboarddescription'),
             'type'  => 'dashboard',
-        ), $systemdashboardviewid, $this->get('id'), false);
+        ), $systemdashboardviewid, $this->get('id'), false, false, $artefactcopies);
 
         db_commit();
 
@@ -761,6 +761,18 @@ class User {
         return $this->get('admin') || $this->is_institutional_admin($institution);
     }
 
+    public function can_edit_group_shortname(stdClass $group) {
+        if (!isset($group->id) || empty($group->id)) {
+            return false;
+        }
+
+        if ($this->get('admin')) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function institution_allows_public_views($institution = null) {
         $user_institutions = $this->get('institutions');
         if (empty($user_institutions)) {
@@ -940,7 +952,10 @@ class User {
     }
 
     public function reset_grouproles() {
-        $memberships = get_records_array('group_member', 'member', $this->get('id'));
+        $sql = "SELECT gm.* FROM {group_member} gm
+                JOIN {group} g ON g.id = gm.group
+                WHERE gm.member = ? AND g.deleted = 0";
+        $memberships = get_records_sql_array($sql, array($this->get('id')));
         $roles = array();
         if ($memberships) {
             foreach ($memberships as $m) {
@@ -1181,9 +1196,6 @@ class User {
         if ($owner > 0 && $owner == $this->get('id')) {
             return true;
         }
-        if ($owner == "0" && $this->get('admin')) {
-            return true;
-        }
         $institution = $v->get('institution');
         if ($institution && $this->can_edit_institution($institution)) {
             return true;
@@ -1306,13 +1318,14 @@ class User {
         }
 
         db_begin();
+        $artefactcopies = array();
         foreach ($templateids as $tid) {
             View::create_from_template(array(
                 'owner' => $this->get('id'),
                 'title' => $views[$tid]->title,
                 'description' => $views[$tid]->description,
                 'type' => $views[$tid]->type == 'profile' && $checkviewaccess ? 'portfolio' : $views[$tid]->type,
-            ), $tid, $this->get('id'), $checkviewaccess);
+            ), $tid, $this->get('id'), $checkviewaccess, false, $artefactcopies);
         }
         db_commit();
     }
@@ -1485,19 +1498,6 @@ class LiveUser extends User {
         if ($parentid = get_field('auth_instance_config', 'value', 'field', 'parent', 'instance', $instanceid)) {
             $instanceid = $parentid;
         }
-        // Check for a suspended institution
-        // If a user in more than one institution and one of them is suspended
-        // make sure their authinstance is not set to the suspended institution
-        // otherwise they will not be able to login.
-        $authinstance = get_record_sql('
-            SELECT i.suspended, i.displayname
-            FROM {institution} i JOIN {auth_instance} a ON a.institution = i.name
-            WHERE a.id = ?', array($instanceid));
-        if ($authinstance->suspended) {
-            $sitename = get_config('sitename');
-            throw new AccessTotallyDeniedException(get_string('accesstotallydenied_institutionsuspended', 'mahara', $authinstance->displayname, $sitename));
-            return false;
-        }
 
         $auth = AuthFactory::create($instanceid);
 
@@ -1546,17 +1546,20 @@ class LiveUser extends User {
         }
 
         // Clear any secret URL access cookies
+        // TODO: The mviewaccess cookie is used by the old token-based Mahara assignment submission
+        // access system, which is now deprecated. Remove eventually.
         foreach (array('viewaccess:', 'mviewaccess:', 'viewaccess:') as $cookiename) {
             foreach (get_cookies($cookiename) as $id => $token) {
                 set_cookie($cookiename . $id, '', 1);
             }
         }
 
+        // Clear the list of allowed views added by the (new) mnet acl system
+        $this->SESSION->clear('mnetviews');
+        $this->SESSION->clear('mnetuser');
+
         require_once(get_config('libroot') . 'ddl.php');
 
-        if ($this->changed == true) {
-            log_debug('Destroying user with un-committed changes');
-        }
         $this->set('logout_time', 0);
         if ($this->authenticated === true) {
             $this->SESSION->set('messages', array());
@@ -1564,6 +1567,8 @@ class LiveUser extends User {
 
         // Unset session variables related to authentication
         $this->SESSION->set('authinstance', null);
+        $this->SESSION->set('remoteavatar', null);
+        $this->SESSION->set('nocheckrequiredfields', null);
         if (get_config('installed') && !defined('INSTALLER') && $this->get('sessionid')
             && table_exists(new XMLDBTable('usr_session'))) {
             delete_records('usr_session', 'session', $this->get('sessionid'));
@@ -1617,6 +1622,7 @@ class LiveUser extends User {
      * continuing
      */
     public function renew() {
+        global $SESSION, $CFG;
         $time = time();
         $this->set('logout_time', $time + get_config('session_timeout'));
         $oldlastaccess = $this->get('lastaccess');
@@ -1624,13 +1630,15 @@ class LiveUser extends User {
         // prevent updating before this time has expired.
         // If it is set to zero, we always update the accesstime.
         $accesstimeupdatefrequency = get_config('accesstimeupdatefrequency');
-        if ($accesstimeupdatefrequency == 0) {
+        if (
+            $accesstimeupdatefrequency == 0
+            || $oldlastaccess + $accesstimeupdatefrequency < $time
+        ) {
             $this->set('lastaccess', $time);
             $this->commit();
-        }
-        else if ($oldlastaccess + $accesstimeupdatefrequency < $time) {
-            $this->set('lastaccess', $time);
-            $this->commit();
+            if ($CFG->version >= 2016060800) {
+                set_field('usr_session', 'mtime', db_format_timestamp($time), 'session', $SESSION->session_id());
+            }
         }
     }
 
@@ -1831,6 +1839,7 @@ class LiveUser extends User {
             'usr' => $this->get('id'),
             'session' => $sessionid,
             'ctime' => db_format_timestamp(time()),
+            'mtime' => db_format_timestamp(time()),
         ));
     }
 
@@ -1867,15 +1876,19 @@ class LiveUser extends User {
     }
 }
 
-function is_site_closed($adminuser) {
-    $siteclosedforupgrade = get_config('siteclosed');
-    if ($siteclosedforupgrade && get_config('disablelogin')) {
+/**
+ * Indicates whether the site is closed for a user
+ * @param boolean $isuseradmin Whether the user we're checking for is an admin
+ * @return boolean True if the site is closed; False if not
+ */
+function is_site_closed($isuseradmin) {
+    if (get_config('siteclosedforupgrade')) {
         global $SESSION;
         $SESSION->add_error_msg(get_string('siteclosedlogindisabled', 'mahara', get_config('wwwroot') . 'admin/upgrade.php'), false);
         return true;
     }
 
-    if (!$adminuser && ($siteclosedforupgrade || get_config('siteclosedbyadmin'))) {
+    if (!$isuseradmin && get_config('siteclosedbyadmin')) {
         global $SESSION;
         $SESSION->add_error_msg(get_string('siteclosed'));
         return true;

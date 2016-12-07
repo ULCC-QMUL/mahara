@@ -62,7 +62,7 @@ if (isset($CFG->behat_dataroot)) {
 // switch the $CFG->X for $CFG->behat_X.
 if (defined('BEHAT_UTIL') || defined('BEHAT_TEST')) {
     if (empty($CFG->behat_wwwroot) || empty($CFG->behat_dataroot) || empty($CFG->behat_dbprefix)) {
-        log_('Behat tests cannot run unless $cfg->behat_wwwroot, $cfg->behat_dataroot, and $cfg->behat_dbprefix are defined in config.php');
+        log_debug('Behat tests cannot run unless $cfg->behat_wwwroot, $cfg->behat_dataroot, and $cfg->behat_dbprefix are defined in config.php');
         die(1);
     }
 
@@ -94,6 +94,17 @@ set_error_handler('error', $errorlevel);
 // core libraries
 require('mahara.php');
 ensure_sanity();
+// Now that we know json_decode exists we check if any config vars are
+// encoded json strings and we convert them to be used in php
+foreach ($CFG as $key => $option) {
+    if (is_string($option)) {
+        $decode = json_decode($option, true);
+        if ($decode !== null && is_array($decode) && json_last_error() === JSON_ERROR_NONE) {
+            $CFG->$key = $decode;
+        }
+    }
+}
+
 require('dml.php');
 require('web.php');
 require('user.php');
@@ -102,10 +113,6 @@ $locallib = get_config('docroot') . 'local/lib.php';
 if (file_exists($locallib)) {
     require($locallib);
 }
-
-// Start up a session object, in case we need to use it to print messages
-require_once('auth/session.php');
-$SESSION = Session::singleton();
 
 // Database access functions
 require('adodb/adodb-exceptions.inc.php');
@@ -242,6 +249,10 @@ if (isset($CFG->wwwroot)) {
     }
 }
 
+// Start up a session object, in case we need to use it to print messages
+require_once('auth/session.php');
+$SESSION = Session::singleton();
+
 // If we have cleanurl subdomains turned on, we need to set cookiedomain
 // to ensure cookies are given back to us in all subdomains
 if (isset($CFG->cleanurls) && isset($CFG->cleanurlusersubdomains) && !isset($CFG->cookiedomain)) {
@@ -308,9 +319,12 @@ if (!get_config('productionmode')) {
     $CFG->log_info_targets    = LOG_TARGET_SCREEN | LOG_TARGET_ERRORLOG;
     $CFG->log_warn_targets    = LOG_TARGET_SCREEN | LOG_TARGET_ERRORLOG;
     $CFG->log_environ_targets = LOG_TARGET_SCREEN | LOG_TARGET_ERRORLOG;
-    $CFG->developermode       = DEVMODE_DEBUGJS | DEVMODE_DEBUGCSS | DEVMODE_UNPACKEDJS;
+    $CFG->developermode       = DEVMODE_DEBUGCSS | DEVMODE_UNPACKEDJS;
     $CFG->perftofoot          = true;
     $CFG->nocache             = true;
+    if ($CFG->log_backtrace_print_args === null) {
+        $CFG->log_backtrace_print_args = true;
+    }
 }
 
 if (get_config('installed')) {
@@ -321,16 +335,13 @@ if (get_config('installed')) {
     if ($upgradeavailable) {
         ensure_upgrade_sanity();
     }
-    $disablelogin  = $config->disablelogin;
-    $cfgsiteclosed = get_config('siteclosed');
-    if ($upgradeavailable != $cfgsiteclosed) {
-        set_config('siteclosed', $upgradeavailable);
-        set_config('disablelogin', $disablelogin);
+    if ($upgradeavailable != get_config('siteclosedforupgrade')) {
+        set_config('siteclosedforupgrade', $upgradeavailable);
     }
 }
 
 // If we're in the middle of an upgrade, quit the cron now.
-$siteclosedforupgrade = get_config('siteclosed');
+$siteclosedforupgrade = get_config('siteclosedforupgrade');
 if ($siteclosedforupgrade && defined('CRON')) {
     exit("Site closed for upgrade.\n");
 }
@@ -370,15 +381,6 @@ try {
     $SESSION->add_error_msg($exception->getMessage());
 }
 
-if ($siteclosedforupgrade && $USER->admin) {
-    if (get_config('disablelogin')) {
-        $USER->logout();
-    }
-    else if (!defined('INSTALLER')) {
-        redirect('/admin/upgrade.php');
-    }
-}
-
 // The installer does its own auth_setup checking, because some upgrades may
 // break logging in and so need to allow no logins.
 // Command-line scripts obviously have no logged-in user.
@@ -386,8 +388,10 @@ if (!defined('INSTALLER') && !defined('CLI') && !defined('CRON')) {
     auth_setup();
 }
 
-$siteclosed = $siteclosedforupgrade || get_config('siteclosedbyadmin');
-if ($siteclosed && !$USER->admin) {
+// Force the user to log out if:
+// - the site is closed by the system due to a pending upgrade
+// - the site was closed by an admin (and the user is not an admin)
+if ($siteclosedforupgrade || (get_config('siteclosedbyadmin') && !$USER->admin)) {
     if ($USER->is_logged_in()) {
         $USER->logout();
     }
@@ -399,6 +403,9 @@ if ($siteclosed && !$USER->admin) {
 // check to see if we're installed...
 if (!get_config('installed')) {
     ensure_install_sanity();
+    if (defined('TESTSRUNNING')) {
+        die("Need to have Mahara installed before phpunit tests will run. Please install via 'php htdocs/admin/cli/install.php'");
+    }
 
     $scriptfilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME']);
     if (!defined('CLI')
@@ -452,6 +459,10 @@ if (!defined('INSTALLER')) {
             }
         }
     }
+}
+
+if (get_config('disableexternalresources')) {
+    $CFG->wwwhost = parse_url($CFG->wwwroot, PHP_URL_HOST);
 }
 /*
  * Initializes our performance info early.

@@ -79,7 +79,7 @@
                 {elseif !$publishable}
                     <span class="display-title">{$displaytitle}</span>
                 {else}
-                    <a href="{$WWWROOT}artefact/file/download.php?file={$file->id}" title="{str tag=downloadfile section=artefact.file arg1=$displaytitle}" class="file-download-link inner-link">
+                    <a href="{$WWWROOT}artefact/file/download.php?file={$file->id}" title="{str tag=downloadfile section=artefact.file arg1=$displaytitle}" class="file-download-link inner-link {if $file->artefacttype == 'image' || $file->artefacttype == 'profileicon'}img-modal-preview{/if}">
                         <span class="display-title">{$displaytitle}</span>
                     </a>
                 {/if}
@@ -98,6 +98,9 @@
                 {/if}
             </td>
 
+            {if $showtags && $editmeta}
+            <td class="filesize">{tif $file->size ?: ''}</td>
+            {/if}
             {if !$showtags && !$editmeta}
             <td class="filesize">{tif $file->size ?: ''}</td>
             <td class="filedate">{tif $file->mtime ?: ''}</td>
@@ -108,7 +111,7 @@
                 {if $selectable && ($file->artefacttype != 'folder' || $selectfolders) && $publishable && !$file->isparent}
                     <button type="submit" class="btn btn-xs btn-default" name="{$prefix}_select[{$file->id}]" id="{$prefix}_select_{$file->id}" title="{str tag=select}">
                         <span class="icon icon-check icon-lg" role="presentation" aria-hidden="true"></span>
-                        <span class="sr-only">{str tag=select}</span>
+                        <span class="sr-only">{str tag=selectspecific section=artefact.file arg1=$displaytitle|escape:html|safe}</span>
                     </button>
                 {/if}
                 {if $editmeta}
@@ -118,7 +121,11 @@
                         {if !isset($file->can_edit) || $file->can_edit !== 0}
                         <button name="{$prefix}_edit[{$file->id}]" class="btn btn-default btn-xs" title="{str tag=edit}">
                             <span class="icon icon-pencil icon-lg" role="presentation" aria-hidden="true"></span>
-                            <span class="sr-only">{$edittext|escape:html|safe}</span>
+                            {if $file->artefacttype == 'folder'}
+                                <span class="sr-only">{str tag=editfolderspecific section=artefact.file arg1=$displaytitle|escape:html|safe}</span>
+                            {else}
+                                <span class="sr-only">{str tag=editfilespecific section=artefact.file arg1=$displaytitle|escape:html|safe}</span>
+                            {/if}
                         </button>
                         {/if}
                     {/if}
@@ -128,7 +135,7 @@
             {/if}
             <!-- Ensure space for 3 buttons (in the case of a really long single line string in a user input field -->
             {if $editable && !$file->isparent}
-            <td class="text-right control-buttons">
+            <td class="text-right control-buttons {if $file->artefacttype == 'archive'}includes-unzip{/if}">
                 {if $file->locked}
                     <span class="dull text-muted">
                         {str tag=Submitted section=view}
@@ -174,7 +181,7 @@
         </tbody>
     </table>
 </div>
-{if !$selectable}
+{if !$selectable && $downloadfolderaszip}
     <a id="downloadfolder" class="panel-footer text-small" href="{$WWWROOT}artefact/file/downloadfolder.php?{$folderparams|safe}">
         <span class="icon icon-download" role="presentation" aria-hidden="true"></span>
         <span>{str tag=downloadfolderziplink section=artefact.file}</span>

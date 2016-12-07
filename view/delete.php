@@ -11,13 +11,12 @@
 
 define('INTERNAL', 1);
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('view.php');
 $viewid = param_integer('id');
 
 $view = new View($viewid, null);
 
-if (!$view || $view->get('owner') == "0" || !$USER->can_edit_view($view) || $view->is_submitted()) {
+if (!$view || !$USER->can_edit_view($view) || $view->is_submitted()) {
     throw new AccessDeniedException(get_string('cantdeleteview', 'view'));
 }
 $groupid = $view->get('group');
@@ -65,8 +64,7 @@ $form = pieform(array(
 ));
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign_by_ref('view', $view);
+$smarty->assign('view', $view);
 $smarty->assign('form', $form);
 $smarty->assign('collectionnote', $collectionnote);
 $smarty->display('view/delete.tpl');

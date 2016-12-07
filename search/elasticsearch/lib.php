@@ -124,8 +124,6 @@ class PluginSearchElasticsearch extends PluginSearch {
      * @return string
      */
     public static function header_search_form() {
-        require_once('pieforms/pieform.php');
-
         return pieform(array(
                 'name'                => 'usf',
                 'action'              => get_config('wwwroot') . 'search/elasticsearch/index.php',
@@ -133,17 +131,20 @@ class PluginSearchElasticsearch extends PluginSearch {
                 'autofocus'           => false,
                 'validate'            => false,
                 'presubmitcallback'   => '',
+                'class'               => 'header-search-form',
                 'elements'            => array(
                         'query' => array(
                                 'type'           => 'text',
-                                'defaultvalue'   => get_string('pagetitle', 'search.elasticsearch'),
+                                'defaultvalue'   => '',
                                 'title'          => get_string('pagetitle', 'search.elasticsearch'),
-                                'class'          => 'emptyonfocus',
+                                'placeholder'    => get_string('pagetitle', 'search.elasticsearch'),
                                 'hiddenlabel'    => true,
                         ),
                         'submit' => array(
-                                'type' => 'submit',
-                                'value' => get_string('go'),
+                            'type' => 'button',
+                            'class' => 'btn-primary input-group-btn',
+                            'usebuttontag' => true,
+                            'value' => '<span class="icon icon-search icon-lg" role="presentation" aria-hidden="true"></span><span class="sr-only">'. get_string('go') . '</span>',
                         )
                 )
         ));
@@ -179,7 +180,6 @@ class PluginSearchElasticsearch extends PluginSearch {
         }
 
         $config = array(
-            'class' => 'panel panel-body',
             'elements' => array(
                 'enablednotice' => array(
                     'type'         => 'html',
@@ -366,6 +366,7 @@ class PluginSearchElasticsearch extends PluginSearch {
     }
 
     public static function save_config_options(Pieform $form, $values) {
+        require_once(get_config('docroot') . 'artefact/lib.php');
         set_config_plugin('search', 'elasticsearch', 'cronlimit', $values['cronlimit']);
 
         // Changes in artefact types:
@@ -882,10 +883,10 @@ class PluginSearchElasticsearch extends PluginSearch {
         return PluginSearchInternal::search_user($query_string, $limit, $offset, $data);
     }
 
-    public static function search_group($query_string, $limit, $offset=0, $type='member', $category='') {
+    public static function search_group($query_string, $limit, $offset=0, $type='member', $category='', $institution='all') {
         // Given the results depends on the user the SQL search makes more sense here than Elastic Search
         // So  I'll just call the PluginSearchInternal related function
-        return PluginSearchInternal::search_group($query_string, $limit, $offset, $type, $category);
+        return PluginSearchInternal::search_group($query_string, $limit, $offset, $type, $category, $institution);
     }
 
     public static function self_search($query_string, $limit, $offset, $type = 'all') {

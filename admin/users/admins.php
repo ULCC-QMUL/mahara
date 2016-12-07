@@ -19,7 +19,6 @@ define('TITLE', get_string('adminusers', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'adminusers');
-require_once('pieforms/pieform.php');
 require_once('activity.php');
 
 // Get users who are currently administrators
@@ -74,5 +73,4 @@ $smarty = smarty();
 setpageicon($smarty, 'icon-user');
 
 $smarty->assign('adminusersform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/admin.tpl');

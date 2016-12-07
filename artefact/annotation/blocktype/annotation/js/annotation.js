@@ -71,7 +71,10 @@ function modifyAnnotationFeedbackSuccess(form, data) {
                 initTinyMCE(formname);
             })(jQuery);
     });
-
+    // if we are in a modal close it
+    if (jQuery('#annotation_feedbacktable_' + $(formname + '_blockid').value).hasClass('modal-docked')) {
+        dock.hide();
+    }
     formSuccess(form, data);
 }
 
@@ -130,4 +133,11 @@ function addAnnotationFeedbackSuccess(form, data) {
     }
     $(formname + '_' + messageid).value = '';
     formSuccess(form, data);
+}
+
+function addAnnotationFeedbackError(form, data) {
+    id = form.id;
+    id = id.replace(/^add_/, '').replace(/_form/,'');
+    jQuery('#' + id).removeClass('closed').addClass('active');
+    formError(form, data);
 }

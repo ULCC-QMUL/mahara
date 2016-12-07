@@ -379,6 +379,13 @@ function watchlist_process_notifications() {
         if (isset($view->owner) && empty($view->owner)) {
             continue;
         }
+        // Ignore system templates, institution = 'mahara' and template = 2
+        require_once(get_config('libroot') . 'view.php');
+        if (isset($view->institution)
+            && $view->institution == 'mahara'
+            && $view->template == View::SITE_TEMPLATE) {
+            continue;
+        }
 
         foreach ($blockinstance_ids as $blockinstance_id) {
             if (empty($blockinstance_id)) {
@@ -699,8 +706,15 @@ abstract class ActivityType {
         return $this->subject;
     }
 
-    // rewrite the url with the internal notification id?
-    protected function update_url() {
+    /**
+     * Rewrite $this->url with the ID of the internal notification record for this activity.
+     * (Generally so that you can make a URL that sends the user to the Mahara inbox page
+     * for this message.)
+     *
+     * @param int $internalid
+     * @return boolean True if $this->url was updated, False if not.
+     */
+    protected function update_url($internalid) {
         return false;
     }
 

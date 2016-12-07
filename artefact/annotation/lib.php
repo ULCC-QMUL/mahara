@@ -33,7 +33,6 @@ defined('INTERNAL') || die();
 
 require_once('activity.php');
 require_once('license.php');
-require_once('pieforms/pieform.php');
 
 class PluginArtefactAnnotation extends PluginArtefact {
 
@@ -156,6 +155,9 @@ class PluginArtefactAnnotation extends PluginArtefact {
     public static function progressbar_link($artefacttype) {
         switch ($artefacttype) {
             case 'annotation':
+                return 'view/index.php';
+                break;
+            case 'annotationfeedback':
                 return 'view/sharedviews.php';
                 break;
         }
@@ -165,6 +167,14 @@ class PluginArtefactAnnotation extends PluginArtefact {
         return array(
             (object)array(
                 'name' => 'annotation',
+                'title' => get_string('placeannotation', 'artefact.annotation'),
+                'plugin' => 'annotation',
+                'active' => true,
+                'iscountable' => true,
+                'is_metaartefact' => true,
+            ),
+            (object)array(
+                'name' => 'annotationfeedback',
                 'title' => get_string('placeannotationfeedback', 'artefact.annotation'),
                 'plugin' => 'annotation',
                 'active' => true,
@@ -184,10 +194,16 @@ class PluginArtefactAnnotation extends PluginArtefact {
                 $sql = "SELECT COUNT(*) AS completed
                         FROM {artefact}
                         WHERE artefacttype='annotation'
+                        AND owner = ?";
+                $meta->completed = count_records_sql($sql, array($USER->get('id')));
+                break;
+            case 'annotationfeedback':
+                $sql = "SELECT COUNT(*) AS completed
+                        FROM {artefact}
+                        WHERE artefacttype='annotationfeedback'
                         AND owner <> ?
                         AND author = ?";
-                $count = get_records_sql_array($sql, array($USER->get('id'), $USER->get('id')));
-                $meta->completed = $count[0]->completed;
+                $meta->completed = count_records_sql($sql, array($USER->get('id'), $USER->get('id')));
                 break;
             default:
                 return false;
@@ -282,6 +298,9 @@ class ArtefactTypeAnnotation extends ArtefactType {
             update_record('artefact_annotation', $data, 'annotation');
         }
 
+        if ($this->get('view')) {
+            set_field('view', 'mtime', db_format_timestamp(time()), 'id', $this->get('view'));
+        }
         db_commit();
         $this->dirty = false;
     }
@@ -307,10 +326,9 @@ class ArtefactTypeAnnotation extends ArtefactType {
             $feedback->delete();
         }
 
-        // Delete any embedded images for this annotation.
-        // Don't use EmbeddedImage::delete_embedded_images() - it deletes by
-        // the fileid. We need to delete by the resourceid.
-        delete_records('artefact_file_embedded', 'resourceid', $this->id);
+        // Remove any embedded images for this annotation.
+        require_once('embeddedimage.php');
+        EmbeddedImage::remove_embedded_images('annotation', $this->id);
         delete_records('artefact_annotation', 'annotation', $this->id);
         parent::delete();
         db_commit();
@@ -420,56 +438,8 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
                     if ($block->get('view')) {
                         // We found the annotation we're inputting feedback for.
                         // Rebuild the block's list and break out of the loop.
+                        set_field('view', 'mtime', db_format_timestamp(time()), 'id', $block->get('view'));
                         $block->rebuild_artefact_list();
-
-//                         Otherwise, we can do this but any images that were deleted while editing will still exist.
-//                         if (count_records_select('view_artefact', "view = {$block->get('view')} AND block = {$block->get('id')} AND artefact = {$this->get('id')}") == 0) {
-//                             // Insert the feedback record in the view_artefact table.
-//                             $va = new StdClass;
-//                             $va->view = $block->get('view');
-//                             $va->block = $block->get('id');
-//                             // this is the feedback id that was just inserted/updated.
-//                             $va->artefact = $this->get('id');
-//                             insert_record('view_artefact', $va);
-//                         }
-//
-//                         // Get any artefacts (i.e. images) that may have been embedded
-//                         // in the feedback text.
-//                         $feedbackartefacts = artefact_get_references_in_html($this->get('description'));
-//                         if (count($feedbackartefacts) > 0) {
-//
-//                             // Get list of allowed artefacts.
-//                             // Please note that images owned by other users that are place on feedback
-//                             // will not be part of the view_artefact because the owner of the
-//                             // annotation does not own the image being placed on the feedback.
-//                             // Therefore, when exported as Leap2A, these images will not come through.
-//                             require_once('view.php');
-//                             $searchdata = array(
-//                                             'extraselect'          => array(array('fieldname' => 'id', 'type' => 'int', 'values' => $feedbackartefacts)),
-//                                             'userartefactsallowed' => true,  // If this is a group view, the user can add personally owned artefacts
-//                             );
-//                             $view = $block->get_view();
-//                             list($allowedfeedbackartefacts, $count) = View::get_artefactchooser_artefacts(
-//                                     $searchdata,
-//                                     $view->get('owner'),
-//                                     $view->get('group'),
-//                                     $view->get('institution'),
-//                                     true
-//                             );
-//                             foreach ($feedbackartefacts as $id) {
-//                                 $va = new StdClass;
-//                                 $va->view = $block->get('view');
-//                                 $va->block = $block->get('id');
-//                                 if (isset($allowedfeedbackartefacts[$id]) || isset($old[$id])) {
-//                                     // only insert artefacts that the view can actually own
-//                                     // and which are not already in the view_artefact table.
-//                                     $va->artefact = $id;
-//                                     if (count_records_select('view_artefact', "view = {$block->get('view')} AND block = {$block->get('id')} AND artefact = {$id}") == 0) {
-//                                         insert_record('view_artefact', $va);
-//                                     }
-//                                 }
-//                             }
-//                         }
                     }
 
                     break;
@@ -500,6 +470,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
         // the fileid. We need to delete by the resourceid.
         delete_records('artefact_file_embedded', 'resourceid', $this->id);
         delete_records('artefact_annotation_feedback', 'artefact', $this->id);
+        delete_records('framework_assessment_feedback', 'artefact', $this->id);
         parent::delete();
         db_commit();
     }
@@ -619,7 +590,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
      */
     public static function get_annotation_feedback_options() {
         $options = new stdClass();
-        $options->limit = 10;
+        $options->limit = 0;
         $options->offset = 0;
         $options->showcomment = null;
 
@@ -628,7 +599,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
         $options->view = '';            // viewid that the annotation is linked to.
         $options->block = '';           // blockid that the annotation lives in.
 
-        $options->export = false;
+        $options->export = 0;
         $sortorder = get_user_institution_comment_sort_order();
         $options->sort = (!empty($sortorder)) ? $sortorder : 'earliest';
         return $options;
@@ -798,11 +769,12 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             if (isset($data->showcomment) && $data->showcomment == $item->id) {
                 $item->highlight = 1;
             }
-            $is_export_preview = param_integer('export', 0);
+            $is_export_preview = param_integer('export', $data->export);
             if ($item->deletedby) {
                 $item->deletedmessage = $deletedmessage[$item->deletedby];
             }
-            else if (($candelete || $item->isauthor) && !$is_export_preview && !$isadminfeedback) {
+            else if (($candelete || $item->isauthor) && !$is_export_preview &&
+                     (!$isadminfeedback || ($isadminfeedback && ($data->owner === $item->author)))) {
                 // If the auther was admin/staff and not the owner of the annotation,
                 // the feedback can't be deleted.
                 $item->deleteform = pieform(self::delete_annotation_feedback_form($data->annotation, $data->view, $data->artefact, $data->block, $item->id));
@@ -823,6 +795,9 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
                     || $data->isowner && $item->requestpublic == 'author') {
                     if (!$is_export_preview) {
                         $item->makepublicform = pieform(self::make_annotation_feedback_public_form($data->annotation, $data->view, $data->artefact, $data->block, $item->id));
+                    }
+                    else {
+                        $item->highlight = 1;
                     }
                 }
                 else if ($item->isauthor && $item->requestpublic == 'author'
@@ -870,6 +845,15 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
                     );
                 }
             }
+            if ($statechange = get_record('framework_assessment_feedback', 'artefact', $item->id)) {
+                safe_require('module', 'framework');
+                $state = Framework::get_state_array($statechange->newstatus, true);
+                $states = Framework::get_evidence_statuses($statechange->framework);
+                // We need to amend a bit of text to the feedback message
+                $item->description .= '<div class="assessment text-small">' .
+                    get_string('assessmentchangedto', 'artefact.annotation', $states[$statechange->newstatus]) .
+                    ' <span class="assessmentfeedback ' . $state['classes'] . '"></span></div>';
+            }
         }
 
         $extradata = array(
@@ -886,7 +870,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             (isset($data->block) ? '&block=' . $data->block : '');
 
         $smarty = smarty_core();
-        $smarty->assign_by_ref('data', $data->data);
+        $smarty->assign('data', $data->data);
         $smarty->assign('canedit', $data->canedit);
         $smarty->assign('viewid', $data->view);
         $smarty->assign('position', $data->position);
@@ -902,8 +886,8 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             'limit' => $data->limit,
             'offset' => $data->offset,
             'forceoffset' => isset($data->forceoffset) ? $data->forceoffset : null,
-            'resultcounttextsingular' => get_string('annotation', 'artefact.annotation'),
-            'resultcounttextplural' => get_string('annotations', 'artefact.annotation'),
+            'resultcounttextsingular' => get_string('annotationfeedback', 'artefact.annotation'),
+            'resultcounttextplural' => get_string('annotationfeedback', 'artefact.annotation'),
             'extradata' => $extradata,
         ));
         $data->pagination = $pagination['html'];
@@ -934,14 +918,159 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
     }
 
     /**
+     * Fetching the annotations for an artefact to display on a matrix
+     *
+     * @param   object  $annotationartefact  The annotation artefact to display feedbacks for.
+     * @param   object  $view     The view on which the annotation artefact is linked to.
+     * @param   int     $blockid  The id of the block instance that connects the artefact to the view
+     * @param   boolean $listonly Only return the list and not the form
+     *
+     */
+    public function get_annotation_feedback_for_matrix($annotationartefact, $view, $blockid, $listonly = false) {
+        $options = ArtefactTypeAnnotationfeedback::get_annotation_feedback_options();
+        $options->limit = 0;
+        $options->view = $view->get('id');
+        $options->annotation = $annotationartefact->get('id');
+        $options->block = $blockid;
+        $options->export = 1;
+        $options->sort = 'latest';
+        $annotationfeedback = ArtefactTypeAnnotationfeedback::get_annotation_feedback($options);
+        $annotationfeedbackcount = isset($annotationfeedback->count) ? $annotationfeedback->count : 0;
+
+        if ($listonly) {
+            return array($annotationfeedbackcount, $annotationfeedback);
+        }
+
+        $smarty = smarty_core();
+        $smarty->assign('blockid', $blockid);
+        $smarty->assign('annotationfeedbackcount', $annotationfeedbackcount);
+        $smarty->assign('annotationfeedback', $annotationfeedback);
+
+        if ($annotationartefact->get('allowcomments')) {
+            $form = ArtefactTypeAnnotationfeedback::add_annotation_feedback_form($annotationartefact, $view, null, $blockid, false, $annotationartefact->get('approvecomments'));
+            // Replace the submit/cancel with just a submit button
+            $submit = array(
+                'type'  => 'submit',
+                'value' => get_string('placeannotationfeedback', 'artefact.annotation'),
+                'class' => 'btn-default'
+            );
+            $form['elements']['submit'] = $submit;
+            // Remove the 'assessment' option as we want that independent of submitting feedback here
+            unset($form['elements']['assessment']);
+            $addannotationfeedbackform = pieform($form);
+            $smarty->assign('addannotationfeedbackform', $addannotationfeedbackform);
+        }
+        else {
+            // The user has switched off annotation feedback. Don't create the add annotation feedback form.
+            $smarty->assign('addannotationfeedbackform', null);
+        }
+        $render = $smarty->fetch('artefact:annotation:annotationfeedbackmatrix.tpl');
+        return array($annotationfeedbackcount, $render);
+    }
+
+    /**
+     * Saving the annotation feedback via the matrix dock
+     *
+     * @param   object  $annotationartefact  The annotation artefact to add feedback to.
+     * @param   object  $view      The view the annotation artefact is on
+     * @param   int     $blockid   The id of the block instance that connects the artefact to the view
+     * @param   string  $message   The feedback message
+     * @param   boolean $ispublic  Whether it is a public message or not
+     */
+    public function save_matrix_feedback($annotationartefact, $view, $blockid, $message, $ispublic = true) {
+        global $USER;
+        if (!is_object($annotationartefact) || !is_object($view) || empty($message)) {
+            throw new MaharaException(get_string('annotationinformationerror', 'artefact.annotation'));
+        }
+
+        $data = (object) array(
+            'title'        => get_string('Annotation', 'artefact.annotation'),
+            'description'  => $message,
+            'onannotation' => $annotationartefact->get('id'),
+        );
+
+        $data->view        = $view->get('id');
+        $data->owner       = $view->get('owner');
+        $data->group       = $view->get('group');
+        $data->institution = $view->get('institution');
+
+        if ($author = $USER->get('id')) {
+            $anonymous = false;
+            $data->author = $author;
+        }
+        else {
+            $anonymous = true;
+            $data->authorname = $values['authorname'];
+        }
+
+        // @TODO deal with moderation
+        // if (isset($values['moderate']) && $values['ispublic'] && !$USER->can_edit_view($view)) {
+        //     $data->private = 1;
+        //     $data->requestpublic = 'author';
+        //     $moderated = true;
+        // }
+        // else {
+            $data->private = (int) !$ispublic;
+            $moderated = false;
+        // }
+        $private = $data->private;
+
+        $annotationfeedback = new ArtefactTypeAnnotationfeedback(0, $data);
+
+        db_begin();
+
+        $annotationfeedback->commit();
+
+        db_commit();
+
+        if (isset($data->requestpublic) && $data->requestpublic === 'author' && $data->owner) {
+            $arg = $author ? display_name($USER, null, true) : $data->authorname;
+            $moderatemsg = (object) array(
+                'subject'   => false,
+                'message'   => false,
+                'strings'   => (object) array(
+                    'subject' => (object) array(
+                        'key'     => 'makepublicrequestsubject',
+                        'section' => 'artefact.annotation',
+                        'args'    => array(),
+                    ),
+                    'message' => (object) array(
+                        'key'     => 'makepublicrequestbyauthormessage',
+                        'section' => 'artefact.annotation',
+                        'args'    => array(hsc($arg)),
+                    ),
+                    'urltext' => (object) array(
+                        'key'     => 'Annotation',
+                        'section' => 'artefact.annotation',
+                    ),
+                ),
+                'users'     => array($data->owner),
+                'url'       => $url,
+            );
+        }
+
+        require_once('activity.php');
+        $data = (object) array(
+            'annotationfeedbackid' => $annotationfeedback->get('id'),
+            'annotationid'         => $annotationartefact->get('id'),
+            'viewid'               => $view->get('id'),
+        );
+        activity_occurred('annotationfeedback', $data, 'artefact', 'annotation');
+
+        if (isset($moderatemsg)) {
+            activity_occurred('maharamessage', $moderatemsg);
+        }
+
+        list($count, $newlist) = self::get_annotation_feedback_for_matrix($annotationartefact, $view, $blockid, true);
+        return $newlist->tablerows;
+    }
+
+    /**
      * Fetching the annotations for an artefact to display on a view
      *
      * @param   object  $annotationartefact  The annotation artefact to display feedbacks for.
      * @param   object  $view     The view on which the annotation artefact is linked to.
      * @param   int     $blockid  The id of the block instance that connects the artefact to the view
-     * @param   int     @annotationscountonview The number annotations alread on the view. If one is already
-     *                            on there, don't add the add_annotation_feedback_form as it's already been
-     *                            created.
      * @param   bool    $html     Whether to return the information rendered as html or not
      * @param   bool    $editing  Whether we are view edit mode or not
      */
@@ -967,14 +1096,18 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             // Return the rendered form.
             $smarty = smarty_core();
             if ($annotationartefact->get('allowcomments') && !$editing) {
-                $addannotationfeedbackform = pieform(ArtefactTypeAnnotationfeedback::add_annotation_feedback_form(false, $annotationartefact->get('approvecomments'), $annotationartefact, $view, null, $blockid));
+                $addannotationfeedbackform = pieform(ArtefactTypeAnnotationfeedback::add_annotation_feedback_form($annotationartefact, $view, null, $blockid, false, $annotationartefact->get('approvecomments')));
                 $smarty->assign('addannotationfeedbackform', $addannotationfeedbackform);
             }
             else {
                 // The user has switched off annotation feedback. Don't create the add annotation feedback form.
                 $smarty->assign('addannotationfeedbackform', null);
             }
+            safe_require('blocktype', 'annotation');
+            $block = new BlockInstance($blockid);
+
             $smarty->assign('blockid', $blockid);
+            $smarty->assign('annotationtitle', $block->get('title'));
             $smarty->assign('annotationfeedbackcount', $annotationfeedbackcount);
             $smarty->assign('annotationfeedback', $annotationfeedback);
             $smarty->assign('editing', $editing);
@@ -1059,14 +1192,15 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
     /**
      * Create a form so the user can enter feedback for an annotation that is linked to
      * a view or an artefact.
-     * @param boolean $defaultprivate set the private setting. Default is false.
-     * @param boolean $moderate if moderating feedback. Default is false.
      * @param object $annotation the annotation artefact object.
      * @param object $view the view object that the annotation is linked to.
      * @param object $artefact the artefact object that the annotation is linked to.
+     * @param string $blockid the id of the block instance
+     * @param boolean $defaultprivate set the private setting. Default is false.
+     * @param boolean $moderate if moderating feedback. Default is false.
      * @return multitype:string multitype:NULL string
      */
-    public static function add_annotation_feedback_form($defaultprivate=false, $moderate=false, $annotation, $view, $artefact, $blockid) {
+    public static function add_annotation_feedback_form($annotation, $view, $artefact, $blockid, $defaultprivate=false, $moderate=false) {
         global $USER;
         $form = array(
             'name'              => 'add_annotation_feedback_form_' . $blockid,
@@ -1078,6 +1212,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             'autofocus'         => false,
             'elements'          => array(),
             'jssuccesscallback' => 'addAnnotationFeedbackSuccess',
+            'jserrorcallback'   => 'addAnnotationFeedbackError',
             'successcallback'   => 'add_annotation_feedback_form_submit',
             'validatecallback'  => 'add_annotation_feedback_form_validate',
         );
@@ -1103,6 +1238,41 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             'cols'  => 80,
             'rules' => array('maxlength' => 8192),
         );
+
+        $collection = $view->get('collection');
+        if (is_object($collection) && $collection->has_framework()) {
+            $view->get_artefact_instances(); // populate the artefact_metadata
+            foreach ($view->get('artefact_metadata') as $metadata) {
+                if ($metadata->id === $annotation->get('id')) {
+                    safe_require('module', 'framework');
+
+                    $evidence = get_record('framework_evidence', 'annotation', $metadata->block);
+                    if (!empty($evidence)) {
+                        // we are dealing with an annotation added since smartevidence was added
+                        $defaultval = $evidence->state;
+
+                        if ($options = Framework::get_my_assessment_options_for_user($view->get('owner'), $evidence->framework)) {
+                            if (!array_key_exists($defaultval, $options)) {
+                                $defaultval = null;
+                            }
+                            $form['elements']['assessment'] = array(
+                                'type' => 'select',
+                                'title' => get_string('assessment', 'module.framework'),
+                                'options' => $options,
+                                'defaultvalue' => $defaultval,
+                                'width' => '280px',
+                            );
+
+                            $form['elements']['evidence'] = array(
+                                'type' => 'hidden',
+                                'value' => $evidence->id,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         $form['elements']['ispublic'] = array(
             'type'  => 'switchbox',
             'title' => get_string('makepublic', 'artefact.annotation'),
@@ -1183,6 +1353,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
             'renderer'          => 'oneline',
             'plugintype'        => 'artefact',
             'pluginname'        => 'annotation',
+            'class' => 'form-as-button pull-left delete-comment btn-group-item',
             'jsform'            => true,
             'successcallback'   => 'delete_annotation_feedback_submit',
             'jssuccesscallback' => 'modifyAnnotationFeedbackSuccess',
@@ -1195,7 +1366,7 @@ class ArtefactTypeAnnotationfeedback extends ArtefactType {
                 'submit'  => array(
                     'type'  => 'button',
                     'usebuttontag' => true,
-                    'class' => 'btn-default',
+                    'class' => 'btn-default btn-sm',
                     'value' => '<span class="icon icon-trash text-danger" role="presentation" aria-hidden="true"></span><span class="sr-only">' . get_string('delete') . '</span>',
                     'elementtitle' => get_string('delete'),
                     'confirm' => get_string('reallydeletethisannotationfeedback', 'artefact.annotation'),
@@ -1530,7 +1701,15 @@ function add_annotation_feedback_form_validate(Pieform $form, $values) {
         $form->set_error('message', get_string('accessdenied', 'error'));
     }
 
-    if (empty($values['message'])) {
+    $elements = $form->get_property('elements');
+    $assessmentchanged = false;
+    if (isset($elements['assessment']) && isset($elements['assessment']['defaultvalue'])) {
+        if ((int) $values['assessment'] !== (int) $elements['assessment']['defaultvalue']) {
+            $assessmentchanged = true;
+        }
+    }
+    // Only error on feedback if we are not changing assessment
+    if (empty($values['message']) && !$assessmentchanged) {
         $form->set_error('message', get_string('annotationfeedbackempty', 'artefact.annotation'));
     }
 
@@ -1541,7 +1720,9 @@ function add_annotation_feedback_form_validate(Pieform $form, $values) {
 }
 
 function add_annotation_feedback_form_submit(Pieform $form, $values) {
+
     global $USER;
+
     $data = (object) array(
         'title'        => get_string('Annotation', 'artefact.annotation'),
         'description'  => $values['message'],
@@ -1594,6 +1775,32 @@ function add_annotation_feedback_form_submit(Pieform $form, $values) {
     db_begin();
 
     $annotationfeedback->commit();
+    if (!empty($values['evidence']) && !empty($values['assessment'])) {
+        $reviewer = null;
+        if ((int) $values['assessment'] === Framework::EVIDENCE_COMPLETED) {
+            $reviewer = $USER->get('id');
+        }
+        $fordb = array('mtime' => db_format_timestamp(time()),
+                       'state' => $values['assessment'],
+                       'reviewer' => $reviewer,
+        );
+        // update row
+        update_record('framework_evidence', (object) $fordb, (object) array('id' => $values['evidence']));
+        $framework = get_field('framework_evidence', 'framework', 'id', $values['evidence']);
+        // check if assessment status changed
+        $elements = $form->get_property('elements');
+        $assessmentchanged = false;
+        if (isset($elements['assessment']) && isset($elements['assessment']['defaultvalue'])) {
+            if ((int) $values['assessment'] !== (int) $elements['assessment']['defaultvalue']) {
+                // We need to log this assessment change
+                insert_record('framework_assessment_feedback', (object) array('framework' => $framework,
+                                                                              'artefact' => $annotationfeedback->get('id'),
+                                                                              'oldstatus' => $elements['assessment']['defaultvalue'],
+                                                                              'newstatus' => $values['assessment'],
+                                                                              'usr' => $USER->get('id')));
+            }
+        }
+    }
 
     $url = $annotation->get_view_url($view->get('id'), true, false);
     $goto = get_config('wwwroot') . $url;

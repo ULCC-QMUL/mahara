@@ -125,9 +125,13 @@ class PluginBlocktypeText extends MaharaCoreBlocktype {
      */
     public static function import_rewrite_blockinstance_extra_config_leap(array $artefactids, array $configdata) {
         // Rewrite embedded image urls in the configdata['text']
-        require_once('embeddedimage.php');
-        $configdata['text'] = EmbeddedImage::rewrite_embedded_image_urls_from_import($configdata['text'], $artefactids);
-
+        if (!empty($configdata['text'])) {
+            require_once('embeddedimage.php');
+            $configdata['text'] = EmbeddedImage::rewrite_embedded_image_urls_from_import($configdata['text'], $artefactids);
+        }
+        else {
+            $configdata['text'] = '';
+        }
         return $configdata;
     }
 
@@ -157,7 +161,6 @@ class PluginBlocktypeText extends MaharaCoreBlocktype {
             $convertibleblocksnumber = 0;
         }
         return array(
-            'class' => 'panel panel-body',
             'elements' => array(
                 'convertdescription' => array(
                     'value' => get_string('convertdescriptionfeatures', 'blocktype.text') . ' ' . get_string('convertdescription', 'blocktype.text',
@@ -309,16 +312,8 @@ class PluginBlocktypeText extends MaharaCoreBlocktype {
         $replacetext = array();
         foreach ($artefactcopies as $copyobj) {
             // Change the old image id to the new one
-            $regexp[] = '#<img([^>]+)src=("|\\")'
-                    . preg_quote(
-                        get_config('wwwroot')
-                        . 'artefact/file/download.php?file=' . $copyobj->oldid
-                    )
-                    . '(&|&amp;)embedded=1([^"]*)"#';
-            $replacetext[] = '<img$1src="'
-                    . get_config('wwwroot')
-                    . 'artefact/file/download.php?file=' . $copyobj->newid
-                    . '&embedded=1"';
+            $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $copyobj->oldid . '([^0-9])#';
+            $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $copyobj->newid . '$2';
         }
         $configdata['text'] = preg_replace($regexp, $replacetext, $configdata['text']);
         return $configdata;

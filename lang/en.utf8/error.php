@@ -55,7 +55,7 @@ The error received was:
 ';
 $string['dbnotutf8'] = 'You are not using a UTF-8 database. Mahara stores all data as UTF-8 internally. Please drop and re-create your database using UTF-8 encoding.';
 $string['dbversioncheckfailed'] = 'Your database server version is not new enough to successfully run Mahara. Your server is %s %s, but Mahara requires at least version %s.';
-$string['plpgsqlnotavailable'] = 'The PL/pgSQL language is not enabled in your Postgres installation, and Mahara cannot enable it.  Please install PL/pgSQL in your database manually. For instructions on how to do this, see https://wiki.mahara.org/wiki/System_Administrator\'s_Guide/Enabling_Plpgsql';
+$string['plpgsqlnotavailable'] = 'The PL/pgSQL language is not enabled in your Postgres installation, and Mahara cannot enable it. Please install PL/pgSQL in your database manually. For instructions on how to do this, see https://wiki.mahara.org/wiki/System_Administrator\'s_Guide/Enabling_Plpgsql';
 $string['mysqlnotriggerprivilege'] = 'Mahara requires permission to create database triggers, but is unable to do so. Please ensure that the trigger privilege has been granted to the appropriate user in your MySQL installation. For instructions on how to do this, see https://wiki.mahara.org/wiki/System_Administrator\'s_Guide/Granting_Trigger_Privilege';
 $string['mbstringneeded'] = 'Please install the mbstring extension for php. This is needed if you have UTF-8 characters in usernames. Otherwise, users might not be able to login.';
 $string['cssnotpresent'] = 'CSS files are not present in your htdocs/theme/raw/style directory. If you are running Mahara from a git checkout, run "make css" to build the CSS files. If you are running Mahara from a ZIP download, try downloading and unzipping again.';
@@ -90,6 +90,8 @@ $string['notfoundexception'] = 'The page you are looking for could not be found.
 $string['accessdenied'] = 'Access denied';
 $string['accessdeniedobjection'] = 'Access denied. The objection has already been resolved by another administrator.';
 $string['accessdeniedexception'] =  'You do not have access to view this page.';
+$string['accessdeniednourlsecret'] =  'You do not have access to this functionality. Please provide the value for "urlsecret" from your config.php file as part of the URL.';
+$string['accessdeniedbadge'] =  'You do not have access to view this badge.';
 
 $string['viewnotfoundexceptiontitle'] = 'Page not found';
 $string['viewnotfoundexceptionmessage'] = 'You tried to access a page that does not exist.';
@@ -136,5 +138,5 @@ $string['gdlibrarylackspngsupport'] = 'The installed PHP GD library does not sup
 
 $string['nopasswordsaltset'] = 'No sitewide password salt has been set. Edit your config.php and set the "passwordsaltmain" parameter to a reasonable secret phrase.';
 $string['passwordsaltweak'] = 'Your sitewide password salt is not strong enough. Edit your config.php and set the "passwordsaltmain" parameter to a longer secret phrase.';
-
+$string['urlsecretweak'] = 'The $cfg->urlsecret set for this site has not been changed from the default value. Edit your config.php and set the $cgf->urlsecret parameter to a different string (or null if you do not wish to use a urlsecret).';
 $string['notproductionsite'] = 'This site is not in production mode. Some data may not be available and/or may be out of date.';

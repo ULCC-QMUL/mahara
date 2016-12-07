@@ -18,7 +18,7 @@ define('SECTION_PAGE', 'profileicons');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('profileicons', 'artefact.file'));
 
-$settingsform = new Pieform(array(
+$settingsform = pieform_instance(array(
     'name'      => 'settings',
     'renderer'  => 'oneline',
     'autofocus' => false,
@@ -76,8 +76,7 @@ $profileiconattachedtoportfolioitems = json_encode(get_string('profileiconattach
 $profileiconappearsinviews = json_encode(get_string('profileiconappearsinviews', 'artefact.file'));
 $profileiconappearsinskins = json_encode(get_string('profileiconappearsinskins', 'artefact.file'));
 $confirmdeletefile = json_encode(get_string('confirmdeletefile', 'artefact.file'));
-$setdefault = json_encode(get_string('setdefault', 'artefact.file'));
-$markfordeletion = json_encode(get_string('markfordeletion', 'artefact.file'));
+
 $IJS = <<<EOF
 formchangemanager.add('settings');
 
@@ -108,7 +107,7 @@ var table = new TableRenderer(
             if (rowdata['isdefault'] == 't' || rowdata['isdefault'] == 1) {
                 options.checked = 'checked';
             }
-            var label = LABEL({'class': 'accessible-hidden sr-only', 'for': 'setdefault_' + rowdata.id}, {$setdefault});
+            var label = LABEL({'class': 'accessible-hidden sr-only', 'for': 'setdefault_' + rowdata.id}, rowdata.default_str);
             return TD({'class': 'defaultcell'}, INPUT(options), label);
         },
         function(rowdata) {
@@ -122,7 +121,7 @@ var table = new TableRenderer(
             if (!rowdata.id) {
                 options.disabled = 'disabled';
             }
-            var label = LABEL({'class': 'accessible-hidden sr-only', 'for': 'markdelete_' + rowdata.id}, {$markfordeletion});
+            var label = LABEL({'class': 'accessible-hidden sr-only', 'for': 'markdelete_' + rowdata.id}, rowdata.delete_str);
             return TD({'class': 'deletecell'}, INPUT(options), label);
         }
     ]
@@ -305,6 +304,7 @@ function settings_submit_default(Pieform $form, $values) {
 }
 
 function settings_submit_delete(Pieform $form, $values) {
+    require_once(get_config('docroot') . 'artefact/lib.php');
     require_once('file.php');
     global $USER, $SESSION;
 
@@ -366,5 +366,4 @@ $smarty->assign('uploadform', $uploadform);
 // the buttons need to be inside the tablerenderer.
 $smarty->assign('settingsformtag', $settingsform->get_form_tag());
 $smarty->assign('imagemaxdimensions', array(get_config('imagemaxwidth'), get_config('imagemaxheight')));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('artefact:file:profileicons.tpl');

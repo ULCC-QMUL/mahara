@@ -30,7 +30,10 @@ $blogs = (object) array(
     'pagination_js' => false,
 );
 
-$subsectionheading = false;
+if ($groupid = param_alphanum('group', null)) {
+    define('SUBSECTIONHEADING', get_string('Blogs','artefact.blog'));
+}
+
 $institutionname = $groupid = null;
 if ($institution = param_alphanum('institution', null)) {
     define('TITLE', get_string('Blogs','artefact.blog'));
@@ -67,7 +70,6 @@ if ($institution = param_alphanum('institution', null)) {
 else if ($groupid = param_alphanum('group', null)) {
     $blogs->group = $groupid;
     $group = get_record('group', 'id', $groupid, 'deleted', 0);
-    $subsectionheading = get_string('Blogs','artefact.blog');
     define('TITLE', $group->name);
 }
 else {
@@ -89,13 +91,9 @@ if (empty($blogs->institution) && empty($blogs->group)) {
 ArtefactTypeBlog::build_blog_list_html($blogs);
 
 $smarty = smarty(array('paginator'));
-$smarty->assign_by_ref('blogs', $blogs);
+$smarty->assign('blogs', $blogs);
 $smarty->assign('institutionname', $institutionname);
 $smarty->assign('group', $groupid);
-if ($subsectionheading) {
-    $smarty->assign('subsectionheading', $subsectionheading);
-}
-$smarty->assign('PAGEHEADING', TITLE);
 $js = '';
 if ($blogs->pagination_js) {
     $js .= 'addLoadEvent(function() {' . $blogs->pagination_js . '});';

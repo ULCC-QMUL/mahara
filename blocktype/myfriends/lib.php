@@ -38,7 +38,7 @@ class PluginBlocktypeMyfriends extends MaharaCoreBlocktype {
     public static function build_myfriends_html(&$friends, $userid, BlockInstance $instance) {
         $friendarray = array_chunk($friends['data'], 4); // get the friends into a 4x4 array
         $smarty = smarty_core();
-        $smarty->assign_by_ref('friends', $friendarray);
+        $smarty->assign('friends', $friendarray);
         $friends['tablerows'] = $smarty->fetch('blocktype:myfriends:myfriendrows.tpl');
 
         if ($friends['limit'] === false) {
@@ -104,7 +104,6 @@ class PluginBlocktypeMyfriends extends MaharaCoreBlocktype {
                 $relationship = 'none';
                 $friendscontrol = get_account_preference($userid, 'friendscontrol');
                 if ($friendscontrol == 'auto') {
-                    require_once('pieforms/pieform.php');
                     $newfriendform = pieform(array(
                         'name' => 'myfriends_addfriend',
                         'successcallback' => 'addfriend_submit',

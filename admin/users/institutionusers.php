@@ -19,7 +19,6 @@ define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'institutionusers');
 define('MENUITEM', 'manageinstitutions/institutionusers');
-require_once('pieforms/pieform.php');
 require_once('institution.php');
 $institutionelement = get_institution_selector(false);
 
@@ -80,6 +79,8 @@ if ($usertype == 'requesters') {
         'title' => get_string('addnewmembers', 'admin'),
         'lefttitle' => get_string('usersrequested', 'admin'),
         'righttitle' => get_string('userstoaddorreject', 'admin'),
+        'leftarrowlabel' => get_string('moveusersfromadd', 'admin'),
+        'rightarrowlabel' => get_string('moveuserstoadd', 'admin'),
         'searchparams' => array('requested' => 1),
     );
     $submittext = get_string('addmembers', 'admin');
@@ -89,6 +90,8 @@ if ($usertype == 'requesters') {
         'title' => get_string('removeusersfrominstitution', 'admin'),
         'lefttitle' => get_string('currentmembers', 'admin'),
         'righttitle' => get_string('userstoberemoved', 'admin'),
+        'leftarrowlabel' => get_string('movemembersfromremove', 'admin'),
+        'rightarrowlabel' => get_string('movememberstoremove', 'admin'),
         'searchparams' => array('member' => 1),
     );
     $submittext = get_string('removeusers', 'admin');
@@ -101,6 +104,8 @@ else if ($usertype == 'lastinstitution') {
         'title' => get_string('inviteuserstojoin', 'admin'),
         'lefttitle' => get_string('userswhohaveleft', 'admin', $lastinstitutionobj->displayname),
         'righttitle' => get_string('userstobeinvited', 'admin'),
+        'leftarrowlabel' => get_string('moveusersfrominviteinstitution', 'admin', $lastinstitutionobj->displayname),
+        'rightarrowlabel' => get_string('moveuserstoinviteinstitution', 'admin', $lastinstitutionobj->displayname),
         'searchparams' => array('member' => 0, 'invitedby' => 0, 'requested' => 0, 'lastinstitution' => $lastinstitution),
     );
     $submittext = get_string('inviteusers', 'admin');
@@ -113,6 +118,8 @@ else if ($usertype == 'nonmembers') {
         'title' => get_string('inviteuserstojoin', 'admin'),
         'lefttitle' => get_string('Non-members', 'admin'),
         'righttitle' => get_string('userstobeinvited', 'admin'),
+        'leftarrowlabel' => get_string('moveusersfrominvite', 'admin'),
+        'rightarrowlabel' => get_string('moveuserstoinvite', 'admin'),
         'searchparams' => array('member' => 0, 'invitedby' => 0, 'requested' => 0)
     );
     $submittext = get_string('inviteusers', 'admin');
@@ -123,6 +130,8 @@ else if ($usertype == 'invited') {
         'title' => get_string('revokeinvitations', 'admin'),
         'lefttitle' => get_string('invitedusers', 'admin'),
         'righttitle' => get_string('userstobeuninvited', 'admin'),
+        'leftarrowlabel' => get_string('moveusersfromuninvited', 'admin'),
+        'rightarrowlabel' => get_string('moveuserstouninvited', 'admin'),
         'searchparams' => array('member' => 0, 'invitedby' => 1),
     );
     $submittext = get_string('revokeinvitations', 'admin');
@@ -308,6 +317,5 @@ $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('usertypeselector', $usertypeselector);
 $smarty->assign('instructions', get_string('institutionusersinstructions' . $usertype . '1', 'admin', $userlistelement['lefttitle'], $userlistelement['righttitle']));
 $smarty->assign('institutionusersform', $userlistform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('institutionselector', $institutionselector);
 $smarty->display('admin/users/institutionusers.tpl');

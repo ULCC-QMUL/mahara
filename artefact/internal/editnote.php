@@ -77,6 +77,7 @@ $form = array(
             'title'        => get_string('tags'),
             'description'  => get_string('tagsdescprofile'),
             'defaultvalue' => $artefact->get('tags'),
+            'help'         => true,
         ),
         'license' => license_form_el_basic($artefact),
         'licensing_advanced' => license_form_el_advanced($artefact),
@@ -156,7 +157,7 @@ $smarty = smarty(array(), array(), array(), array(
     ),
 ));
 $smarty->assign('INLINEJAVASCRIPT', $javascript);
-$smarty->assign_by_ref('form', $form);
+$smarty->assign('form', $form);
 $smarty->assign('PAGEHEADING', $artefact->get('title'));
 $smarty->assign('pagedescriptionhtml', $othernotesmsg);
 $smarty->display('form.tpl');

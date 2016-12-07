@@ -43,7 +43,9 @@ class PluginBlocktypeGroupMembers extends MaharaCoreBlocktype {
     public static function render_instance (BlockInstance $instance, $editing = false) {
         global $USER;
 
-        if ($instance->get_view()->get('owner') == "0") {
+        // Not render if the block is in a template
+        require_once(get_config('libroot') . 'view.php');
+        if ($instance->get_view()->get('template') == View::SITE_TEMPLATE) {
             return '';
         }
 
@@ -70,7 +72,7 @@ class PluginBlocktypeGroupMembers extends MaharaCoreBlocktype {
 
         if ($groupmembers['count']) {
             $smarty = smarty_core();
-            $smarty->assign_by_ref('groupmembers', $groupmembers['data']);
+            $smarty->assign('groupmembers', $groupmembers['data']);
             $groupmembers['tablerows'] = $smarty->fetch('blocktype:groupmembers:row.tpl');
         } else {
             $groupmembers = false;

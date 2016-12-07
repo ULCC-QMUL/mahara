@@ -18,14 +18,13 @@ define('SECTION_PAGE', 'siteviews');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once(get_config('libroot') . 'view.php');
-require_once('pieforms/pieform.php');
 
 $title = get_string('siteviews', 'admin');
 define('TITLE', $title);
 
 $offset = param_integer('offset', 0);
 
-$templateviews = View::get_template_views();
+$templateviews = View::get_site_template_views();
 list($searchform, $data, $pagination) = View::views_by_owner(null, 'mahara');
 if ($data->data) {
     $views = array_merge($templateviews, $data->data);
@@ -61,7 +60,6 @@ $createviewform = pieform(create_view_form(null, 'mahara'));
 $smarty = smarty(array('paginator'));
 setpageicon($smarty, 'icon-file-text');
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('views', $views);
 $smarty->assign('institution', 'mahara');

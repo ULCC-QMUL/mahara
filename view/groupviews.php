@@ -20,11 +20,11 @@ define('SECTION_PAGE', 'groupviews');
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once(get_config('libroot') . 'view.php');
 require_once(get_config('libroot') . 'group.php');
-require_once('pieforms/pieform.php');
 
 $offset = param_integer('offset', 0);
 
 define('GROUP', param_integer('group'));
+define('SUBSECTIONHEADING', get_string('Views', 'view'));
 $group = group_current_group();
 if (!is_logged_in() && !$group->public) {
     throw new AccessDeniedException();
@@ -43,13 +43,7 @@ if (!$can_edit) {
 
     $setlimit = true;
     $limit = param_integer('limit', 0);
-    $userlimit = get_account_preference($USER->get('id'), 'viewsperpage');
-    if ($limit > 0 && $limit != $userlimit) {
-        $USER->set_account_preference('viewsperpage', $limit);
-    }
-    else {
-        $limit = $userlimit;
-    }
+    $limit = user_preferred_limit($limit);
     $offset = param_integer('offset', 0);
 
     $data = View::view_search(null, null, (object) array('group' => $group->id), null, $limit, $offset);
@@ -106,7 +100,6 @@ $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('views', $data->data);
 $smarty->assign('headingclass', 'page-header');
 $smarty->assign('pagination', $pagination['html']);
-$smarty->assign('subsectionheading', get_string('Views', 'view'));
 
 if (!$can_edit) {
     $html = $smarty->fetch('view/indexgroupresults.tpl');

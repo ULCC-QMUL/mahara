@@ -13,12 +13,12 @@ define('PUBLIC', 1);
 define('INTERNAL', 1);
 define('JSON', 1);
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('collection.php');
 
 // offset and limit for pagination
 $offset = param_integer('offset', 0);
-$limit  = param_integer('limit', 10);
+$limit  = param_integer('limit', 0);
+$limit = user_preferred_limit($limit);
 $setlimit = param_boolean('setlimit', false);
 $owner = null;
 $groupid = param_integer('group', 0);
@@ -26,6 +26,7 @@ $institutionname = param_alphanum('institution', false);
 $urlparams = array();
 
 if (!empty($groupid)) {
+    require_once('group.php');
     $group = group_current_group();
     // Check if user can edit group collections <-> user can edit group views
     $role = group_user_access($group->id);
@@ -67,6 +68,10 @@ foreach ($data->data as $value) {
     $views = $collection->get('views');
     if (!empty($views)) {
         $value->views = $views['views'];
+    }
+    if (is_plugin_active('framework', 'module') && $collection->has_framework()) {
+        $framework = new Framework($collection->get('framework'));
+        $value->frameworkname = $framework->get('name');
     }
 }
 $smarty = smarty_core();

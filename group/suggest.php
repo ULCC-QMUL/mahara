@@ -14,10 +14,9 @@ define('INTERNAL', 1);
 define('MENUITEM', 'groups/members');
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once('group.php');
-require_once('pieforms/pieform.php');
 
 define('GROUP', param_integer('id'));
-
+define('SUBSECTIONHEADING', get_string('members'));
 $group = group_current_group();
 if (!is_logged_in() && !$group->public) {
     throw new AccessDeniedException();
@@ -51,6 +50,7 @@ $form = pieform(array(
         ),
         'submit' => array(
             'type' => 'submit',
+            'class' => 'btn-primary',
             'value' => get_string('submit'),
         )
     )
@@ -58,7 +58,6 @@ $form = pieform(array(
 
 $smarty = smarty();
 $smarty->assign('subheading', $subheading);
-$smarty->assign('subsectionheading', get_string('members'));
 $smarty->assign('form', $form);
 $smarty->display('group/form.tpl');
 exit;
@@ -92,6 +91,6 @@ function addmembers_submit(Pieform $form, $values) {
         'urltext' => hsc($group->name),
     ));
 
-    $SESSION->add_ok_msg(get_string('recommendationssent', 'group', count($values['users'])));
+    $SESSION->add_ok_msg(get_string('nrecommendationssent', 'group', count($values['users'])));
     redirect(get_config('wwwroot') . $groupurl);
 }

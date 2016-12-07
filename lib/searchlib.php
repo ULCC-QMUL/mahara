@@ -210,6 +210,14 @@ function get_admin_user_search_results($search, $offset, $limit) {
         }
     }
 
+    if (!empty($search->authname)) {
+        $constraints[] = array(
+            'field' => 'authname',
+            'type' => 'equals',
+            'string' => $search->authname
+        );
+    }
+
     if (!empty($search->f)) {
         $constraints[] = array('field' => 'firstname',
                                'type' => 'starts',
@@ -389,7 +397,7 @@ function get_admin_user_search_results($search, $offset, $limit) {
 function build_admin_user_search_results($search, $offset, $limit) {
     global $USER, $THEME;
 
-    $wantedparams = array('query', 'f', 'l', 'sortby', 'sortdir', 'loggedin', 'loggedindate', 'duplicateemail', 'institution');
+    $wantedparams = array('query', 'f', 'l', 'sortby', 'sortdir', 'loggedin', 'loggedindate', 'duplicateemail', 'institution', 'authname');
     $params = array();
     foreach ($search as $k => $v) {
         if (!in_array($k, $wantedparams)) {
@@ -502,8 +510,8 @@ function build_admin_user_search_results($search, $offset, $limit) {
     }
 
     $smarty = smarty_core();
-    $smarty->assign_by_ref('results', $results);
-    $smarty->assign_by_ref('institutions', $institutions);
+    $smarty->assign('results', $results);
+    $smarty->assign('institutions', $institutions);
     $smarty->assign('USER', $USER);
     $smarty->assign('limit', $limit);
     $smarty->assign('limitoptions', array(10, 50, 100, 200, 500));
@@ -675,7 +683,7 @@ function build_admin_export_queue_results($search, $offset, $limit) {
     );
 
     $smarty = smarty_core();
-    $smarty->assign_by_ref('results', $results);
+    $smarty->assign('results', $results);
     $smarty->assign('USER', $USER);
     $smarty->assign('limit', $limit);
     $smarty->assign('limitoptions', array(10, 50, 100, 200, 500));
@@ -800,7 +808,7 @@ function build_admin_archived_submissions_results($search, $offset, $limit) {
     );
 
     $smarty = smarty_core();
-    $smarty->assign_by_ref('results', $results);
+    $smarty->assign('results', $results);
     $smarty->assign('USER', $USER);
     $smarty->assign('limit', $limit);
     $smarty->assign('limitoptions', array(10, 50, 100, 200, 500));
@@ -946,6 +954,8 @@ function get_group_user_search_results($group, $query, $offset, $limit, $members
  * @param string  The query string
  * @param integer How many results to return
  * @param integer What result to start at (0 == first result)
+ * @param string  Category the group belongs to
+ * @param string  The institution the group belongs
  * @return array  A data structure containing results looking like ...
  *         $results = array(
  *               count   => integer, // total number of results
@@ -972,11 +982,11 @@ function get_group_user_search_results($group, $query, $offset, $limit, $members
  *               ),
  *           );
  */
-function search_group($query_string, $limit, $offset = 0, $type = 'member', $groupcategory = '') {
+function search_group($query_string, $limit, $offset = 0, $type = 'member', $groupcategory = '', $institution='all') {
     $plugin = get_config('searchplugin');
     safe_require('search', $plugin);
 
-    return call_static_method(generate_class_name('search', $plugin), 'search_group', $query_string, $limit, $offset, $type, $groupcategory);
+    return call_static_method(generate_class_name('search', $plugin), 'search_group', $query_string, $limit, $offset, $type, $groupcategory, $institution);
 }
 
 function search_selfsearch($query_string, $limit, $offset, $type = 'all') {

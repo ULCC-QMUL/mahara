@@ -15,7 +15,6 @@ require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'actionregistration');
-require_once('pieforms/pieform.php');
 require_once('institution.php');
 
 $id = param_integer('r');
@@ -66,6 +65,7 @@ foreach ((array)$registration as $key => $value) {
 $elements['submit'] = array(
     'type' => 'submitcancel',
     'value' => array($submitbtn, get_string('cancel')),
+    'class' => 'btn-primary',
     'goto' => get_config('wwwroot') . 'admin/users/pendingregistrations.php?institution='.$inst->name,
 );
 
@@ -77,7 +77,6 @@ $form = pieform(array(
 ));
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('message', $message);
 $smarty->assign('form', $form);
 $smarty->display('admin/users/actionregistration.tpl');

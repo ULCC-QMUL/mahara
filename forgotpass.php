@@ -16,7 +16,6 @@ define('SECTION_PLUGINNAME', 'site');
 define('SECTION_PAGE', 'forgotpass');
 
 require('init.php');
-require_once('pieforms/pieform.php');
 
 if ($SESSION->get('pwchangerequested')) {
     $SESSION->set('pwchangerequested', false);
@@ -98,6 +97,7 @@ $form = array(
         ),
         'submit' => array(
             'type' => 'submit',
+            'class' => 'btn-primary',
             'value' => get_string('sendrequest')
         )
     )

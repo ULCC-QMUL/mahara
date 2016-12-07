@@ -17,7 +17,6 @@ define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'iframesites');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('upgrade.php');
 define('TITLE', get_string('allowediframesites', 'admin'));
 
@@ -96,7 +95,7 @@ foreach ($iframesources as $url => $name) {
             'name'             => 'deleteurl_' . $i,
             'successcallback'  => 'deleteurl_submit',
             'renderer'         => 'div',
-            'class'            => 'form-inline form-as-button pull-left',
+            'class'            => 'form-inline form-as-button pull-right btn-group',
             'elements'         => array(
                 'submit' => array(
                     'type'         => 'button',
@@ -253,6 +252,9 @@ $js = <<<EOF
 jQuery(function($) {
     $('.url-open-editform').click(function(e) {
         e.preventDefault();
+        $('#' + this.id).addClass('collapse-indicator');
+        $('#' + this.id).toggleClass('open');
+        $('#' + this.id).toggleClass('closed');
         $('#' + this.id + '-form').toggleClass('js-hidden');
     });
 });
@@ -261,7 +263,6 @@ EOF;
 $smarty = smarty();
 setpageicon($smarty, 'icon-puzzle-piece');
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('editurls', $editurls);
 $smarty->assign('newform', $newform);

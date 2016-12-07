@@ -69,7 +69,7 @@ if ($blockid = param_integer('blockconfig', 0)) {
         if ($bi->get('view') != $view->get('id')) {
             throw new AccessDeniedException(get_string('blocknotinview', 'view', $bi->get('id')));
         }
-        $bi->build_configure_form();
+        $bi->build_configure_form($new);
     }
 }
 
@@ -88,7 +88,7 @@ else if ($view->get('type') == 'dashboard') {
 }
 else if ($view->get('type') == 'grouphomepage') {
     $title = get_string('grouphomepage', 'view');
-    if ($view->get('owner') != "0") {
+    if ($view->get('template') != View::SITE_TEMPLATE) {
         $groupurl = group_homepage_url(get_record('group', 'id', $view->get('group')), false);
     }
     define('TITLE', $title);
@@ -100,7 +100,7 @@ else {
     define('TITLE', $view->get('title'));
     $editabletitle = true;
 }
-
+define('SUBSECTIONHEADING', TITLE);
 // Make the default category the first tab if none is set
 $category = '';
 if (param_exists('c')) {
@@ -135,7 +135,7 @@ $stylesheets = array_merge($stylesheets, $view->get_all_blocktype_css());
 // longer available to them.
 if ($viewtheme && !isset($allowedthemes[$viewtheme])) {
     $smarty = smarty(array(), $stylesheets, false, $extraconfig);
-    $smarty->assign('maintitle', TITLE);
+    $smarty->assign('PAGEHEADING', get_string('choosetheme'));
     $smarty->assign('formurl', get_config('wwwroot') . 'view/blocks.php');
     $smarty->assign('view', $view->get('id'));
     $smarty->assign('viewtitle', $view->get('title'));
@@ -150,6 +150,9 @@ $javascript = array('views', 'tinymce', 'paginator', 'js/jquery/jquery-ui/js/jqu
                     'lib/pieforms/static/core/pieforms.js','js/jquery/modernizr.custom.js');
 $blocktype_js = $view->get_all_blocktype_javascript();
 $javascript = array_merge($javascript, $blocktype_js['jsfiles']);
+if (is_plugin_active('externalvideo', 'blocktype')) {
+    $javascript = array_merge($javascript, array((is_https() ? 'https:' : 'http:') . '//cdn.embedly.com/widgets/platform.js'));
+}
 $inlinejs = "addLoadEvent( function() {\n" . join("\n", $blocktype_js['initjs']) . "\n});";
 require_once('pieforms/pieform/elements/select.php');
 $inlinejs .= pieform_element_select_get_inlinejs();
@@ -265,7 +268,7 @@ if (isset($groupurl)) {
 }
 $smarty->assign('institution', $institution);
 
-if (get_config('userscanchooseviewthemes') && $view->is_themeable() && $view->get('owner') != "0") {
+if (get_config('userscanchooseviewthemes') && $view->is_themeable()) {
     $smarty->assign('viewtheme', $viewtheme);
     $smarty->assign('viewthemes', $allowedthemes);
 }
@@ -289,9 +292,6 @@ else {
 }
 $smarty->assign('issiteview', isset($institution) && ($institution == 'mahara'));
 
-if ($view->get('owner') == "0") {
-    $smarty->assign('issitetemplate', true);
-}
+$smarty->assign('issitetemplate', $view->is_site_template());
 $smarty->assign('PAGEHEADING', $state);
-$smarty->assign('subsectionheading', TITLE);
 $smarty->display('view/blocks.tpl');

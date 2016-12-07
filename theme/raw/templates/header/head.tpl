@@ -18,7 +18,8 @@
         'mobile': {if $MOBILE}1{else}0{/if},
         'handheld_device': {if $HANDHELD_DEVICE}1{else}0{/if},
         'cc_enabled': {$CC_ENABLED|intval},
-        'mathjax': {ifconfig key=mathjax}1{else}0{/ifconfig}
+        'mathjax': {ifconfig key=mathjax}1{else}0{/ifconfig},
+        'select2_lang': '{$select2_language}'
     {literal}}{/literal};
     </script>
     {$STRINGJS|safe}
@@ -40,7 +41,6 @@
 {/foreach}
     <script type="application/javascript" src="{$WWWROOT}/lib/bootstrap/assets/javascripts/bootstrap.js?v={$CACHEVERSION}"></script>
     <script type="application/javascript" src="{$WWWROOT}/js/javascript-templates/js/tmpl.min.js?v={$CACHEVERSION}"></script>
-    <script type="application/javascript" src="{$WWWROOT}js/jquery.rating.js?v={$CACHEVERSION}"></script>
     <script type="application/javascript" src="{theme_url filename='js/masonry.min.js'}?v={$CACHEVERSION}"></script>
     <script type="application/javascript" src="{theme_url filename='js/pieform.js'}?v={$CACHEVERSION}"></script>
     <script type="application/javascript" src="{theme_url filename='js/formtabs.js'}?v={$CACHEVERSION}"></script>
@@ -50,7 +50,6 @@
     <script type="application/javascript" src="{theme_url filename='js/dock.js'}?v={$CACHEVERSION}"></script>
     <script type="application/javascript" src="{theme_url filename='js/theme.js'}?v={$CACHEVERSION}"></script>
 
-    <script type="application/javascript" src="{$WWWROOT}js/css.js?v={$CACHEVERSION}"></script>
     <link rel="shortcut icon" href="{$WWWROOT}favicon.ico?v={$CACHEVERSION}" type="image/vnd.microsoft.icon">
     <link rel="image_src" href="{$sitelogo}">
 {if $ADDITIONALHTMLHEAD}{$ADDITIONALHTMLHEAD|safe}{/if}

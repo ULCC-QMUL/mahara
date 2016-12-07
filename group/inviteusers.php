@@ -14,10 +14,9 @@ define('INTERNAL', 1);
 define('MENUITEM', 'groups/members');
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once('group.php');
-require_once('pieforms/pieform.php');
 
 define('GROUP', param_integer('id'));
-
+define('SUBSECTIONHEADING', get_string('members'));
 $group = group_current_group();
 if (!is_logged_in() && !$group->public) {
     throw new AccessDeniedException();
@@ -63,7 +62,6 @@ $form = pieform(array(
 
 $smarty = smarty();
 $smarty->assign('subheading', get_string('sendinvitations', 'group'));
-$smarty->assign('subsectionheading', get_string('members'));
 $smarty->assign('form', $form);
 $smarty->display('group/form.tpl');
 exit;

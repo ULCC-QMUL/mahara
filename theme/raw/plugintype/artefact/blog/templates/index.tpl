@@ -17,7 +17,6 @@
             {$blogs->pagination|safe}
         </div>
     </div>
-
 </div>
 {/if}
 {include file="footer.tpl"}

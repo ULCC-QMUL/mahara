@@ -25,8 +25,6 @@
         navBuffer = 660;
 
     // Public Properties
-    // Whether the browser is IE - needed for some hacks
-    ViewManager.isOldIE = $.browser.msie && $.browser.version < 9.0;
     ViewManager.contentEditorWidth = 145;
 
     //Public Methods
@@ -44,6 +42,17 @@
     ViewManager.replaceConfigureBlock = function(data) {
         var oldblock = $('#blockinstance_' + data.blockid);
         if (oldblock.length) {
+            // Dispose the block videojs player if exists
+            try {
+                videojs('audio_' + data.blockid).dispose();
+            }
+            catch (err) {
+            }
+            try {
+                videojs('video_' + data.blockid).dispose();
+            }
+            catch (err) {
+            }
             // doing it this way stop inline js in the
             // data.data.html breaking things
             var temp = $('<div>').append(data.data.html);
@@ -79,6 +88,53 @@
             newblock.find('.configurebutton').focus();
         }, 1);
     };
+
+    /**
+     * Pieform callback function for after a block config form is successfully
+     * submitted
+     */
+    ViewManager.blockConfigSuccess = function(form, data) {
+        if (data.formelementsuccess) {
+            eval(data.formelementsuccess + '(form, data)');
+        }
+        if (data.blockid) {
+            ViewManager.replaceConfigureBlock(data);
+        }
+        if (data.otherblocks) {
+            jQuery.each(data.otherblocks, function( ind, val ) {
+                ViewManager.replaceConfigureBlock(val);
+            });
+        }
+    }
+
+    /**
+     * Pieform callback function for after a block config form fails validation
+     */
+    ViewManager.blockConfigError = function(form, data) {
+        if (data.formelementerror) {
+            eval(data.formelementerror + '(form, data)');
+        }
+
+        // TODO: reduce code duplication between here and getConfigureForm
+        // and addConfigureBlock
+        var blockinstanceId = jQuery(form).find('#instconf_blockconfig').val();
+        var cancelbutton = jQuery('#cancel_instconf_action_configureblockinstance_id_' + blockinstanceId);
+        if (jQuery(form).find('#instconf_new').val() == 1) {
+            // Wire up the cancel button in the new form
+            var deletebutton = jQuery('#configureblock .deletebutton');
+            if (cancelbutton.length > 0) {
+                cancelbutton.attr('name', deletebutton.attr('name'));
+                cancelbutton.off();
+                rewriteCancelButton(cancelbutton, blockinstanceId);
+            }
+        }
+        else {
+            cancelbutton.on('click',function(e) {
+                var configbutton = jQuery('.view-container button[name="action_configureblockinstance_id_' + blockinstanceId + '"]');
+                onModalCancel(e, configbutton);
+            });
+        }
+    }
 
     //Private Methods
     /////////////////
@@ -245,11 +301,8 @@
     }
 
     function writeCookieContentEditorCollapsed(isCollapsed) {
-        if (!config['cc_enabled'] || (config['cc_enabled'] && document.cookie.indexOf("cc_necessary") >= 0)) {
-            document.cookie=cookieName+"="+ (isCollapsed ? '1': '0') +"; expires=Wednesday, 01-Aug-2040 08:00:00 GMT";
-        }
+        document.cookie=cookieName+"="+ (isCollapsed ? '1': '0') +"; expires=Wednesday, 01-Aug-2040 08:00:00 GMT";
     }
-
 
     function makeNewBlocksDraggable() {
 
@@ -318,7 +371,7 @@
             }
         });
 
-        addblockdialog.find('h4.modal-title').text(get_string('addblock', element.text()));
+        addblockdialog.find('h4.modal-title').text(get_string('addblock', 'view', element.text()));
         computeColumnInputs(addblockdialog);
         addblockdialog.find('.block-inner').removeClass('hidden');
         addblockdialog.find('.cell-chooser input:first').prop('checked', true);
@@ -408,7 +461,7 @@
             selectbox = $('#addblock_position');
 
         element.find('.column-content .blockinstance .blockinstance-header').each(function() {
-            options.push(get_string('blockorderafter', $(this).html()));
+            options.push(get_string('blockorderafter', 'view', $(this).html()));
         });
 
 
@@ -707,7 +760,7 @@
                 label = $('<label>').addClass('cell').attr('for', 'cellchooser_' + value).attr('style', $(cols[j]).attr('style'));
 
                 label.append(radio)
-                    .append($('<span>').addClass('pseudolabel mll').html(get_string('cellposition', i + 1, j + 1)));
+                    .append($('<span>').addClass('pseudolabel mll').html(get_string('cellposition', 'view', i + 1, j + 1)));
 
                 row.append(label);
 
@@ -745,6 +798,9 @@
         }
         pd['action_moveblockinstance_id_' + instanceId + '_row_' + whereTo['row'] + '_column_' + whereTo['column'] + '_order_' + whereTo['order']] = true;
         sendjsonrequest(config['wwwroot'] + 'view/blocks.json.php', pd, 'POST', function(data) {
+            if (data.data.html) {
+                $('#blockinstance_' + instanceId + ' .blockinstance-content').html(data.data.html);
+            }
             hideColumnBackgrounds();
         });
     }
@@ -978,8 +1034,6 @@
 
             sendjsonrequest('blocks.json.php', pd, 'POST', function(data) {
 
-                content.html(oldContent);
-
                 addConfigureBlock(blockinstance, data.data);
 
 
@@ -1026,27 +1080,23 @@
         });
     }
 
+    /**
+     * This function is called before the modal is opened. In theory it could be used to make changes
+     * to the display of elements before the modal opens (for things that might interfere with the
+     * modal.
+     *
+     * It's currently empty because everything works fine without it.
+     */
     function hideMediaPlayers() {
-        workspace.find('.mediaplayer-container').each(function() {
-            $(this).height($(this).height()); // retain height while hiding
-            $('mediaplayer:first', this).hide();
-            $('object', this).each(function() {
-                $(this).addClass('in-mediaplayer');
-            });
-        });
-
-        // Try to find and hide players floating around in text blocks, etc. by looking for object elements
-        workspace.find('object').each(function() {
-            if (!$(this).hasClass('in-mediaplayer')) {
-                var temp = $('<div>').addClass('hidden mediaplayer-placeholder');
-                $(temp).height($(this).height());
-                $(this).after(temp);
-                $(this).addClass('hidden');
-                $(temp).removeClass('hidden');
-            }
-        });
     }
 
+    /**
+     * This function is called after the modal is closed. If you have deactivated things using
+     * hideMediaPlayers, this can be a good place to re-open them.
+     *
+     * It is also used as a hacky place to hold other things that should be triggered after the
+     * modal closes.
+     */
     function showMediaPlayers() {
         if (!config['handheld_device'] && tinyMCE && tinyMCE.activeEditor && tinyMCE.activeEditor.id) {
             tinyMCE.execCommand('mceRemoveEditor', false, tinyMCE.activeEditor.id);
@@ -1054,17 +1104,6 @@
         if (config.mathjax && MathJax !== undefined) {
             MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
         }
-        workspace.find('.mediaplayer-container').each(function() {
-            $(this).css({'height': ''});
-            $('mediaplayer:first', this).show();
-            $(this).height($(this).height());
-        });
-        workspace.find('.mediaplayer-placeholder').each(function() {
-            $(this).addClass('hidden');
-            $(this).prev().removeClass('hidden');
-            $(this).remove();
-        });
-
     }
 
     /**
@@ -1148,6 +1187,13 @@
 
 
     function hideDock() {
+      // Reset the form change checker
+      var form = formchangemanager.find('instconf');
+      if (form !== null) {
+          form.unbind();
+          form.reset();
+      }
+
       dock.hide();
     }
 
@@ -1305,33 +1351,29 @@
         /**
          * changes the intructions so they are for ajax
          */
-        $('#blocksinstruction').html(strings['blocksinstructionajax']);
+        $('#blocksinstruction').html(strings['blocksinstructionajaxlive']);
     });
 
 }( window.ViewManager = window.ViewManager || {}, jQuery ));
 
 ViewManager.addCSSRules();
 
-$j = jQuery;
-
+/**
+ * Pieform callback method. Just a wrapper around the ViewManager function,
+ * because Pieforms doesn't like periods in callback method names.
+ * @param form
+ * @param data
+ */
 function blockConfigSuccess(form, data) {
-    if (data.formelementsuccess) {
-        eval(data.formelementsuccess + '(form, data)');
-    }
-    if (data.blockid) {
-        ViewManager.replaceConfigureBlock(data);
-    }
-    if (data.otherblocks) {
-        $j.each(data.otherblocks, function( ind, val ) {
-            ViewManager.replaceConfigureBlock(val);
-        });
-    }
-
+    return ViewManager.blockConfigSuccess(form, data);
 }
 
+/**
+ * Pieform callback method. Just a wrapper around the ViewManager function,
+ * because Pieforms doesn't like periods in callback method names.
+ * @param form
+ * @param data
+ */
 function blockConfigError(form, data) {
-    if (data.formelementerror) {
-        eval(data.formelementerror + '(form, data)');
-        return;
-    }
+    return ViewManager.blockConfigError(form, data);
 }

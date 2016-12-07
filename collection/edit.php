@@ -16,12 +16,12 @@ define('SECTION_PLUGINNAME', 'collection');
 define('SECTION_PAGE', 'edit');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('collection.php');
 
 $new = param_boolean('new', 0);
 $copy = param_boolean('copy', 0);
 
+$subtitle = false;
 if ($new) {    // if creating a new collection
     $owner = null;
     $groupid = param_integer('group', 0);
@@ -30,7 +30,7 @@ if ($new) {    // if creating a new collection
         $owner = $USER->get('id');
     }
     $collection = new Collection(null, array('owner' => $owner, 'group' => $groupid, 'institution' => $institutionname));
-    define('SUBTITLE', get_string('edittitleanddesc', 'collection'));
+    define('SUBSECTIONHEADING', get_string('edittitleanddesc', 'collection'));
 }
 else {    // if editing an existing or copied collection
     $id = param_integer('id');
@@ -38,7 +38,7 @@ else {    // if editing an existing or copied collection
     $owner = $collection->get('owner');
     $groupid = $collection->get('group');
     $institutionname = $collection->get('institution');
-    define('SUBTITLE', $collection->get('name').': '.get_string('edittitleanddesc', 'collection'));
+    define('SUBSECTIONHEADING', $collection->get('name'));
 }
 
 if ($collection->is_submitted()) {
@@ -48,6 +48,7 @@ if ($collection->is_submitted()) {
 
 $urlparams = array();
 if (!empty($groupid)) {
+    require_once('group.php');
     define('MENUITEM', 'groups/collections');
     define('GROUP', $groupid);
     $group = group_current_group();
@@ -109,30 +110,45 @@ $form = pieform(array(
     'name' => 'edit',
     'plugintype' => 'core',
     'pluginname' => 'collection',
-    'successcallback' => 'submit',
+    'validatecallback' => 'collectionedit_validate',
+    'successcallback' => 'collectionedit_submit',
     'elements' => $elements,
 ));
 
 $smarty = smarty();
 setpageicon($smarty, 'icon-folder-open');
-if (!empty($groupid)) {
-    $smarty->assign('PAGESUBHEADING', SUBTITLE);
-    $smarty->assign('PAGEHELPNAME', '0');
-    $smarty->assign('SUBPAGEHELPNAME', '1');
-}
-else {
-    $smarty->assign('PAGEHEADING', SUBTITLE);
-}
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('headingclass', 'page-header');
 
-$smarty->assign_by_ref('form', $form);
+$smarty->assign('form', $form);
 $smarty->display('collection/edit.tpl');
 
-function submit(Pieform $form, $values) {
+function collectionedit_validate(Pieform $form, $values) {
+    if (!empty($values['id'])) {
+        $collection = new Collection($values['id']);
+        if ($collection->has_framework() && $collection->get('framework') != $values['framework']) {
+            // Make sure that if the user is changing the framework that there isn't annotations paired to the old framework
+            $views = get_records_sql_array("SELECT v.id, v.title FROM {view} v
+                                            JOIN {collection_view} cv ON cv.view = v.id
+                                            JOIN {framework_evidence} fe ON fe.view = cv.view
+                                            WHERE cv.collection = ?", array($values['id']));
+            if (!empty($views)) {
+                $errorstr = get_string('changeframeworkproblems', 'module.framework');
+                foreach ($views as $view) {
+                    $errorstr .= " '" . $view->title . "'";
+                }
+                $form->set_error('framework', $errorstr);
+            }
+        }
+    }
+}
+
+function collectionedit_submit(Pieform $form, $values) {
     global $SESSION, $new, $copy, $urlparams;
     $values['navigation'] = (int) $values['navigation'];
+    if (empty($values['framework'])) {
+        $values['framework'] = null;
+    }
     $collection = Collection::save($values);
     if (!$new) {
         $SESSION->add_ok_msg(get_string('collectionsaved', 'collection'));

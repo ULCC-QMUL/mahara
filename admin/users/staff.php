@@ -19,7 +19,6 @@ define('TITLE', get_string('staffusers', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'staffusers');
-require_once('pieforms/pieform.php');
 require_once('activity.php');
 
 // Get users who are currently staff
@@ -71,5 +70,4 @@ $smarty = smarty();
 setpageicon($smarty, 'icon-user');
 
 $smarty->assign('staffusersform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/staff.tpl');

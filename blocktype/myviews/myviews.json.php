@@ -20,24 +20,24 @@ require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 
 safe_require('blocktype', 'myviews');
 require_once(get_config('libroot') . 'view.php');
-require_once(get_config('libroot') . 'pieforms/pieform.php');
 
 $offset = param_integer('offset', 0);
 $viewid = param_integer('view');
 $editing = param_boolean('editing', false);
+$limit = param_integer('limit', 10);
 
 $dashboard = new View($viewid);
 
 if (!can_view_view($dashboard)) {
     json_reply(true, get_string('accessdenied', 'error'));
 }
-$userid = $USER->get('id');
+
 $views = View::view_search(
         null, // $query
         null, // $ownerquery
         (object) array('owner' => $dashboard->get('owner')), // $ownedby
         null, // $copyableby
-        10, // $limit
+        $limit, // $limit
         $offset, // $offset
         true, // $extra
         null, // $sort

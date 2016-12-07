@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups/findfriends');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('findfriends'));
 require_once('searchlib.php');
 safe_require('search', 'internal');
@@ -71,6 +70,7 @@ $searchform['elements']['inputgroup']['elements']['query'] = array(
     'title' => get_string('search'),
     'hiddenlabel' => true,
     'defaultvalue' => $query,
+    'placeholder' => get_string('searchusers'),
 );
 
 $searchform['elements']['inputgroup']['elements']['submit'] = array(
@@ -134,7 +134,6 @@ if ($admingroups) {
     array_push($javascript, 'groupbox');
 }
 $smarty = smarty($javascript, array(), array('applychanges' => 'mahara', 'nogroups' => 'group'), array('sideblocks' => array(friends_control_sideblock('find'))));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('results', $data);
 $smarty->assign('form', $searchform);

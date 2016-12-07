@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'inbox');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once(get_config('docroot') . '/lib/pieforms/pieform.php');
 require_once(get_config('docroot') . '/lib/searchlib.php');
 safe_require('search', 'internal');
 safe_require('module', 'multirecipientnotification');
@@ -239,7 +238,6 @@ $form = pieform(array(
 ));
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('form', $form);
 $smarty->assign('user', $USER);
 $smarty->assign('messages', $messages);

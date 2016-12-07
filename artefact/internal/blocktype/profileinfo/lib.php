@@ -86,7 +86,7 @@ class PluginBlocktypeProfileinfo extends MaharaCoreBlocktype {
 
         // Work out the path to the thumbnail for the profile image
         if (!empty($configdata['profileicon'])) {
-            $downloadpath = get_config('wwwroot') . 'thumb.php?type=profileiconbyid&id=' . $configdata['profileicon'];
+            $downloadpath = get_config('wwwroot') . 'thumb.php?type=profileiconbyid&id=' . $configdata['profileicon'] . '&view=' . $instance->get('view');
             $downloadpath .= '&maxwidth=80';
             $smarty->assign('profileiconpath', $downloadpath);
             $smarty->assign('profileiconalt', get_string('profileimagetext', 'mahara', display_default_name(get_user($viewowner))));
@@ -242,6 +242,16 @@ class PluginBlocktypeProfileinfo extends MaharaCoreBlocktype {
             'artefacttypes' => $artefacttypes,
             'template'  => 'artefact:internal:artefactchooser-element.tpl',
         );
+    }
+    /**
+     * Allow the introduction option to be displayed correctly
+     */
+    public static function artefactchooser_get_element_data($artefact) {
+
+        if ($artefact->artefacttype == 'introduction') {
+            unset($artefact->description);
+        }
+        return $artefact;
     }
 
     /**

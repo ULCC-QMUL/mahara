@@ -28,6 +28,7 @@ class Collection {
     private $submittedstatus;
     private $views;
     private $tags;
+    private $framework;
 
     const UNSUBMITTED = 0;
     const SUBMITTED = 1;
@@ -274,6 +275,7 @@ class Collection {
         else {
             $data->owner = $userid;
         }
+        $data->framework = $colltemplate->get('framework');
 
         $collection = self::save($data);
 
@@ -281,6 +283,8 @@ class Collection {
 
         $views = $colltemplate->get('views');
         $copyviews = array();
+        $evidenceviews = array();
+        $artefactcopies = array();
         foreach ($views['views'] as $v) {
             $values = array(
                 'new' => true,
@@ -289,7 +293,11 @@ class Collection {
                 'institution' => isset($data->institution) ? $data->institution : null,
                 'usetemplate' => $v->view
             );
-            list($view, $template, $copystatus) = View::create_from_template($values, $v->view, $userid, $checkaccess, $titlefromtemplate);
+            list($view, $template, $copystatus) = View::create_from_template($values, $v->view, $userid, $checkaccess, $titlefromtemplate, $artefactcopies);
+            // Check to see if we need to re-map any framework evidence
+            if (!empty($data->framework) && $userid == $data->owner && count_records('framework_evidence', 'view', $v->view)) {
+                $evidenceviews[$v->view] = $view->get('id');
+            }
             if (isset($copystatus['quotaexceeded'])) {
                 $SESSION->clear('messages');
                 return array(null, $colltemplate, array('quotaexceeded' => true));
@@ -319,6 +327,49 @@ class Collection {
                         $bi->set('configdata', array('collection' => $collection->get('id')));
                         $bi->commit();
                     }
+                }
+            }
+        }
+        // If there are views with framework evidence to re-map
+        if (!empty($evidenceviews)) {
+            // We need to get how the old views/artefacts/blocks/evidence fit together
+            $evidences = get_records_sql_array('
+                SELECT va.view, va.artefact, va.block, fe.*
+                FROM {view} v
+                JOIN {view_artefact} va ON va.view = v.id
+                JOIN {artefact} a ON a.id = va.artefact
+                JOIN {framework_evidence} fe ON fe.view = v.id
+                WHERE v.id IN (' . join(',', array_keys($evidenceviews)) . ')
+                AND a.id IN (' . join(',', array_keys($artefactcopies)) . ')
+                AND fe.annotation = va.block', array());
+            $newartefactcopies = array();
+            foreach ($artefactcopies as $ac) {
+                $newartefactcopies[$ac->newid] = 1;
+            }
+            // And get how the new views/artefacts/blocks fit together
+            $newblocks = get_records_sql_assoc('
+                SELECT va.artefact, va.view, va.block
+                FROM {view} v
+                JOIN {view_artefact} va ON va.view = v.id
+                JOIN {artefact} a ON a.id = va.artefact
+                WHERE v.id IN (' . join(',', array_values($evidenceviews)) . ')
+                AND a.id IN (' . join(',', array_keys($newartefactcopies)) . ')
+                AND artefacttype = ?', array('annotation'));
+
+            foreach ($evidences as $evidence) {
+                if (key_exists($evidence->artefact, $artefactcopies) && key_exists($artefactcopies[$evidence->artefact]->newid, $newartefactcopies)) {
+                    $newartefact = $artefactcopies[$evidence->artefact]->newid;
+                    $newevidence = new stdClass();
+                    $newevidence->view = $newblocks[$newartefact]->view;
+                    $newevidence->artefact = $newartefact;
+                    $newevidence->annotation = $newblocks[$newartefact]->block;
+                    $newevidence->framework = $evidence->framework;
+                    $newevidence->element = $evidence->element;
+                    $newevidence->state = 0;
+                    $newevidence->reviewer = null;
+                    $newevidence->ctime = $evidence->ctime;
+                    $newevidence->mtime = $evidence->mtime;
+                    insert_record('framework_evidence', $newevidence);
                 }
             }
         }
@@ -370,6 +421,7 @@ class Collection {
                     c.submittedgroup,
                     c.submittedhost,
                     c.submittedtime,
+                    c.framework,
                     (SELECT COUNT(*) FROM {collection_view} cv WHERE cv.collection = c.id) AS numviews
                 FROM {collection} c
                 WHERE " . $wherestm .
@@ -378,6 +430,7 @@ class Collection {
         }
 
         self::add_submission_info($data);
+        self::add_framework_urls($data);
 
         $result = (object) array(
             'count'  => $count,
@@ -472,6 +525,20 @@ class Collection {
                 'defaultvalue' => 1,
             ),
         );
+        if ($frameworks = $this->get_available_frameworks()) {
+            $options = array('' => get_string('noframeworkselected', 'module.framework'));
+            foreach ($frameworks as $framework) {
+                $options[$framework->id] = $framework->name;
+            }
+            $elements['framework'] = array(
+                'type' => 'select',
+                'title' => get_string('Framework', 'module.framework'),
+                'options' => $options,
+                'defaultvalue' => $this->framework,
+                'width' => '280px',
+                'description' => get_string('frameworkdesc', 'module.framework'),
+            );
+        }
 
         // populate the fields with the existing values if any
         if (!empty($this->id)) {
@@ -553,9 +620,156 @@ class Collection {
     }
 
     /**
+     * Check that a collection can have a framework
+     * - The collection is not owned by a group
+     * - The framework plugin is active
+     * - The institution has 'SmartEvidence' turned on
+     * - There frameworks available for the institution
+     *
+     * @return bool
+     */
+    public function can_have_framework() {
+        if (!empty($this->group)) {
+            return false;
+        }
+
+        if (!is_plugin_active('framework', 'module')) {
+            return false;
+        }
+
+        if ($this->institution) {
+            $institution = $this->institution;
+        }
+        else {
+            $user = new User();
+            $user->find_by_id($this->owner);
+            $institutions = array_keys($user->get('institutions'));
+            $institution = (!empty($institutions)) ? $institutions[0] : 'mahara';
+        }
+        $institution = new Institution($institution);
+        // Check that smart evidence is enabled for the institution
+        if (!$institution->allowinstitutionsmartevidence) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Get available frameworks
+     *
+     * @return array Available frameworks
+     */
+    public function get_available_frameworks() {
+        if (!$this->can_have_framework()) {
+            return array();
+        }
+
+        if ($this->institution) {
+            $institution = $this->institution;
+        }
+        else {
+            $user = new User();
+            $user->find_by_id($this->owner);
+            $institutions = array_keys($user->get('institutions'));
+            $institution = (!empty($institutions)) ? $institutions[0] : 'mahara';
+        }
+        $institution = new Institution($institution);
+        // Check that smart evidence is enabled for the institution
+        if (!$institution->allowinstitutionsmartevidence) {
+            return false;
+        }
+
+        if ($frameworks = Framework::get_frameworks($institution->name, true)) {
+            // Inactive frameworks are only allowed if they were added to
+            // collection when they were active.
+            foreach ($frameworks as $key => $framework) {
+                if (empty($framework->active) && $framework->id != $this->framework) {
+                    unset ($frameworks[$key]);
+                }
+            }
+            return $frameworks;
+        }
+        return array();
+    }
+
+    /**
+     * Check that a collection has a framework
+     * - The collection can have a framework
+     * - It has a framework id
+     * - It has views in the collection
+     *
+     * @return boolean
+     */
+    public function has_framework() {
+        if (!$this->can_have_framework()) {
+            return false;
+        }
+        if (empty($this->framework)) {
+            return false;
+        }
+        if (!$this->views()) {
+            return false;
+        }
+        if (!is_plugin_active('framework', 'module')) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Get collection framework option for collection navigation
+     *
+     * @return object $option;
+     */
+    public function collection_nav_framework_option() {
+        $option = new StdClass;
+        $option->framework = $this->framework;
+        $option->id = $this->id;
+        $option->title = get_field('framework', 'name', 'id', $this->framework);
+        $option->framework = true;
+
+        $option->fullurl = self::get_framework_url($option);
+
+        return $option;
+    }
+
+    /**
+     * Adding the framework frameworkurl / fullurl to collections
+     *
+     * @param array  $data    Array of objects
+     *
+     * @return $data
+     */
+    public static function add_framework_urls(&$data) {
+        if (is_array($data)) {
+            foreach ($data as $k => $r) {
+                $r->frameworkurl = self::get_framework_url($r, false);
+                $r->fullurl = self::get_framework_url($r, true);
+            }
+        }
+    }
+
+    /**
+     * Making the framework url
+     *
+     * @param object $data    Either a collection or standard object
+     * @param bool   $fullurl Return full url rather than relative one
+     *
+     * @return $url
+     */
+    public static function get_framework_url($data, $fullurl = true) {
+        $url = 'module/framework/matrix.php?id=' . $data->id;
+        if ($fullurl) {
+            return get_config('wwwroot') . $url;
+        }
+        return $url;
+    }
+
+    /**
      * Get the available views the current user can choose to add to their collections.
      * Restrictions on this list include:
      * - currently dashboard, group and profile views are ignored to solve access issues
+     * - default pages (with template == 2) are ignored
      * - each view can only belong to one collection
      * - locked/submitted views can't be added to collections
      *
@@ -583,6 +797,7 @@ class Collection {
             WHERE " . $wherestm .
             "   AND cv.view IS NULL
                 AND v.type NOT IN ('dashboard','grouphomepage','profile')
+                AND v.template != 2
                 AND v.submittedgroup IS NULL
                 AND v.submittedhost IS NULL
             GROUP BY v.id, v.title
@@ -773,6 +988,17 @@ class Collection {
 
         $views = $this->views();
         if (!empty($views)) {
+            if ($this->framework) {
+                if ($full) {
+                    $this->fullurl = Collection::get_framework_url($this);
+                    return $this->fullurl;
+                }
+                else {
+                    $this->frameworkurl = Collection::get_framework_url($this, false);
+                    return $this->frameworkurl;
+                }
+            }
+
             $v = new View(0, $views['views'][0]);
             $v->set('dirty', false);
             $firstview = $v;

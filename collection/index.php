@@ -15,24 +15,24 @@ define('SECTION_PLUGINNAME', 'collection');
 define('SECTION_PAGE', 'index');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('collection.php');
 
 // offset and limit for pagination
 $offset = param_integer('offset', 0);
-$limit  = param_integer('limit', 10);
-
+$limit  = param_integer('limit', 0);
+$limit = user_preferred_limit($limit);
 $owner = null;
 $groupid = param_integer('group', 0);
 $institutionname = param_alphanum('institution', false);
 $urlparams = array();
 
 $pageIcon = 'icon-folder-open';
-$subsectionheading = false;
 
 if (!empty($groupid)) {
     define('MENUITEM', 'groups/collections');
     define('GROUP', $groupid);
+    define('SUBSECTIONHEADING', get_string('Collections', 'collection'));
+    require_once('group.php');
     $group = group_current_group();
     // Check if user can edit group collections <-> user can edit group views
     $role = group_user_access($group->id);
@@ -41,11 +41,8 @@ if (!empty($groupid)) {
         throw new GroupAccessDeniedException(get_string('cantlistgroupcollections', 'collection'));
     }
 
-    define('SUBTITLE', false);
     define('TITLE', $group->name);
     $urlparams['group'] = $groupid;
-
-    $subsectionheading = get_string('Collections', 'collection');
     $pageIcon = '';
 }
 else if (!empty($institutionname)) {
@@ -80,14 +77,12 @@ else if (!empty($institutionname)) {
             exit;
         }
     }
-    define('SUBTITLE', '');
     $urlparams['institution'] = $institutionname;
 }
 else {
     define('MENUITEM', 'myportfolio/collection');
     $owner = $USER->get('id');
     $canedit = true;
-    define('SUBTITLE', '');
     define('TITLE', get_string('Collections', 'collection'));
 }
 $baseurl = get_config('wwwroot') . 'collection/index.php';
@@ -101,6 +96,10 @@ foreach ($data->data as $value) {
     $views = $collection->get('views');
     if (!empty($views)) {
         $value->views = $views['views'];
+    }
+    if (is_plugin_active('framework', 'module') && $collection->has_framework()) {
+        $framework = new Framework($collection->get('framework'));
+        $value->frameworkname = $framework->get('name');
     }
 }
 
@@ -137,15 +136,7 @@ if (!empty($institutionname) && ($institutionname != 'mahara')) {
     $smarty->assign('INLINEJAVASCRIPT', $s['institutionselectorjs']);
 }
 
-if($subsectionheading){
-    $smarty->assign('subsectionheading', $subsectionheading);
-}
-if(SUBTITLE) {
-    $smarty->assign('PAGESUBHEADING', SUBTITLE);
-}
-
 setpageicon($smarty, $pageIcon);
-
 $smarty->assign('canedit', $canedit);
 $smarty->assign('urlparamsstr', $urlparamsstr);
 $smarty->assign('collections', $data->data);
@@ -154,7 +145,6 @@ $smarty->assign('collectionhtml', $html);
 $smarty->assign('pagination', $pagination['html']);
 $smarty->assign('pagination_js', $pagination['javascript']);
 $smarty->assign('headingclass', 'page-header');
-$smarty->assign('PAGEHEADING', TITLE);
 
 $smarty->assign('SUBPAGETOP', 'collection/actions.tpl');
 $smarty->display('collection/index.tpl');

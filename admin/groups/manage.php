@@ -14,8 +14,6 @@ define('ADMIN', 1);
 define('MENUITEM', 'managegroups/groups');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 
-require_once('pieforms/pieform.php');
-
 $group = get_record_select('group', 'id = ? AND deleted = 0', array(param_integer('id')));
 
 define('TITLE', get_string('administergroups', 'admin'));
@@ -131,7 +129,6 @@ function groupadminsform_submit(Pieform $form, $values) {
 $smarty = smarty();
 setpageicon($smarty, 'icon-users');
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('quotasform', $quotasform);
 $smarty->assign('groupname', $group->name);
 $smarty->assign('managegroupform', $groupadminsform);

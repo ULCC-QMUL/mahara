@@ -15,7 +15,6 @@ define('SECTION_PLUGINNAME', 'blog');
 define('SECTION_PAGE', 'post');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('license.php');
 
 safe_require('artefact', 'blog');
@@ -47,8 +46,8 @@ if (!$blogpost) {
     $attachments = array();
     if ($blogobj->get('group')) {
         $group = get_record('group', 'id', $blogobj->get('group'), 'deleted', 0);
-        $subsectionheading = $pagetitle;
         define('TITLE', $group->name);
+        define('SUBSECTIONHEADING', $pagetitle);
     }
     else {
         define('TITLE', $pagetitle);
@@ -57,6 +56,15 @@ if (!$blogpost) {
 else {
     $blogpostobj = new ArtefactTypeBlogPost($blogpost);
     $blogpostobj->check_permission(true);
+    $pagetitle = get_string('editblogpost', 'artefact.blog');
+    if ($blogpostobj->get('group')) {
+        $group = get_record('group', 'id', $blogpostobj->get('group'), 'deleted', 0);
+        define('SUBSECTIONHEADING', $pagetitle);
+        define('TITLE', $group->name);
+    }
+    else {
+        define('TITLE', $pagetitle);
+    }
     if ($blogpostobj->get('locked')) {
         throw new AccessDeniedException(get_string('submittedforassessment', 'view'));
     }
@@ -65,17 +73,9 @@ else {
     $description = $blogpostobj->get('description');
     $tags = $blogpostobj->get('tags');
     $checked = !$blogpostobj->get('published');
-    $pagetitle = get_string('editblogpost', 'artefact.blog');
+
     $focuselement = 'description'; // Doesn't seem to work with tinyMCE.
     $attachments = $blogpostobj->attachment_id_list();
-    if ($blogpostobj->get('group')) {
-        $group = get_record('group', 'id', $blogpostobj->get('group'), 'deleted', 0);
-        $subsectionheading = $pagetitle;
-        define('TITLE', $group->name);
-    }
-    else {
-        define('TITLE', $pagetitle);
-    }
 }
 
 $institution = $institutionname = $groupid = null;
@@ -218,11 +218,7 @@ $smarty = smarty(array(), array(), array(), array(
     ),
 ));
 $smarty->assign('INLINEJAVASCRIPT', $javascript);
-$smarty->assign_by_ref('form', $form);
-$smarty->assign('PAGEHEADING', TITLE);
-if (!empty($subsectionheading)) {
-    $smarty->assign('subsectionheading', $subsectionheading);
-}
+$smarty->assign('form', $form);
 $smarty->display('artefact:blog:editpost.tpl');
 
 

@@ -105,6 +105,16 @@ class PluginArtefactBlog extends PluginArtefact {
 
     public static function block_advanced_options_element($configdata, $artefacttype) {
         $strartefacttype = strtolower(get_string($artefacttype, 'artefact.blog'));
+
+        $options = array('nocopy' => get_string('copynocopy', 'artefact.blog'));
+        if ($artefacttype == 'taggedposts') {
+            $options['tagsonly'] = get_string('copytagsonly', 'artefact.blog', $strartefacttype);
+        }
+        else {
+            $options['reference'] = get_string('copyreference', 'artefact.blog', $strartefacttype);
+            $options['full'] = get_string('copyfull', 'artefact.blog', $strartefacttype);
+        }
+
         return array(
             'type' => 'fieldset',
             'name' => 'advanced',
@@ -118,11 +128,7 @@ class PluginArtefactBlog extends PluginArtefact {
                     'title' => get_string('blockcopypermission', 'view'),
                     'description' => get_string('blockcopypermissiondesc', 'view'),
                     'defaultvalue' => isset($configdata['copytype']) ? $configdata['copytype'] : 'nocopy',
-                    'options' => array(
-                        'nocopy' => get_string('copynocopy', 'artefact.blog'),
-                        'reference' => get_string('copyreference', 'artefact.blog', $strartefacttype),
-                        'full' => get_string('copyfull', 'artefact.blog', $strartefacttype),
-                    ),
+                    'options' => $options,
                 ),
             ),
         );
@@ -145,6 +151,17 @@ class PluginArtefactBlog extends PluginArtefact {
 
     public static function progressbar_link($artefacttype) {
         return 'artefact/blog/view/index.php';
+    }
+
+    public static function group_tabs($groupid) {
+        return array(
+            'blogs' => array(
+                'path' => 'groups/blogs',
+                'url' => 'artefact/blog/index.php?group=' . $groupid,
+                'title' => get_string('Blogs', 'artefact.blog'),
+                'weight' => 65,
+            ),
+        );
     }
 }
 
@@ -320,7 +337,7 @@ class ArtefactTypeBlog extends ArtefactType {
         $smarty->assign('owner', $this->get('owner'));
         $smarty->assign('tags', $this->get('tags'));
 
-        $smarty->assign_by_ref('posts', $posts);
+        $smarty->assign('posts', $posts);
 
         return array('html' => $smarty->fetch('artefact:blog:blog.tpl'), 'javascript' => '');
     }
@@ -384,7 +401,7 @@ class ArtefactTypeBlog extends ArtefactType {
 
     public static function build_blog_list_html(&$blogs) {
         $smarty = smarty_core();
-        $smarty->assign_by_ref('blogs', $blogs);
+        $smarty->assign('blogs', $blogs);
         $blogs->tablerows = $smarty->fetch('artefact:blog:bloglist.tpl');
         $pagination = build_pagination(array(
             'id' => 'bloglist_pagination',
@@ -557,8 +574,8 @@ class ArtefactTypeBlog extends ArtefactType {
             foreach ($artefactcopies[$oldid]->oldembeds as $a) {
                 if (isset($artefactcopies[$a])) {
                     // Change the old image id to the new one
-                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '(&|&amp;)embedded=1(.*?"[^>]+)#';
-                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2embedded=1$3';
+                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '([^0-9])#';
+                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2';
                 }
             }
             require_once('embeddedimage.php');
@@ -584,13 +601,13 @@ class ArtefactTypeBlog extends ArtefactType {
         $groupid = $view->get('group');
         $institution = $view->get('institution');
         if ($groupid || $institution) {
-            $SESSION->add_ok_msg(get_string('copiedblogpoststonewjournal', 'collection'));
+            $SESSION->add_msg_once(get_string('copiedblogpoststonewjournal', 'collection'), 'ok', true, 'messages');
         }
         else {
             try {
                 $user = get_user($view->get('owner'));
                 set_account_preference($user->id, 'multipleblogs', 1);
-                $SESSION->add_ok_msg(get_string('copiedblogpoststonewjournal', 'collection'));
+                $SESSION->add_msg_once(get_string('copiedblogpoststonewjournal', 'collection'), 'ok', true, 'messages');
             }
             catch (Exception $e) {
                 $SESSION->add_error_msg(get_string('unabletosetmultipleblogs', 'error', $user->username, $viewid, get_config('wwwroot') . 'account/index.php'), false);
@@ -1209,8 +1226,8 @@ class ArtefactTypeBlogPost extends ArtefactType {
             foreach ($artefactcopies[$oldid]->oldembeds as $a) {
                 if (isset($artefactcopies[$a])) {
                     // Change the old image id to the new one
-                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '(&|&amp;)embedded=1(.*?"[^>]+)#';
-                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2embedded=1$3';
+                    $regexp[] = '#<img([^>]+)src="' . get_config('wwwroot') . 'artefact/file/download.php\?file=' . $a . '([^0-9])#';
+                    $replacetext[] = '<img$1src="' . get_config('wwwroot') . 'artefact/file/download.php?file=' . $artefactcopies[$a]->newid . '$2';
                 }
             }
             require_once('embeddedimage.php');

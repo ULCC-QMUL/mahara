@@ -66,7 +66,7 @@ class webservice_rest_server extends webservice_base_server {
         else if ((isset($_REQUEST['alt']) && trim($_REQUEST['alt']) == 'atom') ||
             (isset($_GET['alt']) && trim($_GET['alt']) == 'atom') ||
             (isset($_SERVER['HTTP_ACCEPT']) && $_SERVER['HTTP_ACCEPT'] == 'application/atom+xml') ||
-            $_SERVER['CONTENT_TYPE'] == 'application/atom+xml' ) {
+            (isset($_SERVER['CONTENT_TYPE']) && $_SERVER['CONTENT_TYPE'] == 'application/atom+xml')) {
             $this->format = 'atom';
         }
         else {
@@ -75,41 +75,80 @@ class webservice_rest_server extends webservice_base_server {
         unset($_REQUEST['alt']);
 
         $this->parameters = $_REQUEST;
+
+        // Handle file uploads
+        if (count($_FILES)) {
+            foreach ($_FILES as $k => $v) {
+                $this->parameters[$k] = $v['name'];
+            }
+        }
+
+        delete_records('oauth_server_nonce');
+
         // if we should have one - setup the OAuth server handler
+        $oauth_token = null;
         if (webservice_protocol_is_enabled('oauth')) {
             OAuthStore::instance('Mahara');
             $this->oauth_server = new OAuthServer();
-            $oauth_token = null;
             $headers = OAuthRequestLogger::getAllHeaders();
-            try {
-                $oauth_token = $this->oauth_server->verifyExtended();
-            }
-            catch (OAuthException2 $e) {
-                // let all others fail
-                if (isset($_REQUEST['oauth_token']) || preg_grep('/oauth/', array_values($headers))) {
-                    $this->auth = 'OAUTH';
-                    throw $e;
+
+            // try 2 Legged
+            if (OAuthRequestVerifier::requestIsSigned()) {
+                try {
+                    $oauth_token = $this->oauth_server->verifyExtended(false);
+                   $this->authmethod = WEBSERVICE_AUTHMETHOD_OAUTH_TOKEN;
+                    $store = OAuthStore::instance();
+                    $secrets = $store->getSecretsForVerify($oauth_token['consumer_key'],
+                                                           null,
+                                                           false);
+                   $this->oauth_token_details = $secrets;
+                }
+                catch (OAuthException2 $e) {
+                    // let all others fail
+                    $oauth_token = false;
                 }
             }
-            if ($oauth_token) {
-                $this->authmethod = WEBSERVICE_AUTHMETHOD_OAUTH_TOKEN;
-                $token = $this->oauth_server->getParam('oauth_token');
-                $store = OAuthStore::instance();
-                $secrets = $store->getSecretsForVerify($oauth_token['consumer_key'],
-                                                       $this->oauth_server->urldecode($token),
-                                                       'access');
-               $this->oauth_token_details = $secrets;
 
+            // try 3 Legged
+            if (!$oauth_token) {
+                try {
+                    $oauth_token = $this->oauth_server->verifyExtended();
+                    $this->authmethod = WEBSERVICE_AUTHMETHOD_OAUTH_TOKEN;
+                    $token = $this->oauth_server->getParam('oauth_token');
+                    $store = OAuthStore::instance();
+                    $secrets = $store->getSecretsForVerify($oauth_token['consumer_key'],
+                                                           $this->oauth_server->urldecode($token),
+                                                           'access');
+                   $this->oauth_token_details = $secrets;
+                }
+                catch (OAuthException2 $e) {
+                    // let all others fail
+                    if (isset($_REQUEST['oauth_token']) || preg_grep('/oauth/', array_values($headers))) {
+                        $this->auth = 'OAUTH';
+                        throw $e;
+                    }
+                }
+            }
+
+            // now - save OAuth details
+            if ($oauth_token) {
                // the content type might be different for the OAuth client
                 if (isset($headers['Content-Type']) && $headers['Content-Type'] == 'application/octet-stream' && $this->format != 'json') {
                     $body = file_get_contents('php://input');
                     parse_str($body, $parameters);
                     $this->parameters = array_merge($this->parameters, $parameters);
                 }
+                else {
+                    if ($this->format != 'json') {
+                        $body = file_get_contents('php://input');
+                        parse_str($body, $parameters);
+                        $this->parameters = array_merge($this->parameters, $parameters);
+                    }
+                }
             }
         }
         // make sure oauth parameters are gone
-        foreach (array('oauth_nonce', 'oauth_timestamp', 'oauth_consumer_key', 'oauth_signature_method', 'oauth_version', 'oauth_token', 'oauth_signature',) as $param) {
+        foreach (array('oauth_nonce', 'oauth_timestamp', 'oauth_consumer_key', 'oauth_signature_method', 'oauth_version', 'oauth_token', 'oauth_signature', 'oauth_callback',) as $param) {
             if (isset($this->parameters[$param])) {
                 unset($this->parameters[$param]);
             }
@@ -121,6 +160,14 @@ class webservice_rest_server extends webservice_base_server {
             $values = (array)json_decode(@file_get_contents('php://input'), true);
             if (!empty($values)) {
                 $this->parameters = array_merge($this->parameters, $values);
+            }
+            // in oauth, structures are flattened using json
+            if ($oauth_token) {
+                foreach ($this->parameters as $key => $value) {
+                    if (json_decode($value, true) !== NULL) {
+                        $this->parameters[$key] = json_decode($value, true);
+                    }
+                }
             }
         }
 
@@ -162,7 +209,7 @@ class webservice_rest_server extends webservice_base_server {
         }
 
         if (!empty($exception)) {
-            $response =  $this->generate_error($exception);
+            $this->send_error($exception);
         }
         else {
             $this->send_headers($this->format);
@@ -171,7 +218,7 @@ class webservice_rest_server extends webservice_base_server {
             }
             else if ($this->format == 'atom') {
                 $smarty = smarty_core();
-                $smarty->assign_by_ref('results', $validatedvalues);
+                $smarty->assign('results', $validatedvalues);
                 $smarty->assign('entries', $validatedvalues['entries']);
                 $smarty->assign('USER', $USER);
                 $smarty->assign('functionname', $this->functionname);
@@ -212,7 +259,14 @@ class webservice_rest_server extends webservice_base_server {
     protected function send_error($ex=null) {
         $this->send_headers($this->format);
         if ($this->format == 'json') {
-            echo json_encode(array('exception' => get_class($ex), 'errorcode' => (isset($ex->errorcode) ? $ex->errorcode : $ex->getCode()), 'message' => $ex->getMessage(), 'debuginfo' => (isset($ex->debuginfo) ? $ex->debuginfo : ''))) . "\n";
+            $classname = get_class($ex);
+            if (!($ex instanceof MaharaException)) {
+                $ex = new SystemException("[{$classname}]: " . $ex->getMessage(), $ex->getCode());
+            }
+            echo json_encode(
+                $ex->render_json_exception(),
+                JSON_PRETTY_PRINT
+            );
         }
         else {
             $xml = '<?xml version="1.0" encoding="UTF-8" ?>' . "\n";
@@ -288,7 +342,9 @@ class webservice_rest_server extends webservice_base_server {
         else if ($desc instanceof external_single_structure) {
             $single = '<SINGLE>' . "\n";
             foreach ($desc->keys as $key=>$subdesc) {
-                $single .= '<KEY name="' . $key . '">' . self::xmlize_result($returns[$key], $subdesc) . '</KEY>' . "\n";
+                if (isset($returns[$key])) {
+                    $single .= '<KEY name="' . $key . '">' . self::xmlize_result($returns[$key], $subdesc) . '</KEY>' . "\n";
+                }
             }
             $single .= '</SINGLE>' . "\n";
             return $single;
@@ -381,7 +437,7 @@ function format_postdata_for_curlcall($postdata) {
  *   filesize and appropriately larger timeout based on get_config('curltimeoutkbitrate')
  * @return mixed false if request failed or content of the file as string if ok. True if file downloaded into $tofile successfully.
  */
-function webservice_download_file_content($url, $headers=null, $postdata=null, $fullresponse=false, $timeout=300, $connecttimeout=20, $skipcertverify=false, $tofile=NULL, $calctimeout=false) {
+function webservice_download_file_content($url, $headers=null, $postdata=null, $fullresponse=false, $timeout=300, $connecttimeout=20, $skipcertverify=false, $tofile=NULL, $calctimeout=false, $quiet=false) {
     // some extra security
     $newlines = array("\r", "\n");
     if (is_array($headers) ) {
@@ -452,7 +508,8 @@ function webservice_download_file_content($url, $headers=null, $postdata=null, $
     }
     $options[CURLOPT_TIMEOUT] = $timeout;
     $options[CURLOPT_URL] = $url;
-    $result = webservice_http_request($options);
+
+    $result = webservice_http_request($options, $quiet);
 
     // reformat the results
     $errno  = $result->errno;
@@ -553,12 +610,14 @@ function webservice_http_request($config, $quiet=false) {
     // ensure that certificates are not checked for tests
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    // curl_setopt($ch, CURLOPT_FAILONERROR, false);
 
     $result = new StdClass();
     $result->data = curl_exec($ch);
     $result->info = curl_getinfo($ch);
     $result->error = curl_error($ch);
     $result->errno = curl_errno($ch);
+    $result->http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
     if ($result->errno) {
         if ($quiet) {

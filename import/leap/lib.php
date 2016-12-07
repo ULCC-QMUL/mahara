@@ -918,7 +918,6 @@ class PluginImportLeap extends PluginImport {
                     'layout'      => null, // TODO
                     'tags'        => self::get_entry_tags($entry),
                     'numrows'     => 1,
-                    'numcolumns'  => 1,
                     'ownerformat' => FORMAT_NAME_DISPLAYNAME, // TODO
                     'owner'       => $this->get('usr'),
                 );
@@ -1138,8 +1137,8 @@ class PluginImportLeap extends PluginImport {
             }
         }
         $smarty = smarty_core();
-        $smarty->assign_by_ref('displaydecisions', $this->get('displaydecisions'));
-        $smarty->assign_by_ref('entryviews', $entryviews);
+        $smarty->assign('displaydecisions', $this->get('displaydecisions'));
+        $smarty->assign('entryviews', $entryviews);
         return $smarty->fetch('import/views.tpl');
     }
 

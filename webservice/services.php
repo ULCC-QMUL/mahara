@@ -83,6 +83,14 @@ $functions = array(
         'type'        => 'read',
     ),
 
+    'mahara_autologin_redirect' => array(
+        'classname'   => 'mahara_user_external',
+        'methodname'  => 'autologin_redirect',
+        'classpath'   => WEBSERVICE_DIRECTORY,
+        'description' => 'Automatically log a user in and redirect if supplied - use with OAuth only',
+        'type'        => 'read',
+    ),
+
     'mahara_user_delete_users' => array(
         'classname'   => 'mahara_user_external',
         'methodname'  => 'delete_users',
@@ -214,71 +222,38 @@ $functions = array(
         'description' => 'decline request for institiution membership',
         'type'        => 'read',
     ),
+
+    'mahara_submission_get_views_for_user' => array(
+        'classname'   => 'mahara_view_external',
+        'methodname'  => 'get_views_for_user',
+        'classpath'   => WEBSERVICE_DIRECTORY,
+        'description' => 'Get views for a specific user',
+        'type'        => 'read',
+    ),
+
+    'mahara_submission_submit_view_for_assessment' => array(
+        'classname'   => 'mahara_view_external',
+        'methodname'  => 'submit_view_for_assessment',
+        'classpath'   => WEBSERVICE_DIRECTORY,
+        'description' => 'Submit and lock view for assessment',
+        'type'        => 'write',
+    ),
+
+    'mahara_submission_release_submitted_view' => array(
+        'classname'   => 'mahara_view_external',
+        'methodname'  => 'release_submitted_view',
+        'classpath'   => WEBSERVICE_DIRECTORY,
+        'description' => 'Unlock view that has been used for an assessment',
+        'type'        => 'write',
+    ),
 );
 
 /**
-* Prepopulated service groups that propose units of access
+* Prepopulated service groups
+* (None are actually needed yet for the "webservice" pseudo-module.
+* See module.mobileapi for one that does have service groups.)
 */
 $services = array(
-    'User Provisioning' => array(
-            'functions' => array ('mahara_user_get_online_users', 'mahara_user_get_all_favourites', 'mahara_user_get_favourites', 'mahara_user_update_favourites', 'mahara_user_get_users', 'mahara_user_get_users_by_id', 'mahara_user_create_users', 'mahara_user_delete_users', 'mahara_user_update_users', 'mahara_user_get_context', 'mahara_user_get_extended_context'),
-            'enabled'=>1,
-    ),
-    'User Query' => array(
-            'functions' => array ('mahara_user_get_online_users', 'mahara_user_get_all_favourites', 'mahara_user_get_favourites', 'mahara_user_get_users', 'mahara_user_get_users_by_id', 'mahara_user_get_context', 'mahara_user_get_extended_context'),
-            'enabled'=>1,
-    ),
-    'Simple User Provisioning' => array(
-            'functions' => array ('mahara_user_get_online_users', 'mahara_user_get_all_favourites', 'mahara_user_get_favourites', 'mahara_user_update_favourites', 'mahara_user_get_users', 'mahara_user_get_users_by_id', 'mahara_user_create_users', 'mahara_user_delete_users', 'mahara_user_update_users', 'mahara_user_get_context', 'mahara_user_get_extended_context'),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
-    'Simple User Query' => array(
-            'functions' => array ('mahara_user_get_online_users', 'mahara_user_get_all_favourites', 'mahara_user_get_favourites', 'mahara_user_get_users', 'mahara_user_get_users_by_id', 'mahara_user_get_context', 'mahara_user_get_extended_context'),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
-    'UserToken User Query' => array(
-            'functions' => array ('mahara_user_get_my_user', 'mahara_user_get_context', 'mahara_user_get_extended_context'),
-            'enabled'=>1,
-            'tokenusers'=>1,
-    ),
-    'Group Provisioning' => array(
-            'functions' => array ('mahara_group_get_groups', 'mahara_group_get_groups_by_id', 'mahara_group_create_groups', 'mahara_group_delete_groups', 'mahara_group_update_groups', 'mahara_group_update_group_members'),
-            'enabled'=>1,
-    ),
-    'Group Query' => array(
-            'functions' => array ('mahara_group_get_groups', 'mahara_group_get_groups_by_id'),
-            'enabled'=>1,
-    ),
-    'Simple Group Provisioning' => array(
-            'functions' => array ('mahara_group_get_groups', 'mahara_group_get_groups_by_id', 'mahara_group_create_groups', 'mahara_group_delete_groups', 'mahara_group_update_groups', 'mahara_group_update_group_members'),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
-    'Simple Group Query' => array(
-            'functions' => array ('mahara_group_get_groups', 'mahara_group_get_groups_by_id'),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
-    'Institution Provisioning' => array(
-            'functions' => array ('mahara_institution_add_members', 'mahara_institution_remove_members', 'mahara_institution_invite_members', 'mahara_institution_decline_members',),
-            'enabled'=>1,
-    ),
-    'Institution Query' => array(
-            'functions' => array ('mahara_institution_get_members', 'mahara_institution_get_requests'),
-            'enabled'=>1,
-    ),
-    'Simple Institution Provisioning' => array(
-            'functions' => array ('mahara_institution_add_members', 'mahara_institution_remove_members', 'mahara_institution_invite_members', 'mahara_institution_decline_members',),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
-    'Simple Institution Query' => array(
-            'functions' => array ('mahara_institution_get_members', 'mahara_institution_get_requests'),
-            'enabled'=>1,
-            'restrictedusers'=>1,
-    ),
 );
 
 

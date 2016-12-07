@@ -218,7 +218,7 @@ class PluginBlocktypeTaggedposts extends MaharaCoreBlocktype {
 
                 $artefact = new ArtefactTypeBlogpost($result->id);
                 // get comments for this post
-                $result->commentcount = count_records_select('artefact_comment_comment', "onartefact = {$result->id} AND private = 0 AND deletedby IS NULL");
+                $result->commentcount = count_records_select('artefact_comment_comment', "onartefact = {$result->id} AND private = 0 AND deletedby IS NULL AND hidden=0");
                 $allowcomments = $artefact->get('allowcomments');
                 if (empty($result->commentcount) && empty($allowcomments)) {
                     $result->commentcount = null;
@@ -276,8 +276,13 @@ class PluginBlocktypeTaggedposts extends MaharaCoreBlocktype {
                 $tagomitstr .= ($viewownerdisplay) ? '"' . $tag . '"' : '"<a href="' . get_config('wwwroot') . 'tags.php?tag=' . $tag . '&sort=name&type=text">' . $tag . '</a>"';
             }
         }
-        $blockheading = get_string('blockheadingtags', 'blocktype.blog/taggedposts', count($tagsin), $tagstr);
-        $blockheading .= (!empty($tagomitstr)) ? get_string('blockheadingtagsomit', 'blocktype.blog/taggedposts', count($tagsout), $tagomitstr) : '';
+        if (empty($tagsin)) {
+            $blockheading = get_string('blockheadingtagsomitonly', 'blocktype.blog/taggedposts', count($tagsout), $tagomitstr);
+        }
+        else {
+            $blockheading = get_string('blockheadingtags', 'blocktype.blog/taggedposts', count($tagsin), $tagstr);
+            $blockheading .= (!empty($tagomitstr)) ? get_string('blockheadingtagsomitboth', 'blocktype.blog/taggedposts', count($tagsout), $tagomitstr) : '';
+        }
         $blockheading .= ($viewownerdisplay) ? ' ' . get_string('by', 'artefact.blog') . ' <a href="' . profile_url($viewownerdisplay) . '">' . display_name($viewownerdisplay) . '</a>' : '';
         $smarty->assign('full', $full);
         $smarty->assign('results', $results);
@@ -318,7 +323,7 @@ class PluginBlocktypeTaggedposts extends MaharaCoreBlocktype {
 
     public static function instance_config_form(BlockInstance $instance) {
         global $USER;
-
+        safe_require('artefact', 'blog');
         $configdata = $instance->get('configdata');
         $tags = self::get_chooseable_tags();
 
@@ -370,6 +375,7 @@ EOF;
                         'escapeMarkup' => 'function(textToEscape) { return textToEscape; }',
                 ),
             );
+            $elements[] = PluginArtefactBlog::block_advanced_options_element($configdata, 'taggedposts');
             $elements['count']  = array(
                 'type'          => 'text',
                 'title'         => get_string('itemstoshow', 'blocktype.blog/taggedposts'),
@@ -427,7 +433,7 @@ EOF;
 EOF;
     }
 
-    public static function instance_config_validate($form, $values) {
+    public static function instance_config_validate(Pieform $form, $values) {
 
         if (empty($values['tagselect'])) {
             // We don't have a tagselect field due to no journal entries having a tag

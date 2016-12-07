@@ -11,10 +11,9 @@
 
 define('INTERNAL', 1);
 define('ADMIN', 1);
-define('MENUITEM', 'configextensions/webservices');
+define('MENUITEM', 'webservices');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('pluginadmin', 'admin'));
-require_once('pieforms/pieform.php');
 
 $suid  = param_variable('suid', '');
 // lookup user cancelled
@@ -110,14 +109,14 @@ $serviceuser_details['elements']['service'] = array(
 $serviceuser_details['elements']['enabled'] = array(
     'title'        => get_string('enabled'),
     'defaultvalue' => (($serviceenabled == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => true,
 );
 
 $serviceuser_details['elements']['restricted'] = array(
     'title'        => get_string('restrictedusers', 'auth.webservice'),
     'defaultvalue' => (($restrictedusers == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => true,
 );
 
@@ -129,7 +128,7 @@ $serviceuser_details['elements']['functions'] = array(
 
 $serviceuser_details['elements']['wssigenc'] = array(
     'defaultvalue' => (($dbserviceuser->wssigenc == 1) ? 'checked' : ''),
-    'type'         => 'checkbox',
+    'type'         => 'switchbox',
     'disabled'     => false,
     'title'        => get_string('wssigenc', 'auth.webservice'),
 );
@@ -187,8 +186,6 @@ $form = pieform($form);
 
 $smarty = smarty(array(), array('<link rel="stylesheet" type="text/css" href="' . $THEME->get_url('style/webservice.css', false, 'auth/webservice') . '">',));
 safe_require('auth', 'webservice');
-$webservice_menu = PluginAuthWebservice::admin_menu_items();
-$smarty->assign('SUBPAGENAV', $webservice_menu);
 $smarty->assign('suid', $dbserviceuser->id);
 $smarty->assign('form', $form);
 $heading = get_string('users', 'auth.webservice');

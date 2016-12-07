@@ -16,7 +16,6 @@ define('SECTION_PAGE', 'settings');
 
 require(dirname(dirname(dirname(dirname(__FILE__)))) . '/init.php');
 define('TITLE', get_string('blogsettings','artefact.blog'));
-require_once('pieforms/pieform.php');
 require_once('license.php');
 safe_require('artefact', 'blog');
 if (!PluginArtefactBlog::is_active()) {
@@ -112,9 +111,8 @@ if (!$institutionname && !$groupid) {
     }
 }
 
-$smarty->assign_by_ref('editform', $form);
-$smarty->assign_by_ref('blog', $blog);
-$smarty->assign('PAGEHEADING', TITLE);
+$smarty->assign('editform', $form);
+$smarty->assign('blog', $blog);
 $smarty->display('artefact:blog:settings.tpl');
 exit;
 

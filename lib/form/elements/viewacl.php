@@ -50,7 +50,9 @@ function pieform_element_viewacl(Pieform $form, $element) {
     if ($form->get_property('userview')) {
         $allowedpresets[] = 'friends';
     }
+
     $accesslist = array();
+    $lockedpreset = null;
     if ($value) {
         foreach ($value as $item) {
             if (is_array($item)) {
@@ -84,7 +86,7 @@ function pieform_element_viewacl(Pieform $form, $element) {
                     $accesslist[] = $item;
                 }
                 if (!empty($item['locked'])) {
-                    $allowedpresets = array_values(array_diff($allowedpresets, array($item['type'])));
+                    $lockedpreset = $item['type'];
                 }
             }
         }
@@ -92,7 +94,27 @@ function pieform_element_viewacl(Pieform $form, $element) {
 
     $defaultaccesslist = ($accesslist) ? 0 : 1;
     $myinstitutions = array();
-    foreach ($USER->get('institutions') as $i) {
+    if ($USER->get('admin')) {
+        $institutions = array();
+        // Allow site admins to choose to share with the institution
+        // that the first selected view/collection belongs to
+        $viewid = $form->get_property('viewid');
+        $view = new View($viewid);
+        $institution = $view->get('institution');
+        if ($institution) {
+            $institutions = array(
+                $institution => (object) array(
+                    'institution' => $institution,
+                    'displayname' => institution_display_name($institution),
+                )
+            );
+        }
+    }
+    else {
+        $institutions = $USER->get('institutions');
+    }
+
+    foreach ($institutions as $i) {
         $myinstitutions[] = array(
             'type' => 'institution',
             'id'   => $i->institution,
@@ -110,6 +132,7 @@ function pieform_element_viewacl(Pieform $form, $element) {
             'start' => null,
             'end'   => null,
             'name' => get_string(($preset == 'loggedin' ? 'registeredusers' : $preset), 'view'),
+            'locked' => ($preset === $lockedpreset),
             'preset' => true
         );
     }
@@ -179,6 +202,7 @@ function pieform_element_viewacl(Pieform $form, $element) {
             $datepickeroptionstr .= $key . ': ' . json_encode($option) . ',';
         }
     }
+
     $smarty->assign('datepickeroptions', $datepickeroptionstr);
     $smarty->assign('viewtype', $element['viewtype']);
     $smarty->assign('potentialpresets', json_encode($allowedpresets));

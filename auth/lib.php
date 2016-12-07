@@ -474,11 +474,6 @@ function auth_setup () {
         if (defined('JSON')) {
             json_reply('global', get_string('sessiontimedoutreload'), 1);
         }
-        if (defined('IFRAME')) {
-            header('Content-type: text/html');
-            print_auth_frame();
-            exit;
-        }
 
         // If the page the user is viewing is public, inform them that they can
         // log in again
@@ -500,17 +495,13 @@ function auth_setup () {
         // Build login form. If the form is submitted it will be handled here,
         // and set $USER for us (this will happen when users hit a page and
         // specify login data immediately
-        require_once('pieforms/pieform.php');
-        $form = new Pieform(auth_get_login_form());
+        $form = pieform_instance(auth_get_login_form());
         if ($USER->is_logged_in()) {
             return;
         }
 
         // Check if the page is public or the site is configured to be public.
         if (defined('PUBLIC') && !isset($_GET['login'])) {
-            if ($lang = param_alphanumext('lang', null)) {
-                $SESSION->set('lang', $lang);
-            }
             return;
         }
 
@@ -733,10 +724,9 @@ function auth_get_available_auth_types($institution=null) {
 function auth_check_required_fields() {
     global $USER, $SESSION;
 
-    if (defined('NOCHECKREQUIREDFIELDS')) {
+    if (defined('NOCHECKREQUIREDFIELDS') || $SESSION->get('nocheckrequiredfields') === true) {
         return;
     }
-
     $changepassword = true;
     $elements = array();
 
@@ -813,7 +803,6 @@ function auth_check_required_fields() {
     }
 
     safe_require('artefact', 'internal');
-    require_once('pieforms/pieform.php');
 
     $alwaysmandatoryfields = array_keys(ArtefactTypeProfile::get_always_mandatory_fields());
     foreach(ArtefactTypeProfile::get_mandatory_fields() as $field => $type) {
@@ -882,6 +871,7 @@ function auth_check_required_fields() {
     }
 
     if (empty($elements)) { // No mandatory fields that aren't set
+        $SESSION->set('nocheckrequiredfields', true);
         return;
     }
 
@@ -1089,6 +1079,7 @@ function requiredfields_submit(Pieform $form, $values) {
         }
     }
 
+    $SESSION->set('nocheckrequiredfields', true);
     if ($form->get_property('backoutaftersubmit')) {
         return;
     }
@@ -1117,7 +1108,6 @@ function auth_draw_login_page($message=null, Pieform $form=null) {
         $loginform = get_login_form_js($form->build());
     }
     else {
-        require_once('pieforms/pieform.php');
         $loginform = get_login_form_js(pieform(auth_get_login_form()));
         /*
          * If $USER is set, the form was submitted even before being built.
@@ -1140,9 +1130,9 @@ function auth_draw_login_page($message=null, Pieform $form=null) {
     if ($message) {
         $SESSION->add_info_msg($message);
     }
+    define('TITLE', get_string('loginto', 'mahara', get_config('sitename')));
     $smarty = smarty(array(), array(), array(), array('pagehelp' => false, 'sidebars' => false));
     $smarty->assign('login_form', $loginform);
-    $smarty->assign('PAGEHEADING', get_string('loginto', 'mahara', get_config('sitename')));
     $smarty->assign('LOGINPAGE', true);
     $smarty->display('login.tpl');
     exit;
@@ -1302,7 +1292,7 @@ function auth_get_login_form_elements() {
     if (!empty($extraelements) && $showbasicform) {
         $loginlabel = array(
             'type' => 'markup',
-            'value' => '<p>' . get_string('orloginvia') . '</p>'
+            'value' => '<p><a name="sso" />' . get_string('orloginvia') . '</p>'
         );
         $extraelements = array_merge(array('label' => $loginlabel), $extraelements);
         $keys = array_keys($extraelements);
@@ -1439,6 +1429,21 @@ class AuthFactory {
         }
 
         return false;
+    }
+}
+
+/**
+ * Called when the login form is being validated during submission.
+ * Checks the user and password fields are filled in.
+ *
+ * @param object $form   The Pieform form object
+ * @param array  $values The submitted values
+ */
+function login_validate(Pieform $form, $values) {
+    if (!empty('login_submitted')) {
+        if (empty($values['login_username']) || empty($values['login_password'])) {
+            $form->set_error(null, get_string('loginfailed'));
+        }
     }
 }
 
@@ -1666,6 +1671,23 @@ function ensure_user_account_is_active($user=null) {
         }
         die_info(get_string('accountsuspended', 'mahara', $suspendedctime, $suspendedreason));
     }
+
+    // Check to see if institution is suspended or expired
+    // If a user in more than one institution and one of them is suspended
+    // make sure their authinstance is not set to the suspended/expired institution
+    // otherwise they will not be able to login (administer via site).
+    $authinstance = get_record_sql('
+        SELECT i.suspended, CASE WHEN i.expiry < NOW() THEN 1 ELSE 0 END AS expired, i.displayname
+        FROM {institution} i JOIN {auth_instance} a ON a.institution = i.name
+        WHERE a.id = ?', array($user->authinstance));
+    if ($authinstance->suspended || $authinstance->expired) {
+        $sitename = get_config('sitename');
+        $state = ($authinstance->suspended) ? 'suspended' : 'expired';
+        throw new AccessTotallyDeniedException(get_string('accesstotallydenied_institution' . $state, 'mahara', $authinstance->displayname, $sitename));
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -1899,8 +1921,8 @@ function auth_handle_institution_expiries() {
 function auth_remove_old_session_files() {
     $basedir = get_config('sessionpath');
 
-    // delete sessions older than the session timeout plus 2 days
-    $mintime = time() - get_config('session_timeout') - 2 * 24 * 60 * 60;
+    // delete sessions older than the session timeout
+    $mintime = time() - get_config('session_timeout');
 
     // Session files are stored in a three tier md5sum layout
     // The actual files are stored in the third directory
@@ -1927,8 +1949,8 @@ function auth_remove_old_session_files() {
             }
         }
     }
-    // Throw away records of old login sessions. Should check whether any are still alive.
-    delete_records_select('usr_session', 'ctime < ?', array(db_format_timestamp(time() - 86400 * 30)));
+    // Delete database records of expired login sessions.
+    delete_records_select('usr_session', 'mtime < ?', array(db_format_timestamp($mintime - get_config('accesstimeupdatefrequency'))));
 }
 
 /**
@@ -1939,7 +1961,6 @@ function auth_remove_old_session_files() {
  */
 function auth_generate_login_form() {
     global $SESSION;
-    require_once('pieforms/pieform.php');
     if (!get_config('installed')) {
         return;
     }
@@ -2216,7 +2237,7 @@ function auth_generate_registration_form_js($aform, $registerconfirm) {
 
     // The javascript needs to refer to field names, but they are obfuscated in this form,
     // so construct and build the form in separate steps, so we can get the field names.
-    $form = new Pieform($aform);
+    $form = pieform_instance($aform);
     $institutionid = $form->get_name() . '_' . $form->hashedfields['institution'];
     $reasonid = $form->get_name() . '_' . $form->hashedfields['reason'];
     $formhtml = $form->build();
@@ -2463,15 +2484,10 @@ function auth_register_submit(Pieform $form, $values) {
             $SESSION->set('registeredokawaiting', true);
         }
         else {
-            if (isset($values['authtype']) && $values['authtype'] == 'browserid') {
-                redirect('/register.php?key='.$values['key']);
-            }
-            else {
-                email_user($user, null,
-                    get_string('registeredemailsubject', 'auth.internal', get_config('sitename')),
-                    get_string('registeredemailmessagetext', 'auth.internal', $values['firstname'], get_config('sitename'), get_config('wwwroot'), $values['key'], get_config('sitename')),
-                    get_string('registeredemailmessagehtml', 'auth.internal', $values['firstname'], get_config('sitename'), get_config('wwwroot'), $values['key'], get_config('wwwroot'), $values['key'], get_config('sitename')));
-            }
+            email_user($user, null,
+                get_string('registeredemailsubject', 'auth.internal', get_config('sitename')),
+                get_string('registeredemailmessagetext', 'auth.internal', $values['firstname'], get_config('sitename'), get_config('wwwroot'), $values['key'], get_config('sitename')),
+                get_string('registeredemailmessagehtml', 'auth.internal', $values['firstname'], get_config('sitename'), get_config('wwwroot'), $values['key'], get_config('wwwroot'), $values['key'], get_config('sitename')));
             // Add a marker in the session to say that the user has registered
             $SESSION->set('registered', true);
         }
@@ -2518,14 +2534,6 @@ class PluginAuth extends Plugin {
         $subscriptions[] = clone $activecheck;
 
         return $subscriptions;
-    }
-
-    /**
-     * Can be overridden by plugins to assert when they are able to be used.
-     * For example, a plugin might check that a certain PHP extension is loaded
-     */
-    public static function is_usable() {
-        return true;
     }
 
     /**

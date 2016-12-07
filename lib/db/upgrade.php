@@ -4179,7 +4179,11 @@ function xmldb_core_upgrade($oldversion=0) {
         // Add a site default portfolio page template
         log_debug('Add a site default portfolio page template');
         require_once('view.php');
+        // Need to make sure 'root' user has admin privs for this task
+        // and then make sure it doesn't afterwards
+        update_record('usr', array('admin' => 1), array('id' => 0));
         install_system_portfolio_view();
+        update_record('usr', array('admin' => 0), array('id' => 0));
     }
 
     if ($oldversion < 2015091700) {
@@ -4205,14 +4209,145 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
-    if ($oldversion < 2015092908) {
+    if ($oldversion < 2015100200) {
         log_debug('Upgrade comment plugin for threaded comments');
         if ($data = check_upgrades('artefact.comment')) {
             upgrade_plugin($data);
         }
     }
 
-    if ($oldversion < 2015092915) {
+    if ($oldversion < 2015110600) {
+        log_debug('Expanding the size of the activity_queue.data column');
+        $table = new XMLDBTable('activity_queue');
+        $field = new XMLDBField('data');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+    }
+
+    if ($oldversion < 2016012800) {
+        log_debug('Upgrade wall block and add wall notifications to default inbox block');
+        if ($data = check_upgrades('blocktype.wall')) {
+            upgrade_plugin($data);
+        }
+        // Find the inbox block from the dashboard template page
+        $foundit = false;
+        $dashboardtemplateid = get_field('view', 'id', 'type', 'dashboard', 'owner', 0, 'template', 1);
+        $defaultinboxblocks = get_records_select_array('block_instance', 'view=? AND blocktype=?', array($dashboardtemplateid, 'inbox'));
+        $specialinboxtitle = get_string('topicsimfollowing');
+        if ($defaultinboxblocks) {
+            safe_require('blocktype', 'inbox');
+            foreach ($defaultinboxblocks as $blockrec) {
+                // There are two default inbox blocks. One has just "newpost" notifications, which gives it a special title.
+                // We want the other one.
+                $bi = new BlockInstance($blockrec->id, $blockrec);
+                if ($bi->get_title() == $specialinboxtitle) {
+                    continue;
+                }
+                else {
+                    $oldconfigdata = $blockrec->configdata;
+                    $newconfigdata = unserialize($oldconfigdata);
+                    $newconfigdata['wallpost'] = true;
+                    $newconfigdata = serialize($newconfigdata);
+                    log_debug('Updating all user inbox blocks that are still on the default settings');
+                    execute_sql('UPDATE {block_instance} SET configdata=? WHERE blocktype=? AND configdata=?', array($newconfigdata, 'inbox', $oldconfigdata));
+                    $foundit = true;
+                }
+            }
+        }
+        if (!$foundit) {
+            log_debug('Couldn\'t find default inbox block, so it won\'t be updated.');
+        }
+    }
+
+    if ($oldversion < 2016021200) {
+        // Expanding the size of all the columns containing serialized data
+        // to avoid errors with MySQL/MariaDB.
+
+        log_debug('Expanding the size of the block_instance.configdata');
+        $table = new XMLDBTable('block_instance');
+        $field = new XMLDBField('configdata');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the config.value');
+        $table = new XMLDBTable('config');
+        $field = new XMLDBField('value');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the import_entry_requests.artefactmapping');
+        $table = new XMLDBTable('import_entry_requests');
+        $field = new XMLDBField('artefactmapping');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the import_entry_requests.duplicateditemids');
+        $table = new XMLDBTable('import_entry_requests');
+        $field = new XMLDBField('duplicateditemids');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the import_entry_requests.existingitemids');
+        $table = new XMLDBTable('import_entry_requests');
+        $field = new XMLDBField('existingitemids');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the import_queue.data');
+        $table = new XMLDBTable('import_queue');
+        $field = new XMLDBField('data');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the skin.viewskin');
+        $table = new XMLDBTable('skin');
+        $field = new XMLDBField('viewskin');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the skin_favorites.favorites');
+        $table = new XMLDBTable('skin_favorites');
+        $field = new XMLDBField('favorites');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the skin_fonts.variants');
+        $table = new XMLDBTable('skin_fonts');
+        $field = new XMLDBField('variants');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+
+        log_debug('Expanding the size of the usr_registration.extra');
+        $table = new XMLDBTable('usr_registration');
+        $field = new XMLDBField('extra');
+        $field->setType(XMLDB_TYPE_TEXT);
+        $field->setLength('big');
+        change_field_precision($table, $field);
+    }
+
+    if ($oldversion < 2016030300) {
+        log_debug('Removing obsolete Netherlands Antilles ".an" country type');
+        safe_require('artefact', 'internal');
+        if ($results = get_records_sql_assoc("SELECT * FROM {artefact} WHERE artefacttype = ? AND title = ?", array('country','an'))) {
+            foreach ($results as $result) {
+                $classname = generate_artefact_class_name($result->artefacttype);
+                $a = new $classname($result->id);
+                $a->delete();
+            }
+        }
+    }
+
+    if ($oldversion < 2016030400) {
         log_debug('Sorting out block_instance sort order drift');
         // There was an issue with the sorting of blocks (Bug #1523719) that existed since
         // Sept 2007, commit 02fb5d96 where the max order number does not equal the number
@@ -4230,13 +4365,33 @@ function xmldb_core_upgrade($oldversion=0) {
             foreach ($results as $r) {
                 $updates[$r->view][$r->row][$r->column][] = array('order' => $r->order, 'id' => $r->id);
             }
+
+            // There's a uniqueness constraint on the block_instance.order column, which gets in the way
+            // when re-ordering them.
+            //
+            // If there are no negative values for block_instance.order (there shouldn't be) then we
+            // can temporarily move the orders into negative numbers to get them "out of the way" while
+            // re-ordering things.
+            //
+            // If there are negative sortorders, however, then we will just drop and re-create the index.
+            $dropkey = record_exists_select('block_instance', '"order" < 0');
+            if ($dropkey) {
+                // Now recreating index again.
+                $table = new XMLDBTable('block_instance');
+                $constraint = new XMLDBKey('viewrowcolumnorderuk');
+                $constraint->setAttributes(XMLDB_KEY_UNIQUE, array('view', 'row', 'column', 'order'));
+                drop_key($table, $constraint);
+            }
+
             // Now deal with the results
             foreach ($updates as $view => $grid) {
                 foreach ($grid as $row => $columns) {
                     foreach ($columns as $column => $blocks) {
-                        foreach ($blocks as $key => $block) {
-                            // First move them out of the way to avoid uniqueness clash
-                            execute_sql('UPDATE {block_instance} SET "order" = ? WHERE id = ?', array(($block['order'] * -1), $block['id']));
+                        if (!$dropkey) {
+                            foreach ($blocks as $key => $block) {
+                                // First move them out of the way to avoid uniqueness clash
+                                execute_sql('UPDATE {block_instance} SET "order" = ? WHERE id = ?', array(($block['order'] * -1), $block['id']));
+                            }
                         }
                         foreach ($blocks as $key => $block) {
                             // Then update them with true order
@@ -4246,16 +4401,350 @@ function xmldb_core_upgrade($oldversion=0) {
                 }
                 set_time_limit(30);
             }
+
+            if ($dropkey) {
+                add_key($table, $constraint);
+            }
         }
     }
 
-    if ($oldversion < 2015092919) {
+    if ($oldversion < 2016030600) {
+        log_debug('Forcing the multirecipient notification plugin to be the default one');
+        $result = get_field('module_installed', 'active', 'name', 'multirecipientnotification');
+        if ($result === '0') {
+            set_field('module_installed', 'active', 1, 'name', 'multirecipientnotification');
+        }
+        log_debug('Multirecipient notifications plugin active');
+    }
+
+    if ($oldversion < 2016031600) {
+        log_debug('Removing the obsolete "view.numcolumns"  column');
+        $table = new XMLDBTable('view');
+        $field = new XMLDBField('numcolumns');
+        drop_field($table, $field);
+    }
+
+    if ($oldversion < 2016032900) {
         log_debug('Expanding the size of the event_log.data');
         $table = new XMLDBTable('event_log');
         $field = new XMLDBField('data');
         $field->setType(XMLDB_TYPE_TEXT);
         $field->setLength('big');
         change_field_precision($table, $field);
+    }
+
+    if ($oldversion < 2016033100) {
+        log_debug('Upgrade openbadgedisplayer plugin');
+        if ($data = check_upgrades('blocktype.openbadgedisplayer')) {
+            upgrade_plugin($data);
+        }
+    }
+
+    if ($oldversion < 2016042100) {
+        log_debug('Making site pages owned by "mahara" institution');
+        // Change ownership of system templates: profile, dashboard, and group homepage
+        // to institution = 'mahara' and template = 2
+        execute_sql('
+            UPDATE {view}
+                SET owner = NULL, institution = ?, template = ?
+            WHERE owner = ? AND template = ?'
+        , array('mahara', 2, 0, 1));
+    }
+
+    if ($oldversion < 2016051600) {
+        // Get all the group view blocks from groups that have 'Allow submissions' set to true.
+        $sql = "SELECT bi.id, bi.configdata
+                FROM {block_instance} bi
+                INNER JOIN {view} v ON v.id = bi.view
+                INNER JOIN {group} g ON g.id = v.group
+                WHERE bi.blocktype = 'groupviews'
+                AND v.type = 'grouphomepage'
+                AND g.submittableto = 1";
+        $groupviews = get_records_sql_array($sql, array());
+
+        if ($groupviews) {
+            log_debug("Processing 'Group page' blocks to set the allow submitted configuration if not already set");
+            $count = 0;
+            $limit = 1000;
+            $total = count($groupviews);
+
+            foreach ($groupviews as $groupview) {
+                $configdata = unserialize($groupview->configdata);
+                if (!isset($configdata['showsubmitted'])) {
+                    $configdata['showsubmitted'] = 1;
+                    set_field('block_instance', 'configdata', serialize($configdata), 'id', $groupview->id);
+                }
+                $count++;
+                if (($count % $limit) == 0 || $count == $total) {
+                    log_debug("$count/$total");
+                    set_time_limit(30);
+                }
+            }
+        }
+    }
+
+    if ($oldversion < 2016060800) {
+        log_debug('Add an "mtime" field to usr_session table');
+        $table = new XMLDBTable('usr_session');
+        $field = new XMLDBField('mtime');
+        $field->setAttributes(XMLDB_TYPE_DATETIME);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+            // Fill in starting value for existing sessions.
+            execute_sql('UPDATE {usr_session} SET mtime=ctime');
+        }
+
+        log_debug('Limit session_timeout to 30 days.');
+        if (get_config('session_timeout') > 60 * 60 * 24 * 30) {
+            set_config('session_timeout', 60 * 60 * 24 * 30);
+        }
+    }
+
+    if ($oldversion < 2016061700) {
+        log_debug('Add a "clearcaches" event');
+        $e = new StdClass;
+        $e->name = 'clearcaches';
+        insert_record('event_type', $e);
+    }
+
+    if ($oldversion < 2016062200) {
+        require_once(get_config('docroot') . 'lib/group.php');
+        log_debug('Assign a unique shortname for each existing group that doesn\'t have one.');
+
+        $groups = get_records_select_array(
+            'group',
+            "(shortname IS NULL OR shortname = '') AND deleted = 0"
+        );
+
+        if (!empty($groups)) {
+            foreach ($groups as $group) {
+                $group->shortname = group_generate_shortname($group->name);
+                update_record('group', $group, 'id');
+            }
+        }
+    }
+
+    if ($oldversion < 2016062900) {
+        log_debug('Assign an istitution for each existing group that doesn\'t have one.');
+        $groups = execute_sql("UPDATE {group} SET institution = 'mahara'
+                               WHERE (institution IS NULL OR institution = '') AND deleted = 0", array());
+    }
+
+    if ($oldversion < 2016070500) {
+        log_debug('Extend sso_session.sessionid to 64 characters because we now use SHA-256 session ids.');
+        $table = new XMLDBTable('sso_session');
+        $field = new XMLDBField('sessionid');
+        $field->setType(XMLDB_TYPE_CHAR);
+        $field->setLength(64);
+        $field->setNotNull(true);
+        change_field_precision($table, $field);
+    }
+
+    if ($oldversion < 2016070700) {
+        require_once('file.php');
+        log_debug('Remove obsolete dataroot/smarty directory');
+        rmdirr(get_config('dataroot') . 'smarty');
+    }
+
+    if ($oldversion < 2016070800) {
+        log_debug('Add client_connections_institution table');
+        $table = new XMLDBTable('client_connections_institution');
+        $table->addFieldInfo('id', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        $table->addFieldInfo('name', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('plugintype', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('pluginname', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('priority', XMLDB_TYPE_INTEGER, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('class', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('connection', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('institution', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('url', XMLDB_TYPE_TEXT, 'small', false, XMLDB_NOTNULL);
+        $table->addFieldInfo('username', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('password', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('consumer', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('secret', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('token', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('header', XMLDB_TYPE_CHAR, 255, false);
+        $table->addFieldInfo('useheader', XMLDB_TYPE_INTEGER, 1, false, XMLDB_NOTNULL, null, null, null, 1);
+        $table->addFieldInfo('certificate', XMLDB_TYPE_TEXT, 'small', false);
+        $table->addFieldInfo('parameters', XMLDB_TYPE_TEXT, 'small', false);
+        $table->addFieldInfo('type', XMLDB_TYPE_CHAR, 10, false, XMLDB_NOTNULL, null, null, null, 2);
+        $table->addFieldInfo('authtype', XMLDB_TYPE_CHAR, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('json', XMLDB_TYPE_INTEGER, 1, false, XMLDB_NOTNULL, null, null, null, 1);
+        $table->addFieldInfo('enable', XMLDB_TYPE_INTEGER, 1, false, XMLDB_NOTNULL, null, null, null, 1);
+        $table->addFieldInfo('isfatal', XMLDB_TYPE_INTEGER, 1, false, XMLDB_NOTNULL, null, null, null, 1);
+        $table->addFieldInfo('version', XMLDB_TYPE_CHAR, 255, false);
+        $table->addKeyInfo('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->addIndexInfo('connectionk', XMLDB_INDEX_UNIQUE, array('name', 'class', 'connection', 'institution'));
+        $table->addKeyInfo('institution', XMLDB_KEY_FOREIGN, array('institution'), 'institution', array('name'));
+        create_table($table);
+        clear_menu_cache();
+    }
+
+    if ($oldversion < 2016070801) {
+        log_debug('Adjusting the profile "introduction" field to store the tinymce data in description field rather than title field for consistency');
+        if ($results = get_records_array('artefact', 'artefacttype', 'introduction', 'id', 'id')) {
+            safe_require('artefact', 'internal');
+            $count = 0;
+            $limit = 1000;
+            $total = count($results);
+            foreach ($results as $result) {
+                $introduction = new ArtefactTypeIntroduction($result->id);
+                $introduction->commit();
+                $count++;
+                if (($count % $limit) == 0 || $count == $total) {
+                    log_debug("$count/$total");
+                    set_time_limit(30);
+                }
+            }
+        }
+    }
+
+    if ($oldversion < 2016072200) {
+        log_debug('Add primary key to view_access table');
+
+        // See if we need to add the id column
+        $table = new XMLDBTable('view_access');
+        $field = new XMLDBField('id');
+        if (!field_exists($table, $field)) {
+            log_debug('Making a temp copy and adding id column');
+            execute_sql('CREATE TEMPORARY TABLE {temp_view_access} AS SELECT DISTINCT * FROM {view_access}', array());
+            if (is_mysql()) {
+                // We've disabled the db_start() method for our MySQL driver, but since we're truncating view_access,
+                // we really should start a transaction manually at least.
+                execute_sql('START TRANSACTION');
+            }
+            execute_sql('TRUNCATE {view_access}', array());
+
+            if (is_mysql()) {
+                // MySQL requires the auto-increment column to be a primary key right away.
+                execute_sql('ALTER TABLE {view_access} ADD id BIGINT(10) NOT NULL auto_increment PRIMARY KEY FIRST');
+            }
+            else {
+                $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+                add_field($table, $field);
+            }
+
+            log_debug('Adding back in the view_access information');
+            // We will do in chuncks for large sites.
+            $count = 0;
+            $x = 0;
+            $limit = 1000;
+            $total = count_records('temp_view_access');
+            for ($i = 0; $i <= $total; $i += $limit) {
+                if (is_postgres()) {
+                    $limitsql = ' OFFSET ' . $i . ' LIMIT ' . $limit;
+                }
+                else {
+                    $limitsql = ' LIMIT ' . $i . ',' . $limit;
+                }
+                execute_sql('INSERT INTO {view_access} (view, accesstype, startdate, stopdate, allowcomments, approvecomments, "group", role, usr, token, visible, ctime, institution) SELECT view, accesstype, startdate, stopdate, allowcomments, approvecomments, "group", role, usr, token, visible, ctime, institution FROM {temp_view_access}' . $limitsql, array());
+                $count += $limit;
+                if (($count % ($limit *10)) == 0 || $count >= $total) {
+                    if ($count > $total) {
+                        $count = $total;
+                    }
+                    log_debug("$count/$total");
+                    set_time_limit(30);
+                }
+                set_time_limit(30);
+            }
+            if (is_mysql()) {
+                execute_sql('COMMIT');
+            }
+            execute_sql('DROP TABLE {temp_view_access}', array());
+
+            if (!is_mysql()) {
+                log_debug('Adding primary key index to view_access.id column');
+                $key = new XMLDBKey('primary');
+                $key->setAttributes(XMLDB_KEY_PRIMARY, array('id'));
+                add_key($table, $key);
+            }
+        }
+    }
+
+    if ($oldversion < 2016072500) {
+        log_debug('Drop obsolete column "accessconf" from "view" table');
+        $table = new XMLDBTable('view');
+        $field = new XMLDBField('accessconf');
+        if (field_exists($table, $field)) {
+            drop_field($table, $field);
+        }
+
+        log_debug('Updating usr.suspendedcusr from 0 to a valid site admin ID for users suspended via a cron task.');
+        $admins = get_site_admins();
+        $suspendinguserid = $admins[0]->id;
+        set_field('usr', 'suspendedcusr', $suspendinguserid, 'suspendedcusr', 0);
+    }
+
+    if ($oldversion < 2016082400) {
+        log_debug('Add a "ctime" column to import_entry_requests table.');
+        $table = new XMLDBTable('import_entry_requests');
+        $field = new XMLDBField('ctime');
+        $field->setAttributes(XMLDB_TYPE_DATETIME);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+            // Fill in starting value for existing rows.
+            execute_sql('UPDATE {import_entry_requests} SET ctime = ?', array(db_format_timestamp(time())));
+        }
+    }
+
+    if ($oldversion < 2016090200) {
+        log_debug('Add a "framework" field to the collection table');
+        $table = new XMLDBTable('collection');
+        $field = new XMLDBField('framework');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+    }
+
+    if ($oldversion < 2016090203) {
+      log_debug('Add iframe url in iframe_source table for glogster educational new url pattern');
+      delete_records('iframe_source', 'prefix', 'edu.glogster.com/glog/');
+      delete_records('iframe_source', 'prefix', 'edu.glogster.com//glog/');
+      if (!get_field('iframe_source', 'prefix', 'prefix', 'edu.glogster.com//?glog/')) {
+          insert_record('iframe_source', (object) array('prefix' => 'edu.glogster.com//?glog/', 'name' => 'Glogster'));
+      }
+      update_safe_iframe_regex();
+    }
+
+    if ($oldversion < 2016090206) {
+        log_debug('Fix broken user data for existing users created via webservices');
+        if ($studentids = get_records_sql_array("
+            SELECT u.id, u.studentid, 1 AS makenew FROM {usr} u
+            WHERE (u.studentid IS NOT NULL AND u.studentid != '')
+            AND NOT EXISTS (
+                SELECT id FROM {artefact}
+                WHERE artefacttype = 'studentid'
+                AND owner = u.id
+            )
+            UNION
+            SELECT u.id, u.studentid, 0 AS makenew FROM {usr} u
+            JOIN {artefact} a ON (a.owner = u.id AND a.artefacttype='studentid')
+            WHERE (u.studentid IS NOT NULL AND u.studentid != '')
+            AND u.studentid != a.title", array())) {
+            foreach ($studentids as $info) {
+                set_profile_field($info->id, 'studentid', $info->studentid, (bool) $info->makenew);
+            }
+        }
+
+        if ($preferrednames = get_records_sql_array("
+            SELECT u.id, u.preferredname, 1 AS makenew FROM {usr} u
+            WHERE (u.preferredname IS NOT NULL AND u.preferredname != '')
+            AND NOT EXISTS (
+                SELECT id FROM {artefact}
+                WHERE artefacttype = 'preferredname'
+                AND owner = u.id
+            )
+            UNION
+            SELECT u.id, u.preferredname, 0 AS makenew FROM {usr} u
+            JOIN {artefact} a ON (a.owner = u.id AND a.artefacttype='preferredname')
+            WHERE (u.preferredname IS NOT NULL AND u.preferredname != '')
+            AND u.preferredname != a.title", array())) {
+            foreach ($preferrednames as $info) {
+                set_profile_field($info->id, 'preferredname', $info->preferredname, (bool) $info->makenew);
+            }
+        }
     }
 
     return $status;

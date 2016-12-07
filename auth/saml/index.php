@@ -30,7 +30,7 @@
 
 define('INTERNAL', 1);
 define('PUBLIC', 1);
-global $CFG, $USER, $SESSION;
+global $CFG, $USER, $SESSION, $idp_entityid;
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once(get_config('docroot') .'auth/saml/lib.php');
 require_once(get_config('libroot') .'institution.php');
@@ -40,47 +40,38 @@ if (get_field('auth_installed', 'active', 'name', 'saml') != 1) {
     redirect();
 }
 
-// get the config pointing to the SAML library - and load it
-$samllib = get_config_plugin('auth', 'saml', 'simplesamlphplib');
-if (!file_exists($samllib.'/lib/_autoload.php')) {
-    throw new AuthInstanceException(get_string('errorbadssphplib','auth.saml'));
+if (!extension_loaded('mcrypt')) {
+    throw new AuthInstanceException(get_string('errornomcrypt','auth.saml'));
 }
-require_once($samllib.'/lib/_autoload.php');
 
-// point at the configured config directory
-$samlconfig = get_config_plugin('auth', 'saml', 'simplesamlphpconfig');
+$sp = 'default-sp';
 
-// get all the things that we will need from the SAML authentication
-// and then shutdown the session control
-SimpleSAML_Configuration::init($samlconfig);
-$saml_session = SimpleSAML_Session::getInstance();
-
-// do we have a logout request?
-if (param_variable("logout", false)) {
-    // logout the saml session
-    $sp = $saml_session->getAuthority();
-    if (! $sp) {
-        $sp = 'default-sp';
-    }
-    $as = new SimpleSAML_Auth_Simple($sp);
-    $as->logout($CFG->wwwroot);
+if (!file_exists(get_config('docroot') . 'auth/saml/extlib/simplesamlphp/vendor/autoload.php')) {
+    throw new AuthInstanceException(get_string('errorbadlib', 'auth.saml', get_config('docroot') . 'auth/saml/extlib/simplesamlphp/vendor/autoload.php'));
 }
-$sp = param_alphanumext('as','default-sp');
-if (! in_array($sp, SimpleSAML_Auth_Source::getSources())) {
-    $sp = 'default-sp';
-}
-$as = new SimpleSAML_Auth_Simple($sp);
+require_once(get_config('docroot') . 'auth/saml/extlib/simplesamlphp/vendor/autoload.php');
+require_once(get_config('docroot') . 'auth/saml/extlib/_autoload.php');
+
+SimpleSAML_Configuration::init(get_config('docroot') . 'auth/saml/config');
 
 // Check the SimpleSAMLphp config is compatible
 $saml_config = SimpleSAML_Configuration::getInstance();
 $session_handler = $saml_config->getString('session.handler', false);
 $store_type = $saml_config->getString('store.type', false);
 if ($store_type == 'phpsession' || $session_handler == 'phpsession' || (empty($store_type) && empty($session_handler))) {
-    throw new AuthInstanceException(get_string('errorbadssphp','auth.saml'));
+    throw new AuthInstanceException(get_string('errorbadssphp', 'auth.saml'));
+}
+
+// do we have a logout request?
+if (param_variable("logout", false)) {
+    // logout the saml session
+    $as = new SimpleSAML_Auth_Simple($sp);
+    $as->logout($CFG->wwwroot);
 }
 
 // what is the session like?
-$valid_saml_session = $saml_session->isValid($sp);
+$saml_session = SimpleSAML_Session::getSession();
+$valid_saml_session = $saml_session ? $saml_session->isValid($sp) : false;
 
 // figure out what the returnto URL should be
 $wantsurl = param_variable("wantsurl", false);
@@ -88,14 +79,13 @@ if (!$wantsurl) {
     if (isset($_SESSION['wantsurl'])) {
         $wantsurl = $_SESSION['wantsurl'];
     }
-    else if (! $saml_session->getIdP()) {
+    else if (! $saml_session || ! $valid_saml_session) {
         $wantsurl = array_key_exists('HTTP_REFERER',$_SERVER) ? $_SERVER['HTTP_REFERER'] : $CFG->wwwroot;
     }
     else {
         $wantsurl = $CFG->wwwroot;
     }
 }
-
 // taken from Moodle clean_param - make sure the wantsurl is correctly formed
 include_once('validateurlsyntax.php');
 if (!validateUrlSyntax($wantsurl, 's?H?S?F?E?u-P-a?I?p?f?q?r?')) {
@@ -105,8 +95,37 @@ if (!validateUrlSyntax($wantsurl, 's?H?S?F?E?u-P-a?I?p?f?q?r?')) {
 // trim off any reference to login and stash
 $SESSION->wantsurl = preg_replace('/\&login$/', '', $wantsurl);
 
-// now - are we logged in?
-$as->requireAuth();
+$as = new SimpleSAML_Auth_Simple($sp);
+$idp_entityid = null;
+if (! $as->isAuthenticated()) {
+    if (param_variable("idpentityid", false)) {
+        $idp_entityid = param_variable("idpentityid", false);
+    }
+    else {
+        if (class_exists('PluginAuthSaml_IdPDisco')) {
+            $discoHandler = new PluginAuthSaml_IdPDisco(array('saml20-idp-remote', 'shib13-idp-remote'), 'saml');
+            $disco = $discoHandler->getTheIdPs();
+            if (count($disco['list']) == 0) {
+                throw new AuthInstanceException(get_string('errorbadssphpmetadata', 'auth.saml'));
+            }
+            else if (count($disco['list']) == 1) {
+                $idp_entityid = array_shift($disco['list']);
+                $idp_entityid = $idp_entityid["entityid"];
+            }
+            else {
+                auth_saml_disco_screen($disco['list'], $disco['preferred']);
+            }
+        }
+        else {
+            throw new AuthInstanceException(get_string('errorbadssphpmetadata', 'auth.saml'));
+        }
+    }
+}
+
+// reinitialise config to pickup idp entityID
+SimpleSAML_Configuration::init(get_config('docroot') . 'auth/saml/config');
+$as = new SimpleSAML_Auth_Simple('default-sp');
+$as->requireAuth(array('ReturnTo' => get_config('wwwroot') . "auth/saml/index.php"));
 
 // ensure that $_SESSION is cleared for simplesamlphp
 if (isset($_SESSION['wantsurl'])) {
@@ -134,17 +153,13 @@ $THEME   = new Theme($USER);
 // END of copied stuff from original init.php
 // ***********************************************************************
 
-if (!$SESSION->get('wantsurl')) {
-    $SESSION->set('wantsurl', preg_replace('/\&login$/', '', $wantsurl));
-}
-
 // now start the hunt for the associated authinstance for the organisation attached to the saml_attributes
 global $instance;
 $instance = auth_saml_find_authinstance($saml_attributes);
 
 // if we don't have an auth instance then this is a serious failure
 if (!$instance) {
-    throw new UserNotFoundException(get_string('errorbadinstitution','auth.saml'));
+    throw new UserNotFoundException(get_string('errorbadinstitution', 'auth.saml'));
 }
 
 // stash the existing logged in user - if we have one
@@ -158,7 +173,7 @@ try {
     $can_login = $auth->request_user_authorise($saml_attributes);
 }
 catch (AccessDeniedException $e) {
-    throw new UserNotFoundException(get_string('errnosamluser','auth.saml'));
+    throw new UserNotFoundException(get_string('errnosamluser', 'auth.saml'));
 }
 catch (XmlrpcClientException $e) {
     throw new AccessDeniedException($e->getMessage());
@@ -179,7 +194,7 @@ if ($can_login) {
         $wantsurl = $CFG->wwwroot;
     }
     // must be within this domain
-    if (!preg_match('/'.$_SERVER['HTTP_HOST'].'/', $wantsurl)) {
+    if (!preg_match('/'.$_SERVER['HTTP_HOST'] . '/', $wantsurl)) {
         $wantsurl = $CFG->wwwroot;
     }
     @session_write_close();
@@ -189,7 +204,7 @@ if ($can_login) {
 // are we configured to allow testing of local login and linking?
 $loginlink = get_field('auth_instance_config', 'value', 'field', 'loginlink', 'instance', $instance->id);
 if (empty($loginlink)) {
-    throw new UserNotFoundException(get_string('errnosamluser','auth.saml'));
+    throw new UserNotFoundException(get_string('errnosamluser', 'auth.saml'));
 }
 
 // used in the submit callback for auth_saml_loginlink_screen()
@@ -250,7 +265,7 @@ function auth_saml_find_authinstance($saml_attributes) {
     // find all the possible institutions/auth instances of type saml
     $instances = recordset_to_array(get_recordset_sql("SELECT * FROM {auth_instance_config} aic, {auth_instance} ai WHERE ai.id = aic.instance AND ai.authname = 'saml' AND aic.field = 'institutionattribute'"));
     foreach ($instances as $row) {
-        $institutions[]= $row->instance.':'.$row->institution.':'.$row->value;
+        $institutions[]= $row->instance . ':' . $row->institution . ':' . $row->value;
         if (isset($saml_attributes[$row->value])) {
             // does this institution use a regex match against the institution check value?
             if ($configvalue = get_record('auth_instance_config', 'instance', $row->instance, 'field', 'institutionregex')) {
@@ -268,7 +283,7 @@ function auth_saml_find_authinstance($saml_attributes) {
 
             if ($is_regex) {
                 foreach ($saml_attributes[$row->value] as $attr) {
-                    if (preg_match('/'.trim($institution_value).'/', $attr)) {
+                    if (preg_match('/' . trim($institution_value) . '/', $attr)) {
                         $instance = $row;
                         break;
                     }
@@ -289,6 +304,86 @@ function auth_saml_find_authinstance($saml_attributes) {
 
 
 /**
+ * present the IdP discovery screen if there are more than one
+ * available - user selects ...
+ *
+ * @param string $list
+ * @param string $preferred
+*/
+function auth_saml_disco_screen($list, $preferred) {
+
+    $idps = array();
+    $lang = current_language();
+    $lang = explode('.', $lang);
+    $lang = strtolower(array_shift($lang));
+    $haslogos = false;
+    foreach ($list as $entityid => $value) {
+        $desc = $name = $entityid;
+        if (isset($value['description'][$lang])) {
+            $desc = $value['description'][$lang];
+        }
+        if (isset($value['name'][$lang])) {
+            $name = $value['name'][$lang];
+        }
+        $idplogo = array();
+        if (isset($value['UIInfo']) && isset($value['UIInfo']['Logo'])) {
+            $haslogos = true;
+            // Fetch logo from provider if given
+            $logos = $value['UIInfo']['Logo'];
+            foreach ($logos as $logo) {
+                if ($logo['lang'] == $lang) {
+                    $idplogo = $logo;
+                    break;
+                }
+            }
+            // None matching the lang wanted so use the first one
+            if (empty($idplogo)) {
+                $idplogo = $logos[0];
+            }
+        }
+        $idps[]= array('idpentityid' => $entityid, 'name' => $name, 'description' => $desc, 'logo' => $idplogo);
+    }
+
+    $idps = array(
+        'count'   => count($idps),
+        'limit'   => count($idps),
+        'offset'  => 1,
+        'data'    => $idps,
+    );
+
+    $cols = array(
+            'logo' => array('name' => get_string('logo', 'auth.saml'),
+                            'template' => 'auth:saml:idplogo.tpl',
+                            'class' => 'short',
+                            'sort' => 'false'),
+            'idpentityid' => array('name' => get_string('idpentityid', 'auth.saml'),
+                                   'template' => 'auth:saml:idpentityid.tpl',
+                                   'class' => 'col-sm-3',
+                                   'sort' => false),
+            'description' => array('name' => get_string('idpprovider','auth.saml'),
+                                   'sort' => false),
+    );
+    if ($haslogos === false) {
+        unset($cols['logo']);
+    }
+
+    $smarty = smarty_core();
+    $smarty->assign('results', $idps);
+    $smarty->assign('cols', $cols);
+    $smarty->assign('pagedescriptionhtml', get_string('selectidp', 'auth.saml'));
+    $idps = $smarty->fetch('auth:saml:idptable.tpl');
+
+    $smarty = smarty(array(), array(), array(), array('pagehelp' => false, 'sidebars' => false));
+    $smarty->assign('columns', $cols);
+    $smarty->assign('idps', $idps);
+    $smarty->assign('preferred', $preferred);
+    $smarty->assign('PAGEHEADING', get_string('disco', 'auth.saml'));
+    $smarty->display('auth:saml:disco.tpl');
+    exit;
+}
+
+
+/**
  * present the login-link screen where users are asked if they want to link
  * the current loggedin local account to the remote saml one
  *
@@ -296,7 +391,6 @@ function auth_saml_find_authinstance($saml_attributes) {
  * @param string $currentuser
  */
 function auth_saml_loginlink_screen($remoteuser, $currentuser) {
-    require_once('pieforms/pieform.php');
     $form = array(
         'name'           => 'loginlink',
         'renderer'       => 'div',
@@ -321,10 +415,10 @@ function auth_saml_loginlink_screen($remoteuser, $currentuser) {
         'dieaftersubmit' => false,
         'iscancellable'  => true
     );
-    $form = new Pieform($form);
+    $form = pieform_instance($form);
+    define('TITLE', get_string('link', 'auth.saml'));
     $smarty = smarty(array(), array(), array(), array('pagehelp' => false, 'sidebars' => false));
     $smarty->assign('form', $form->build());
-    $smarty->assign('PAGEHEADING', get_string('link', 'auth.saml'));
     $smarty->display('form.tpl');
     exit;
 }
@@ -336,11 +430,10 @@ function auth_saml_loginlink_screen($remoteuser, $currentuser) {
  * @param string $remoteuser
  */
 function auth_saml_login_screen($remoteuser) {
-    require_once('pieforms/pieform.php');
+    define('TITLE', get_string('logintolink', 'auth.saml', get_config('sitename')));
     $smarty = smarty(array(), array(), array(), array('pagehelp' => false, 'sidebars' => false));
     $smarty->assign('pagedescriptionhtml', get_string('logintolinkdesc', 'auth.saml', $remoteuser, get_config('sitename')));
-    $smarty->assign('form', '<div id="loginform_container"><noscript><p>{str tag="javascriptnotenabled"}</p></noscript>'.saml_auth_generate_login_form());
-    $smarty->assign('PAGEHEADING', get_string('logintolink', 'auth.saml', get_config('sitename')));
+    $smarty->assign('form', '<div id="loginform_container"><noscript><p>{str tag="javascriptnotenabled"}</p></noscript>' . saml_auth_generate_login_form());
     $smarty->assign('LOGINPAGE', true);
     $smarty->display('form.tpl');
     exit;
@@ -357,7 +450,6 @@ function saml_auth_generate_login_form() {
     if (!get_config('installed')) {
         return;
     }
-    require_once('pieforms/pieform.php');
     if (count_records('institution', 'registerallowed', 1, 'suspended', 0)) {
         $registerlink = '<a class="btn btn-primary btn-xs" href="' . get_config('wwwroot') . 'register.php">' . get_string('register') . '</a>';
     }
@@ -444,13 +536,12 @@ function login_test_all_user_authinstance($username, $password) {
     }
 
     // stop right here if the site is closed for any reason
-    $siteclosedforupgrade = get_config('siteclosed');
-    if ($siteclosedforupgrade && get_config('disablelogin')) {
+    if (get_config('siteclosedforupgrade')) {
         global $SESSION;
         $SESSION->add_error_msg(get_string('siteclosedlogindisabled', 'mahara', get_config('wwwroot') . 'admin/upgrade.php'), false);
         return false;
     }
-    if ($siteclosedforupgrade || get_config('siteclosedbyadmin')) {
+    if (get_config('siteclosedbyadmin')) {
         global $SESSION;
         $SESSION->add_error_msg(get_string('siteclosed'));
         return false;

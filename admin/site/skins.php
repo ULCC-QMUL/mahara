@@ -19,7 +19,6 @@ define('SECTION_PAGE', 'siteskins');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once(get_config('libroot') . 'skin.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('siteskins', 'skin'));
 
 if (!get_config('skins')) {
@@ -44,5 +43,4 @@ $smarty = smarty();
 $smarty->assign('skins', $data->data);
 $smarty->assign('siteskins', true);
 $smarty->assign('pagination', $pagination['html']);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('skin/index.tpl');

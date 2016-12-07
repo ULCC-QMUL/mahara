@@ -100,7 +100,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         self.nextupload++;
         var message = makeMessage(DIV(null,
             SPAN({'class': 'icon-spinner icon-pulse icon icon-lg'}), ' ',
-            get_string('uploadingfiletofolder',e.name,self.foldername)
+            get_string('uploadingfiletofolder','artefact.file',e.name,self.foldername)
             ), 'info');
         setNodeAttribute(message, 'id', 'uploadstatusline' + self.nextupload);
         appendChildNodes(self.id + '_upload_messages', message);
@@ -113,15 +113,10 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         if ($(self.id + '_userfile').files) {
             for (var i = 0; i < $(self.id + '_userfile').files.length; ++ i) {
                 self.nextupload++;
-                if (is_FF()) {
-                    var localname = $(self.id + '_userfile').files[i].name;
-                }
-                else {
-                    var localname = $(self.id + '_userfile').files[i].fileName;
-                }
+                var localname = $(self.id + '_userfile').files[i].name;
                 var message = makeMessage(DIV(null,
                     SPAN({'class': 'icon-spinner icon-pulse icon icon-lg'}), ' ',
-                    get_string('uploadingfiletofolder',localname,self.foldername)
+                    get_string('uploadingfiletofolder','artefact.file',localname,self.foldername)
                     ), 'ok');
                 setNodeAttribute(message, 'id', 'uploadstatusline' + self.nextupload);
                 appendChildNodes(self.id + '_upload_messages', message);
@@ -179,7 +174,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
                 message = get_string('nametoolong');
             }
             else if (self.fileexists(name)) {
-                message = get_string('filewithnameexists', name);
+                message = get_string('filewithnameexists', 'artefact.file', name);
             }
         }
         if (message) {
@@ -197,7 +192,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
             message = get_string('namefieldisrequired');
         }
         else {
-            name = name.value;
+            name = name.value.trim();
             if (name == '') {
                 message = get_string('namefieldisrequired');
             }
@@ -205,7 +200,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
                 message = get_string('nametoolong');
             }
             else if (self.fileexists(name, this.name.replace(/.*_update\[(\d+)\]$/, '$1'))) {
-                message = get_string('filewithnameexists', name);
+                message = get_string('filewithnameexists', 'artefact.file', name);
             }
         }
         if (message) {
@@ -301,7 +296,18 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
             pieform_select_other($(self.id + '_edit_license'));
         }
         $(self.id + '_edit_allowcomments').checked = self.filedata[id].allowcomments;
-        $(self.id + '_edit_tags').value = self.filedata[id].tags.join(', ');
+
+        $(self.id + '_edit_tags').selectedIndex = -1;
+        self.tag_select2_clear(self.id + '_edit_tags');
+        if (self.filedata[id].tags) {
+            for (var x in self.filedata[id].tags) {
+                var option = document.createElement("option");
+                option.text = option.value = self.filedata[id].tags[x];
+                option.selected = "selected";
+                $(self.id + '_edit_tags').add(option);
+            }
+        }
+
         replaceChildNodes($(self.id + '_edit_messages'));
         forEach(getElementsByTagAndClassName('input', 'permission', self.id + '_edit_row'), function (elem) {
             var perm = getNodeAttribute(elem, 'name').split(':');
@@ -314,8 +320,8 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         });
         // $(self.id + '_edit_artefact').value = id; // Changes button text in IE
         setNodeAttribute(self.id + '_edit_artefact', 'name', self.id + '_update[' + id + ']');
-        var tags_control_elem = augment_tags_control(self.id + '_edit_tags', true);
-        swapDOM($(self.id + '_edit_tags').parentNode.firstChild, tags_control_elem);
+
+        self.tag_select2(self.id + '_edit_tags');
         var edit_row = removeElement(self.id + '_edit_row');
         var this_row = getFirstParentByTagAndClassName(this, 'tr');
         insertSiblingNodesAfter(this_row, edit_row);
@@ -337,7 +343,52 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         return false;
     }
 
-    this.edit_init = function () { augment_tags_control(self.id + '_edit_tags'); }
+    this.tag_select2_clear = function (id) {
+        var select2 = jQuery('#' + id).data('select2');
+        if (select2) {
+            jQuery('#' + id).select2();
+        }
+        jQuery('#' + id).find('option').remove();
+    }
+
+    this.tag_select2 = function (id) {
+        var placeholder = get_string('defaulthint');
+
+        jQuery('#' + id).select2({
+            ajax: {
+                url: self.config.wwwroot + "json/taglist.php",
+                dataType: 'json',
+                type: 'POST',
+                delay: 250,
+                data: function(params) {
+                    return {
+                        'q': params.term,
+                        'page': params.page || 0,
+                        'sesskey': self.config.sesskey,
+                        'offset': 0,
+                        'limit': 10,
+                    }
+                },
+                processResults: function(data, page) {
+                    return {
+                        results: data.results,
+                        pagination: {
+                            more: data.more
+                        }
+                    };
+                }
+            },
+            language: globalconfig.select2_lang,
+            multiple: true,
+            width: "300px",
+            allowClear: false,
+            placeholder: placeholder,
+            minimumInputLength: 1,
+            tags: true,
+        });
+    }
+
+    this.edit_init = function () { }
 
     this.browse_init = function () {
         if (self.config.edit || self.config.editmeta) {
@@ -357,7 +408,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
                             if (self.filedata[id].childcount > 0) {
                                 warn += get_string('foldernotempty') + ' ';
                                 if (self.filedata[id].profileiconcount > 0) {
-                                    warn += get_string('foldercontainsprofileicons', self.filedata[id].profileiconcount) + ' ';
+                                    warn += get_string('foldercontainsprofileicons', 'artefact.file', self.filedata[id].profileiconcount) + ' ';
                                 }
                                 warn += get_string('confirmdeletefolderandcontents');
                             }
@@ -370,7 +421,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
                                 warn += get_string('defaultprofileicon') + ' ';
                             }
                             if (self.filedata[id].attachcount > 0) {
-                                warn += get_string('fileattachedtoportfolioitems', self.filedata[id].attachcount) + ' ';
+                                warn += get_string('fileattachedtoportfolioitems', 'artefact.file', self.filedata[id].attachcount) + ' ';
                             }
                             if (self.filedata[id].viewcount > 0) {
                                 warn += get_string('fileappearsinviews') + ' ';
@@ -465,6 +516,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         if (self.config.select) {
             self.connect_select_buttons();
         }
+        self.connect_link_modal();
     }
 
     this.create_move_list = function(icon, moveid) {
@@ -480,16 +532,18 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
             var elemid = title.attr('id').replace(/^changefolder:/, '');
             if (elemid != moveid) {
                 var displaytitle = title.find('.display-title').html();
-                var link = $j('<a>').attr('href', '#').html(get_string('moveto', displaytitle));
-                link.on('click keydown', function(e) {
-                    if ((e.type === 'click' || e.keyCode === 32) && !e.isDefaultPrevented()) {
-                        self.setfocus = 'changefolder:' + elemid;
-                        self.move_to_folder(moveid, elemid);
-                        self.move_list = null;
-                        e.preventDefault();
-                    }
-                });
-                ul.append($j('<li><span class="icon icon-long-arrow-right left"></span>').append(link));
+                if (typeof displaytitle !== 'undefined') {
+                    var link = $j('<a>').attr('href', '#').html(get_string('moveto', 'artefact.file', displaytitle));
+                    link.on('click keydown', function(e) {
+                        if ((e.type === 'click' || e.keyCode === 32) && !e.isDefaultPrevented()) {
+                            self.setfocus = 'changefolder:' + elemid;
+                            self.move_to_folder(moveid, elemid);
+                            self.move_list = null;
+                            e.preventDefault();
+                        }
+                    });
+                    ul.append($j('<li><span class="icon icon-long-arrow-right left"></span>').append(link));
+                }
             }
         });
 
@@ -640,6 +694,43 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
         });
     }
 
+    /**
+     * A modal popup to show larger version of image.
+     * The popup is hooked onto the name link in filebrowser
+     */
+    this.connect_link_modal = function () {
+        if ($j('#' + self.id + '_filelist').length === 0) {
+            return;
+        }
+        var pagemodal = $j('#page-modal');
+        if (pagemodal.length === 0) {
+            return;
+        }
+
+        var pagemodalbody = $j('#page-modal .modal-body');
+
+        var elem = $j('#' + self.id + '_filelist .img-modal-preview');
+
+        elem.each(function() {
+
+            $j(this).on('click', function(e) {
+
+                e.preventDefault();
+                var previewimg = $j('#previewimg');
+                if (previewimg.length === 0) {
+                    previewimg = $j('<img id="previewimg" src="">');
+                    pagemodalbody.append(previewimg);
+                }
+                var imgsrc = $j(this).attr('href');
+                imgsrc = updateUrlParameter(imgsrc, 'maxwidth', 400);
+                imgsrc = updateUrlParameter(imgsrc, 'maxheight', 400);
+                previewimg.attr('src',imgsrc);
+                $j('#page-modal').modal('show');
+
+            });
+        });
+    }
+
     this.connect_select_buttons = function () {
 
         if (document.getElementById(self.id + '_filelist') === null) {
@@ -656,7 +747,11 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
                 e.preventDefault();
 
                 // if folder, or a link that goes somewhere exit out
-                if(e.target.nodeName === 'A'){
+                if (e.target.nodeName === 'A') {
+                    return;
+                }
+                // if an image preview link
+                if (jQuery(e.target).parent().hasClass('img-modal-preview')) {
                     return;
                 }
 
@@ -665,7 +760,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
 
                 // remove visual selection if this is for selecting 1 file
                 if (self.config.selectone) {
-                    for(j = 0; j < elem.length; j = j + 1){
+                    for (j = 0; j < elem.length; j = j + 1) {
                         removeElementClass(elem[j], 'active');
                     }
                 }
@@ -760,7 +855,7 @@ function FileBrowser(idprefix, folderid, config, globalconfig) {
             }
         };
         if (!existed) {
-            var remove = BUTTON({'class': 'btn-link text-small button submit unselect', 'type': 'submit', 'name': self.id+'_unselect[' + id + ']', 'title': get_string('remove')}, SPAN({'class': 'icon icon-times icon-lg text-danger left'}), SPAN(null, get_string('remove')));
+            var remove = BUTTON({'class': 'btn btn-default btn-xs text-small button submit unselect', 'type': 'submit', 'name': self.id+'_unselect[' + id + ']', 'title': get_string('remove')}, SPAN({'class': 'icon icon-times icon-lg text-danger left'}), SPAN(null, get_string('remove')));
             connect(remove, 'onclick', self.unselect);
 
             filelink = ''

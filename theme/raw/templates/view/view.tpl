@@ -13,7 +13,7 @@
 {if $maintitle}
 <h1 id="viewh1" class="page-header">
     {if $title}
-        <span class="subsection-heading">{$title}</span>
+        <span class="subsection-heading">{$title|safe}</span>
     {else}
         <span class="section-heading">{$maintitle|safe}</span>
     {/if}
@@ -48,7 +48,7 @@
     </a>
     {/if}
 
-    {if $LOGGEDIN}
+    {if $LOGGEDIN && !$userisowner}
     <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
         <span class="icon icon-ellipsis-h icon-lg" role="presentation" aria-hidden="true"></span>
         <span class="sr-only">{str tag="more..."}</span>

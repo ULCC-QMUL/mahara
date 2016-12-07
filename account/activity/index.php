@@ -16,7 +16,6 @@ define('SECTION_PLUGINNAME', 'account');
 define('SECTION_PAGE', 'activity');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('inbox'));
 
 // Make sure the unread message count is up to date whenever the
@@ -153,7 +152,6 @@ $smarty = smarty(array('paginator'));
 $smarty->assign('options', $options);
 $smarty->assign('type', $type);
 $smarty->assign('INLINEJAVASCRIPT', $javascript);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('deleteall', $deleteall);
 $smarty->assign('activitylist', $activitylist);
 $smarty->display('account/activity/index.tpl');

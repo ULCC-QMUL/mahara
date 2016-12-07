@@ -11,6 +11,10 @@
 
 defined('INTERNAL') || die();
 
+// Defining the path used by the functions in the Mahara Assign Submission plugin for Moodle.
+// (Note: As a current workaround, the path is to a related "local" plugin.)
+define('MNET_MDL_ASSIGN_SUBMISSION_MAHARA_PATH', 'local/mahara/mnetlib.php/');
+
 function xmlrpc_exception (Exception $e) {
     if (($e instanceof XmlrpcServerException) && get_class($e) == 'XmlrpcServerException') {
         $e->handle_exception();
@@ -122,7 +126,52 @@ function find_remote_user($username, $wwwroot) {
         }
         try {
             $user = new User;
-            $user->find_by_instanceid_username($authinstance->id, $username, true);
+            $userfound = false;
+            if (get_config('usersuniquebyusername')) {
+                // When turned on, this setting means that it doesn't matter
+                // which other application the user SSOs from, they will be
+                // given the same account in Mahara.
+                //
+                // This setting is one that has security implications unless
+                // only turned on by people who know what they're doing. In
+                // particular, every system linked to Mahara should be making
+                // sure that same username == same person.  This happens for
+                // example if two Moodles are using the same LDAP server for
+                // authentication.
+                //
+                // If this setting is on, it must NOT be possible to self
+                // register on the site for ANY institution - otherwise users
+                // could simply pick usernames of people's accounts they wished
+                // to steal.
+                if ($institutions = get_column('institution', 'name', 'registerallowed', '1')) {
+                    log_warn(get_string('warninstitutionregistration', 'auth') . ' ' .
+                             get_string('warninstitutionregistrationinstitutions',
+                                 'auth',
+                                 count($institutions),
+                                 join("\n  ", $institutions)));
+                    return false;
+                }
+
+                if (!get_config('usersallowedmultipleinstitutions')) {
+                    log_warn(get_string('warnmultiinstitutionsoff', 'auth'));
+                    return false;
+                }
+
+                try {
+                    $user->find_by_username($username);
+                    // It came back. We found a user.
+                    $userfound = true;
+                }
+                catch (Exception $e) {
+                    // $user->find_by_username will throw an error if a user was not found.
+                    // We can ignore it and try to find the user by the authinstance below.
+                    continue;
+                }
+            }
+            if ($userfound == false) {
+                // Try finding user by the authinstance.
+                $user->find_by_instanceid_username($authinstance->id, $username, true);
+            }
             $candidates[$authinstance->id] = $user;
         } catch (Exception $e) {
             // we don't care
@@ -389,7 +438,7 @@ function send_content_intent($username) {
         throw $e;
     }
 
-    $queue = PluginImport::create_new_queue($user->id, null, $REMOTEWWWROOT, 0);
+    $queue = PluginImport::create_new_queue($user->id, $REMOTEWWWROOT, 0);
 
     return array(
         'sendtype' => (($queue->queue) ? 'queue' : 'immediate'),
@@ -553,6 +602,30 @@ function kill_children($username, $useragent) {
     return true;
 }
 
+/**
+ * When the IdP requests that child sessions are terminated,
+ * this function will be called on each of the child hosts. The machine that
+ * calls the function (over xmlrpc) provides us with the mnethostid we need.
+ *
+ * @param   string  $username       Username for session to kill
+ * @param   string  $useragent      SHA1 hash of user agent to look for
+ * @return  bool                    True on success
+ */
+function kill_child($username, $useragent) {
+    global $REMOTEWWWROOT; // comes from server.php
+
+    $user_exists = find_remote_user($username, $REMOTEWWWROOT);
+    if (!$user_exists) {
+        return false;
+    }
+
+    list($user, $authinstance) = $user_exists;
+    $userid = $user->get('id');
+
+    delete_records('sso_session', 'userid', $userid);
+    remove_user_sessions($userid);
+    return true;
+}
 function xmlrpc_not_implemented() {
     return true;
 }
@@ -693,9 +766,16 @@ function get_watchlist_for_user($username, $maxitems) {
  * @param string $username
  * @param int $id The ID of the view or collection to be submitted
  * @param boolean $iscollection Indicates whether it's a view or a collection
+ * @param boolean $lock Whether or not to lock the submission
+ * @param string $apilevel The API level the remote service would prefer to use
+ *      Prior to resolving Github Issue 2 (mnet-based access control) this will
+ *      default to "moodle-assignsubmission-mahara:1
+ *      After resolving Github Issue2, this will be moodle-assignsubmission-mahara:2
+ *      (We could do this through Mnet system.listMethods calls, but this saves us
+ *      some round-trips)
  * @return array An array of data for the web service to consume
  */
-function submit_view_for_assessment($username, $id, $iscollection = false) {
+function submit_view_for_assessment($username, $id, $iscollection = false, $apilevel = 'moodle-assignsubmission-mahara:1', $lock = true) {
     global $REMOTEWWWROOT;
 
     list ($user, $authinstance) = find_remote_user($username, $REMOTEWWWROOT);
@@ -706,6 +786,28 @@ function submit_view_for_assessment($username, $id, $iscollection = false) {
     $id = (int) $id;
     if (!$id) {
         return false;
+    }
+
+    // Figure out which API level Moodle wants to use
+    if ($apilevel && is_string($apilevel) && count(explode(':', $apilevel, 2)) == 2) {
+        list($apiname, $apinumber) = explode(':', $apilevel, 2);
+    }
+    else {
+        throw new XmlrpcClientException('Invalid application level ' . hsc((string) $apilevel));
+    }
+
+    if ($apiname === 'moodle-assignsubmission-mahara' && ((int) $apinumber) >= 2) {
+        // Level 2 or later API. We'll use a later MNet call for access control, no need
+        // for an access token.
+        $usetokens = false;
+        $returnapi = 'moodle-assignsubmission-mahara:2';
+    }
+    else {
+        // "Classic" api. Use access tokens. If the client wants the page to remain unlocked
+        // they'll have to do a subsequent "unlock" call and rely on the token sticking around.
+        $usetokens = true;
+        $lock = true;
+        $returnapi = 'moodle-assignsubmission-mahara:1';
     }
 
     require_once('view.php');
@@ -719,26 +821,36 @@ function submit_view_for_assessment($username, $id, $iscollection = false) {
         $title = $collection->get('name');
         $description = $collection->get('description');
 
-        // Check whether the collection is already submitted
-        if ($collection->is_submitted()) {
-            // If this is already submitted to something else, throw an exception
-            if ($collection->get('submittedgroup') || $collection->get('submittedhost') !== $REMOTEWWWROOT) {
-                throw new CollectionSubmissionException(get_string('collectionalreadysubmitted', 'view'));
-            }
-
-            // It may have been submitted to a different assignment in the same remote
-            // site, but there's no way we can tell. So we'll just send the access token
-            // back.
-            $access = $collection->get_invisible_token();
-        }
-        else {
-            $collection->submit(null, $remotehost, $userid);
-            $access = $collection->new_token(false);
-        }
-
-        // If the collection is empty, $access will be false
-        if (!$access) {
+        // Can't submit an empty collection, because it won't be viewable.
+        if (!$collection->views()) {
             throw new CollectionSubmissionException(get_string('cantsubmitemptycollection', 'view'));
+        }
+
+        if ($lock) {
+            // Check whether the collection is already submitted
+            if ($collection->is_submitted()) {
+                // If this is already submitted to something else, throw an exception
+                if ($collection->get('submittedgroup') || $collection->get('submittedhost') !== $REMOTEWWWROOT) {
+                    throw new CollectionSubmissionException(get_string('collectionalreadysubmitted', 'view'));
+                }
+
+                // It may have been submitted to a different assignment in the same remote
+                // site, but there's no way we can tell. So we'll just send the access token
+                // back.
+                $access = $collection->get_invisible_token();
+            }
+            else {
+                $collection->submit(null, $remotehost, $userid);
+                $access = $collection->new_token(false);
+            }
+            $token = $access->token;
+            $url = 'view/view.php?mt=' . $token;
+        }
+
+        // The client has indicated via its API level that we don't need to use access tokens
+        if (!$usetokens) {
+            $token = null;
+            $url = $collection->get_url(false, true);
         }
     }
     else {
@@ -746,20 +858,30 @@ function submit_view_for_assessment($username, $id, $iscollection = false) {
         $title = $view->get('title');
         $description = $view->get('description');
 
-        if ($view->is_submitted()) {
-            // If this is already submitted to something else, throw an exception
-            if ($view->get('submittedgroup') || $view->get('submittedhost') !== $REMOTEWWWROOT) {
-                throw new ViewSubmissionException(get_string('viewalreadysubmitted', 'view'));
-            }
+        if ($lock) {
+            if ($view->is_submitted()) {
+                // If this is already submitted to something else, throw an exception
+                if ($view->get('submittedgroup') || $view->get('submittedhost') !== $REMOTEWWWROOT) {
+                    throw new ViewSubmissionException(get_string('viewalreadysubmitted', 'view'));
+                }
 
-            // It may have been submitted to a different assignment in the same remote
-            // site, but there's no way we can tell. So we'll just send the access token
-            // back.
-            $access = View::get_invisible_token($id);
+                // It may have been submitted to a different assignment in the same remote
+                // site, but there's no way we can tell. So we'll just send the access token
+                // back.
+                $access = View::get_invisible_token($id);
+            }
+            else {
+                View::_db_submit(array($id), null, $remotehost, $userid);
+                $access = View::new_token($id, false);
+            }
+            $token = $access->token;
+            $url = 'view/view.php?mt=' . $token;
         }
-        else {
-            View::_db_submit(array($id), null, $remotehost, $userid);
-            $access = View::new_token($id, false);
+
+        // The client has indicated via its API level that we don't need to use access tokens
+        if (!$usetokens) {
+            $token = null;
+            $url = $view->get_url(false, true);
         }
     }
 
@@ -767,9 +889,10 @@ function submit_view_for_assessment($username, $id, $iscollection = false) {
         'id'          => $id,
         'title'       => $title,
         'description' => $description,
-        'fullurl'     => get_config('wwwroot') . 'view/view.php?mt=' . $access->token,
-        'url'         => '/view/view.php?mt=' . $access->token,
-        'accesskey'   => $access->token,
+        'fullurl'     => get_config('wwwroot') . $url,
+        'url'         => '/' . $url,
+        'accesskey'   => $token,
+        'apilevel'    => $returnapi,
     );
 
     // Provide each artefact plugin the opportunity to handle the remote submission and
@@ -1264,16 +1387,18 @@ class OpenSslRepo {
             // Decryption failed... let's try our archived keys
             $openssl_history = $this->get_history();
             foreach($openssl_history as $keyset) {
-                $keyresource = openssl_pkey_get_private($keyset['keypair_PEM']);
-                $isOpen      = openssl_open($data, $payload, $key, $keyresource);
-                if ($isOpen) {
-                    // It's an older code, sir, but it checks out
-                    if ($oldkeyok) {
-                        return $payload;
-                    }
-                    else {
-                        // We notify the remote host that the key has changed
-                        throw new CryptException($this->keypair['certificate'], 7025);
+                if (isset($keyset['keypair_PEM'])) {
+                    $keyresource = openssl_pkey_get_private($keyset['keypair_PEM']);
+                    $isOpen      = openssl_open($data, $payload, $key, $keyresource);
+                    if ($isOpen) {
+                        // It's an older code, sir, but it checks out
+                        if ($oldkeyok) {
+                            return $payload;
+                        }
+                        else {
+                            // We notify the remote host that the key has changed
+                            throw new CryptException($this->keypair['certificate'], 7025);
+                        }
                     }
                 }
             }

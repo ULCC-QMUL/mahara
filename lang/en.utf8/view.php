@@ -29,12 +29,13 @@ $string['userviewurltaken']       = 'This URL is already taken. Please choose an
 $string['description']            = 'Page description';
 $string['startdate']              = 'Access start date/time';
 $string['stopdate']               = 'Access end date/time';
+$string['overrideconflict'] = 'One or more access permissions are in conflict with the overriding dates. These access permissions will not be valid outside the overriding dates.';
 $string['stopdatecannotbeinpast1'] = '"To" date cannot be in the past';
 $string['startdatemustbebeforestopdate'] = 'Start date must be before stop date';
 $string['newstopdatecannotbeinpast'] = 'The end date for \'%s\' access cannot be in the past.';
 $string['newstartdatemustbebeforestopdate'] = 'The start date for \'%s\' access must be before the end date.';
 $string['unrecogniseddateformat'] = 'Unrecognised date format';
-$string['allowcommentsonview']    = 'If checked, users will be allowed to leave comments.';
+$string['allowcommentsonview1']    = 'Allow users to leave comments.';
 $string['ownerformat']            = 'Name display format';
 $string['ownerformatdescription'] = 'How do you want people who look at your page to see your name?';
 $string['anonymise']              = 'Anonymise';
@@ -63,9 +64,9 @@ $string['deletethisview'] = 'Delete this page';
 $string['submitthisviewto1'] = 'Submit this page for assessment to';
 $string['submitthiscollectionto1'] = 'Submit this collection for assessment to';
 $string['forassessment1'] = 'Submit for assessment';
-$string['accessfromdate2'] = 'Nobody else can see this page before %s.';
-$string['accessuntildate2'] = 'Nobody else can see this page after %s.';
-$string['accessbetweendates2'] = 'Nobody else can see this page before %s or after %s.';
+$string['accessfromdate3'] = 'Nobody can see this page before %s.';
+$string['accessuntildate3'] = 'Nobody can see this page after %s.';
+$string['accessbetweendates3'] = 'Nobody can see this page before %s or after %s.';
 $string['artefactsinthisview'] = 'Artefacts in this page';
 $string['whocanseethisview'] = 'Who can see this page';
 $string['view'] = 'page';
@@ -194,7 +195,7 @@ $string['cantdeleteview'] = 'You cannot delete this page.';
 $string['deletespecifiedview'] = 'Delete page "%s"';
 $string['deleteviewconfirm1'] = 'Do you really want to delete this page? It cannot be undone.';
 $string['deleteviewconfirmbackup'] = 'Please consider creating a backup of this page by <a href="%sexport/">exporting</a> it.';
-$string['deleteviewconfirmnote1'] = '<strong>Note:</strong> All your files and journal entries that you linked in this page will still be available.<br/>However, any feedback placed on this page will be deleted.';
+$string['deleteviewconfirmnote3'] = '<strong>Note:</strong> All your files and journal entries that you linked in this page will still be available.<br/>However, any comments placed on this page will be deleted.';
 $string['deleteviewconfirmnote2'] = 'This page is a part of the collection <a href="%s">"%s"</a>.';
 
 $string['editaccesspagedescription6'] = 'You are the only one who can see your pages and collections by default. On this page you decide who can access them besides you.';
@@ -222,7 +223,10 @@ $string['blocknotinview'] = 'The block with ID "%d" is not in the page.';
 $string['viewcreatedsuccessfully'] = 'Page created successfully';
 $string['viewaccesseditedsuccessfully'] = 'Page access saved successfully';
 $string['viewsavedsuccessfully'] = 'Page saved successfully';
-$string['updatedaccessfornumviews'] = 'Access rules were updated for %d page(s)';
+$string['updatedaccessfornumviews1'] = array(
+    'Access rules were updated for 1 page.',
+    'Access rules were updated for %d pages.',
+);
 
 $string['invalidcolumn'] = 'Column %s out of range';
 
@@ -255,7 +259,7 @@ $string['blockinstanceconfiguredsuccessfully'] = 'Block configured successfully'
 $string['blockconfigurationrenderingerror'] = 'Configuration failed because the block could not be rendered.';
 
 $string['blocksintructionnoajax'] = 'Select a block and choose where to add it to your page. You can position a block using the arrow buttons in its titlebar.';
-$string['blocksinstructionajax'] = 'This area shows a preview of what your page will look like.<br>Drag blocks below this line to add them to your page layout. You can drag blocks around your page layout to position them.';
+$string['blocksinstructionajaxlive'] = 'This area shows a preview of what your page looks like. Changes are saved automatically.<br>Drag blocks onto the page to add them. You can then also drag them around the page to change their position.';
 
 $string['addblock'] = 'Add block: %s';
 $string['blockcell'] = 'Cell';
@@ -350,7 +354,7 @@ $string['blocktypecategorydesc.internal'] = 'Click for personal info options';
 $string['blocktypecategorydesc.blog'] = 'Click for journal options';
 
 $string['notitle'] = 'No title';
-$string['clickformoreinformation'] = 'Click for more information and to place feedback.';
+$string['clickformoreinformation1'] = 'Click for more information and to add a comment.';
 $string['detailslinkalt'] = 'Details';
 
 $string['Browse'] = 'Browse';
@@ -367,9 +371,9 @@ $string['nothemeselected1'] = 'Use institution theme';
 $string['Template'] = 'Template';
 $string['allowcopying'] = 'Allow copying';
 $string['retainviewrights1'] = 'Retain view access on copied pages or collections';
-$string['templatedescriptionplural1'] = 'Check this box if you would like the people who can see your selected pages / collections to be able to make their own copies of them, along with any files and folders they contain.';
-$string['retainviewrightsdescription1'] = 'Check this box if you would like to add access for you to view copies of the selected pages / collections that are copied by other users. Those users can revoke this access later on if they wish. Pages that are copied from a copy of this page or collection will not have this same access.';
-$string['retainviewrightsgroupdescription1'] = 'Check this box if you would like to add access for members of this group to view copies of the selected pages / collections that are copied by other users. Those users can revoke this access later on if they wish. Pages that are copied from a copy of this page or collection will not have this same access.';
+$string['templatedescriptionplural2'] = 'If people have access to your selected pages / collections, they can make their own copies.';
+$string['retainviewrightsdescription2'] = 'Add access for you to view copies of the selected pages / collections that are copied by other users. Those users can revoke this access later on if they wish. Pages that are copied from a copy of this page or collection will not have this same access.';
+$string['retainviewrightsgroupdescription2'] = 'Add access for members of this group to view copies of the selected pages / collections that are copied by other users. Those users can revoke this access later on if they wish. Pages that are copied from a copy of this page or collection will not have this same access.';
 $string['choosetemplatepageandcollectiondescription'] = '<p>Here you can search through the pages that you are allowed to copy as a starting point for making a new page. You can see a preview of each page by clicking on its name. Once you have found the page you wish to copy, click the corresponding "Copy page" button to make a copy and begin customising it. You may also choose to copy the entire collection that the page belongs to by clicking the corresponding "Copy collection" button.</p>';
 $string['choosetemplategrouppageandcollectiondescription'] = '<p>Here you can search through the pages that this group is allowed to copy as a starting point for making a new page. You can see a preview of each page by clicking on its name. Once you have found the page you wish to copy, click the corresponding "Copy page" button to make a copy and begin customising it. You may also choose to copy the entire collection that the page belongs to by clicking the corresponding "Copy collection" button.</p><p><strong>Note:</strong> Groups cannot currently make copies of journals, journal entries, plans and résumé information.</p>';
 $string['choosetemplateinstitutionpageandcollectiondescription'] = '<p>Here you can search through the pages that this institution is allowed to copy as a starting point for making a new page. You can see a preview of each page by clicking on its name. Once you have found the page you wish to copy, click the corresponding "Copy page" button to make a copy and begin customising it. You may also choose to copy the entire collection that the page belongs to by clicking the corresponding "Copy collection" button.</p><p><strong>Note:</strong> Institutions cannot currently make copies of journals, journal entries, plans and résumé information.</p>';
@@ -389,9 +393,9 @@ $string['confirmcopytitle'] = 'Confirm copying';
 $string['confirmcopydesc'] = 'Please choose which you would like to copy:';
 $string['Untitled'] = 'Untitled';
 $string['copyfornewusers'] = 'Copy for new users';
-$string['copyfornewusersdescription1'] = 'Whenever a new user is created, automatically make a personal copy of the selected pages / collections in the user\'s portfolio.';
+$string['copyfornewusersdescription2'] = 'Whenever a new user is created, automatically make a personal copy of the selected pages / collections in the user\'s account. If you want these users to be able to copy the selected pages / collections later on as well, please allow copying in general.';
 $string['copyfornewmembers'] = 'Copy for new institution members';
-$string['copyfornewmembersdescription1'] = 'Automatically make a personal copy of the selected pages / collections for all new members of %s.';
+$string['copyfornewmembersdescription2'] = 'Automatically make a personal copy of the selected pages / collections for all new members of %s. If you want these users to be able to copy the selected pages / collections later on as well, please allow copying in general.';
 $string['copyfornewgroups'] = 'Copy for new groups';
 $string['copyfornewgroupsdescription1'] = 'Make a copy of the selected pages / collections in all new groups with these roles:';
 $string['owner'] = 'owner';
@@ -420,7 +424,7 @@ $string['latestcreated'] = 'Date created';
 $string['latestmodified'] = 'Last modified';
 $string['latestviewed'] = 'Last viewed';
 $string['mostvisited'] = 'Most visited';
-$string['mostcomments'] = 'Most feedback';
+$string['mostcomments1'] = 'Most comments';
 
 // View types
 $string['dashboard'] = 'Dashboard';

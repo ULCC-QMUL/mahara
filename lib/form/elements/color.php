@@ -24,7 +24,7 @@ function pieform_element_color(Pieform $form, $element) {
     $result = '';
     $name = Pieform::hsc($element['name']);
     $baseid = Pieform::hsc($form->get_name() . '_' . $element['name']);
-    $value = Pieform::hsc($element['defaultvalue']);
+    $value = Pieform::hsc($form->get_value($element));
     $transparent = (!empty($element['options']['transparent']) && $element['options']['transparent'] == true);
 
     // Transparency optional control
@@ -64,7 +64,7 @@ EOF;
     // Color Picker (Chooser)
     $result .= '<input type="text" name="' . $name . '_color" id="' . $baseid . '"'
         . ($transparent && (!isset($element['defaultvalue']) || $element['defaultvalue'] == 'transparent') ? ' disabled="disabled"' : '')
-        . ($transparent ? ' class="color {hash:true,required:false}"' : ' class="color {hash:true}"')
+        . ($transparent ? ' class="jscolor {hash:true,required:false}"' : ' class="jscolor {hash:true}"')
         . ' value="' . ($value == 'transparent' ? '' : $value) . '">';
 
     return $result;
@@ -103,6 +103,10 @@ function pieform_element_color_get_value(Pieform $form, $element) {
         return $color;
     }
 
+    if (isset($element['defaultvalue'])) {
+        return $element['defaultvalue'];
+    }
+
     return 'transparent';
 }
 
@@ -112,10 +116,24 @@ function pieform_element_color_get_value(Pieform $form, $element) {
  * @param array $element The element to get <head> code for
  * @return array         An array of HTML elements to go in the <head>
  */
-function pieform_element_color_get_headdata($element) {
+function pieform_element_color_get_headdata($element, Pieform $form) {
     $libfile   = get_config('wwwroot')  . 'js/jscolor/jscolor.js';
-    $result = array(
-        '<script type="application/javascript" src="' . $libfile . '"></script>'
+    $name = $form->get_property('name') . '_' . $element['name'];
+    $result = '<script type="application/javascript">';
+    $result .= "var initjscolor = false; \n";
+    $result .= "PieformManager.connect('onload', null, function() {\n";
+    $result .= "  jQuery('document').ready(function($) { \n";
+    $result .= "    if (initjscolor === true) { \n";
+    $result .= "      // rewire up the picker to show up\n";
+    $result .= "      var jsc = new jscolor('" . $name . "'); \n";
+    $result .= "    } \n";
+    $result .= "    // only after initial page load\n";
+    $result .= "    initjscolor = true; \n";
+    $result .= "  }); \n";
+    $result .= "});</script>";
+    $results = array(
+        '<script type="application/javascript" src="' . $libfile . '"></script>',
+        $result
     );
-    return $result;
+    return $results;
 }

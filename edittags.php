@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'myportfolio');
 require('init.php');
-require_once('pieforms/pieform.php');
 
 define('TITLE', get_string('edittags'));
 
@@ -51,7 +50,6 @@ if ($tag = param_variable('tag', null)) {
 }
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('tags', $tags);
 if ($tag) {
     $smarty->assign('tag', $tag);

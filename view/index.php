@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'index');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once(get_config('libroot') . 'view.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('Views', 'view'));
 
 $offset = param_integer('offset', 0);
@@ -56,7 +55,6 @@ $smarty->assign('querystring', get_querystring());
 $html = $smarty->fetch('view/indexresults.tpl');
 $smarty->assign('viewresults', $html);
 $smarty->assign('pagination', $pagination['html']);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('headingclass', 'page-header');
 $smarty->assign('query', param_variable('query', null));
 $smarty->assign('searchform', $searchform);

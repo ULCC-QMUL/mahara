@@ -427,6 +427,35 @@ class BehatGeneral extends BehatBase {
     }
 
     /**
+     * Click a matrix point by being given a column,row pair
+     * NOTE: column and row start from number '0' so the first cell in a table is (0,0)
+     *
+     * @When I click on the matrix point :matrix_point
+     * @param string $matrix_point a column,row value
+     * @throws ElementNotFoundException
+     * @throws ExpectationException
+     */
+    public function i_click_matrix_point($matrix_point) {
+        // Check that we have a valid matrix point
+        $point = explode(',', $matrix_point);
+        if (empty($point[0]) || empty($point[1]) ||
+            !is_numeric($point[0]) || !is_numeric($point[1])) {
+            throw new ExpectationException('"' . $matrix_point . '" is not valid. Needs to be like "3,5"', $this->getSession());
+        }
+
+        // The table container.
+        $exception = new ElementNotFoundException($this->getSession(), 'text', null, 'Unable to find the point "(' . $matrix_point . ')" in a table with class "tablematrix"');
+        $xpath = "//table[(contains(concat(' ', normalize-space(@class), ' '), ' tablematrix '))]" .
+                 "/tbody/tr[" . $point[1] . "]/td[" . $point[0] . "]";
+        $pointnode = $this->find('xpath', $xpath, $exception);
+
+        // For some reasons, the Mink function click() and check() do not work
+        // Using jQuery as a workaround
+        $jscode = "jQuery(\".tablematrix tr:eq('" . $point[1] . "') td:eq('" . $point[0] . "') span\").click();";
+        $this->getSession()->executeScript($jscode);
+    }
+
+    /**
      * Click on the delete button inside a list/table row containing the specified text.
      *
      * @When /^I delete the "(?P<row_text_string>(?:[^"]|\\")*)" row$/
@@ -855,7 +884,7 @@ class BehatGeneral extends BehatBase {
         foreach(plugin_types() as $plugintype) {
             set_field($plugintype . '_cron', 'nextrun', null);
         }
-        $this->getSession()->visit($this->locate_path('/lib/cron.php'));
+        $this->getSession()->visit($this->locate_path('/lib/cron.php?urlsecret=' . urlencode(get_config('urlsecret'))));
     }
 
     /**
@@ -905,34 +934,6 @@ class BehatGeneral extends BehatBase {
         catch (ElementNotFoundException $e) {
             // It passes.
             return;
-        }
-    }
-
-    /**
-     * Fills in WYSIWYG editor with specified id. (If no ID is specified, uses the first
-     * TinyMCE editor on the page.
-     *
-     * TODO: Is there a better, more human-readable way we could specify the TinyMCE editor
-     * to use? Like, tie it to the label for the pieform element?
-     *
-     * @Given /^(?:|I )fill in "(?P<text>[^"]*)" in WYSIWYG editor(?:| "(?P<iframe>[^"]*)")$/
-     */
-    public function iFillInInWYSIWYGEditor($text, $iframe = null) {
-        if ($iframe == null) {
-            // Use the first TinyMCE iframe on the page
-            // TODO: May have to change this when upgrading TinyMCE. Is there a TinyMCE
-            // Javascript API we could use instead?
-            $iframe = $this->find('css', '.mce-edit-area > iframe')->getAttribute('id');
-        }
-
-        // switchToIFrame($iframe) seems not to work using current selenium webdriver
-        // Use javascript to update the tinyMCE editor
-        if ($this->find('xpath', "//iframe[@id='" . $iframe . "']")) {
-            $editorid = substr($iframe, 0, -4);    // remove '_ifr'
-            $this->getSession()->executeScript("tinymce.get('" . $editorid . "').setContent('" . $text . "');");
-        }
-        else {
-            throw new \NotFoundException("Iframe with id '$iframe'");
         }
     }
 
@@ -1027,20 +1028,25 @@ class BehatGeneral extends BehatBase {
 
     }
 
-/**
- * Tick the radio button
- * https://github.com/Kunstmaan/KunstmaanBehatBundle/blob/master/Features/Context/SubContext/RadioButtonSubContext.php
- *
- * @When /^I select the radio "(?P<text>(?:[^"]|\\")*)"$/
- * @param string $labeltext The label
- */
-    public function i_check_radio($labeltext) {
-        $radioButton = $this->getSession()->getPage()->findField($labeltext);
-        if (null === $radioButton) {
-            throw new ElementNotFoundException($this->getSession(), 'form field', 'id|name|label|value', $labeltext);
-        }
-        $this->getSession()->getDriver()->click($radioButton->getXPath());
+    /**
+     * Close the config modal dialog.
+     *
+     * @When /^I close the config dialog$/
+     * @throws ElementNotFoundException
+     */
+    public function i_close_config_dialog() {
 
+        // Find the config dialog close button.
+        $exception = new ElementNotFoundException($this->getSession(), 'dialog');
+        $xpath = "//div[@id='configureblock']" .
+                 "//div[contains(concat(' ', normalize-space(@class), ' '), ' modal-dialog ')]" .
+                 "//button[contains(concat(' ', normalize-space(@class), ' '), ' close ')]";
+        $closebutton = $this->find('xpath', $xpath, $exception);
+        if ($closebutton->isVisible()) {
+            $closebutton->click();
+            $this->getSession()->getDriver()->getWebDriverSession()->accept_alert();
+            return;
+        }
     }
 
 /**
@@ -1091,8 +1097,9 @@ class BehatGeneral extends BehatBase {
  */
     public function i_delete_link_resource_menu_item($item) {
         $this->getSession()->executeScript('jQuery("div#menuitemlist tr:contains(\'' . $item . '\') button:contains(\'Delete\')")[0].click();');
-        usleep((10000));
+        usleep(10000);
         $this->i_accept_confirm_popup();
+        $this->wait_until_the_page_is_ready();
     }
 
 /**
@@ -1135,6 +1142,91 @@ JS;
         catch(Exception $e) {
             throw new \Exception("scrollIntoView failed");
         }
+    }
+
+/**
+ * Check if images exist in the block given its title
+ *
+ * @Then I should see images in the block :blocktitle
+ *
+ */
+    public function i_should_see_images_block($blocktitle) {
+        // Find the block.
+        $blocktitleliteral = $this->escaper->escapeLiteral($blocktitle);
+        $xpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' column-content ')]" .
+                     "/div[contains(@id,'blockinstance_')" .
+                         " and contains(h3, " . $blocktitleliteral . ")]//img";
+        // Wait until it finds the text inside the block title.
+        try {
+            $blockimages = $this->find_all('xpath', $xpath);
+        }
+        catch (ElementNotFoundException $e) {
+            throw new ExpectationException('The block with title ' . $blocktitleliteral . ' was not found', $this->getSession());
+        }
+
+        // If we are not running javascript we have enough with the
+        // element existing as we can't check if it is visible.
+        if (!$this->running_javascript()) {
+            return;
+        }
+
+        // We also check the element visibility when running JS tests.
+        $this->spin(
+            function($context, $args) {
+
+                foreach ($args['nodes'] as $node) {
+                    if ($node->isVisible()) {
+                        return true;
+                    }
+                }
+
+                throw new ExpectationException('The block with title ' . $args['text'] . ' was not visible', $context->getSession());
+            },
+            array('nodes' => $blockimages, 'text' => $blocktitleliteral)
+        );
+    }
+
+/**
+ * Check if images does not exist in the block given its title
+ *
+ * @Then I should not see images in the block :blocktitle
+ *
+ */
+    public function i_should_not_see_images_block($blocktitle) {
+        // Find the block.
+        $blocktitleliteral = $this->escaper->escapeLiteral($blocktitle);
+        $xpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' column-content ')]" .
+                     "/div[contains(@id,'blockinstance_')" .
+                         " and contains(h3, " . $blocktitleliteral . ")]" .
+                         "[count(descendant::img) = 0]";
+        // Wait until it finds the text inside the block title.
+        try {
+            $blockimages = $this->find_all('xpath', $xpath);
+        }
+        catch (ElementNotFoundException $e) {
+            throw new ExpectationException('The block with title ' . $blocktitleliteral . ' was not found', $this->getSession());
+        }
+
+        // If we are not running javascript we have enough with the
+        // element existing as we can't check if it is visible.
+        if (!$this->running_javascript()) {
+            return;
+        }
+
+        // We also check the element visibility when running JS tests.
+        $this->spin(
+            function($context, $args) {
+
+                foreach ($args['nodes'] as $node) {
+                    if ($node->isVisible()) {
+                        return true;
+                    }
+                }
+
+                throw new ExpectationException('The block with title ' . $args['text'] . ' was not visible', $context->getSession());
+            },
+            array('nodes' => $blockimages, 'text' => $blocktitleliteral)
+        );
     }
 
 }

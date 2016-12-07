@@ -15,7 +15,6 @@ define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'site');
 define('SECTION_PAGE', 'contact');
 require('init.php');
-require_once('pieforms/pieform.php');
 require_once('lib/antispam.php');
 define('TITLE', get_string('contactus'));
 
@@ -136,6 +135,5 @@ function contactus_submit(Pieform $form, $values) {
 }
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('form', $contactform);
 $smarty->display('form.tpl');

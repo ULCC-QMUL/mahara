@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'licenses');
 
 require(dirname(dirname(dirname(__FILE__))).'/init.php');
 require_once('license.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('sitelicenses', 'admin'));
 define('DEFAULTPAGE', 'home');
 
@@ -45,7 +44,6 @@ $extralicenses = get_column_sql("
 $smarty = smarty();
 setpageicon($smarty, 'icon-legal');
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('licenses', $licenses);
 $smarty->assign('extralicenses', $extralicenses);
 $smarty->assign('allowextralicenses', get_config('licenseallowcustom'));

@@ -110,6 +110,20 @@ $cfg->log_environ_targets = LOG_TARGET_SCREEN | LOG_TARGET_ERRORLOG;
  */
 $cfg->log_backtrace_levels = LOG_LEVEL_WARN | LOG_LEVEL_ENVIRON;
 
+
+/**
+ * @global boolean $cfg->log_backtrace_print_args Whether or not to print the values of function & method
+ * arguments when printing a backtrace. This can be useful for debugging, but it is a mild security risk,
+ * because function parameters may include sensitive data such as passwords and private keys. (Though
+ * arguments whose names suggest that they contain passwords, will still be blanked out even if this
+ * feature is enabled.)
+ *
+ * A NULL value here tells Mahara to hide argument values when $cfg->productionmode is enabled, and to
+ * show them otherwise. A TRUE or FALSE tells Mahara to always show/hide argument values in backtraces
+ * regardless of the value of $cfg->productionmode.
+ */
+$cfg->log_backtrace_print_args = null;
+
 /**
  * @global int $cfg->error_reporting What level of errors to print to the Mahara logs. Gets passed directly
  * to the PHP function "error_reporting()".
@@ -125,8 +139,6 @@ $cfg->error_reporting = E_ALL & ~E_STRICT;
  * @global int|bool $cfg->developermode Developer mode
  * When set, the following things (among others) will happen:
  *
- * * 'debug.js' will be included on each page. You can edit this file to add
- *   debugging javascript at your discretion
  * * 'debug.css' will be included on each page. You can edit this file to add
  *   debugging CSS at your discretion
  * * the unpacked version of MochiKit will be used
@@ -135,7 +147,7 @@ $cfg->error_reporting = E_ALL & ~E_STRICT;
  * developing for Mahara
  */
 $cfg->developermode = false;
-// $cfg->developermode = DEVMODE_DEBUGJS | DEVMODE_DEBUGCSS | DEVMODE_UNPACKEDJS;
+// $cfg->developermode = DEVMODE_DEBUGCSS | DEVMODE_UNPACKEDJS;
 
 /**
  * @global bool $cfg->sendemail Whether to send e-mail. If set to false, Mahara will not send any e-mail at
@@ -520,7 +532,7 @@ $cfg->plugin_search_elasticsearch_redolimit = '500';
 
 /**
  * The maximum number of comment indentation levels to show
- * (Same for the feedback block & for bottom of page, so it's best if it's small)
+ * (Same for the comment block & for bottom of page, so it's best if it's small)
  */
 // $cfg->plugin_artefact_comment_maxindent = 5;
 
@@ -587,6 +599,15 @@ $cfg->usersuniquebyusername = false;
 // $cfg->opensslcnf = '';
 
 /**
+ * global string $cfg->dbprefix If set, Mahara will add this prefix to all of its database table names.
+ * This setting is generally only necessary if you are running Mahara in the same database as another
+ * web application (a situation most commonly encountered in shared hosting).
+ *
+ * Due to database name length limits, the dbprefix MUST be no longer than 19 characters.
+ */
+$cfg->dbprefix = '';
+
+/**
  * @global string $cfg->dbtimezone Sets the timezone for your database connection. This is only necessary if your
  * database server has a different timezone than your web server (which is most likely to happen in cloud hosting).
  * Consult your database's manual for legal values.
@@ -619,6 +640,13 @@ $cfg->probationenabled = false;
  * many probation points new users will start with.
  */
 $cfg->probationstartingpoints = 2;
+
+/**
+ * @global integer $cfg->emailcontact If Mahara's anti-spam settings are enabled, this email address will be
+ * shown as a contact address to anonymous users when their message is identified as a possible spam message.
+ * This can help reduce user frustration in the event of a false positive.
+ */
+$cfg->emailcontact = '';
 
 /**
  * @global string $cfg->cookieprefix Prefix to use on the names of any cookies issued by Mahara. This may
@@ -666,3 +694,24 @@ MathJax.Hub.Configured();
  *  - this setting $cfg->maxuploadsize if set
  */
 //$cfg->maxuploadsize = 16777216;
+
+/**
+ * @global string $cfg->urlsecret A secret you need to add to the lib/cron.php or admin/upgrade.php
+ * URL to run it through the browser rather than the commandline to prevent unauthorised users triggering
+ * the cron or an upgrade, eg http://example.com/lib/cron.php?urlsecret=mysupersecret. If you do not wish
+ * to have a url secret set $cfg->urlsecret = null.
+ */
+$cfg->urlsecret = 'mysupersecret';
+
+/**
+ * @global string $cfg->passwordsaltalt1 A previous password salt used on the site.
+ * When changing the salt (or disabling it), you will need to set the current salt as an alternate salt
+ * There are up to 20 alternate salts (e.g. $cfg->passwordsaltalt2, $cfg->passwordsaltalt3, etc)
+ */
+$cfg->passwordsaltalt1 = 'old salt value';
+
+/**
+ * @global array $cfg->openbadgedisplayer_source The open badge sources
+ * The default sources are Mozilla Backpack and openbadgepassport.com
+ */
+$cfg->openbadgedisplayer_source = '{"backpack":"https://backpack.openbadges.org/","passport":"https://openbadgepassport.com/"}';

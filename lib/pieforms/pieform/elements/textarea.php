@@ -69,7 +69,7 @@ function pieform_element_textarea(Pieform $form, $element) {/*{{{*/
     return '<textarea'
         . (($rows) ? ' rows="' . $rows . '"' : '')
         . (($cols) ? ' cols="' . $cols . '"' : '')
-        . $form->element_attributes($element, array('maxlength', 'size'))
+        . $form->element_attributes($element, array('size'))
         . '>' . Pieform::hsc($form->get_value($element)) . '</textarea>';
 }/*}}}*/
 
@@ -88,16 +88,4 @@ function pieform_element_textarea_get_value(Pieform $form, $element) {/*{{{*/
     }
 
     return '';
-}/*}}}*/
-
-function pieform_element_textarea_get_headdata() {/*{{{*/
-    global $_PIEFORM_TEXTAREAS;
-
-    $result  = '<script type="application/javascript">';
-    $result .= "PieformManager.loadPlugin('element', 'textarea');\n";
-    foreach ($_PIEFORM_TEXTAREAS as $textarea) {
-        $result .= 'PieformManager.connect("onload", "' . $textarea['formname'] . '", function(){new PieformTextarea($("' . $textarea['elementname'] . '"),' . $textarea['fullwidth'] . ');});' . "\n";
-    }
-    $result .= "</script>";
-    return array($result);
 }/*}}}*/

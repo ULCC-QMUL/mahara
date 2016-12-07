@@ -10,6 +10,8 @@
  */
 
 defined('INTERNAL') || die();
+global $CFG;
+require_once($CFG->docroot . '/artefact/lib.php');
 
 class EmbeddedImage {
 
@@ -25,19 +27,37 @@ class EmbeddedImage {
      * @param string $resourcetype The type of resource which the TinyMCE editor is used in, e.g. 'forum', 'topic', 'post' for forum text boxes
      * @param int $resourceid The id of the resourcetype
      * @param int $groupid The id of the group the resource is in if applicable
+     * @param int $userid The user trying to embed the image (current user if null)
      * @return string The updated $fieldvalue
      */
-    public static function prepare_embedded_images($fieldvalue, $resourcetype, $resourceid, $groupid = NULL) {
+    public static function prepare_embedded_images($fieldvalue, $resourcetype, $resourceid, $groupid = NULL, $userid = NULL) {
 
         if (empty($fieldvalue) || empty($resourcetype) || empty($resourceid)) {
             return $fieldvalue;
         }
 
         global $USER;
+        if ($userid == null) {
+            $user = $USER;
+        }
+        else {
+            $user = new User();
+            try {
+                $user->find_by_id($userid);
+            }
+            catch (AuthUnknownUserException $e) {
+                log_warn('No user found with ID ' . $userid);
+                return $fieldvalue;
+            }
+        }
+
         $dom = new DOMDocument();
         $dom->encoding = 'utf-8';
         $oldval = libxml_use_internal_errors(true);
-        $success = $dom->loadHTML(utf8_decode($fieldvalue));
+        $tmpstr = (mb_detect_encoding($fieldvalue, 'auto') == 'UTF-8')
+                ? '<?xml version="1.0" encoding="utf-8"?>' . $fieldvalue
+                : $fieldvalue;
+        $success = $dom->loadHTML($tmpstr);
         libxml_use_internal_errors($oldval);
         if ($success) {
             $publicimages = array();
@@ -56,11 +76,18 @@ class EmbeddedImage {
                 $foundmatch = preg_match_all($searchpattern, $imgsrc, $matches);
                 if ($foundmatch) {
                     foreach ($matches[1] as $imgid) {
-                        $file = artefact_instance_from_id($imgid);
-                        if (!($file instanceof ArtefactTypeImage)
-                            || !$USER->can_publish_artefact($file)
-                           ) {
-                            return $fieldvalue;
+                        try {
+                            $file = artefact_instance_from_id($imgid);
+                        }
+                        catch (ArtefactNotFoundException $e) {
+                            continue;
+                        }
+
+                        if (
+                            !($file instanceof ArtefactTypeImage)
+                            || !$user->can_publish_artefact($file)
+                        ) {
+                            continue;
                         }
                         else {
                             $publicimages[] = $imgid;
@@ -118,10 +145,12 @@ class EmbeddedImage {
             // we only want the fragments inside the body tag created by new DOMDocument
             $childnodes = $dom->getElementsByTagName('body')->item(0)->childNodes;
             $dummydom = new DOMDocument();
+            $dummydom->loadHTML('<?xml version="1.0" encoding="utf-8"?><div></div>');
+            $dummydiv = $dummydom->getElementsByTagName('div')->item(0);
             foreach ($childnodes as $child) {
-                $dummydom->appendChild($dummydom->importNode($child, true));
+                $dummydiv->appendChild($dummydom->importNode($child, true));
             }
-            $fieldvalue = html_entity_decode($dummydom->saveHTML(), ENT_QUOTES, 'UTF-8');
+            $fieldvalue = substr($dummydom->saveHTML($dummydom->getElementsByTagName('div')->item(0)), strlen('<div>'), -strlen('</div>'));
             return $fieldvalue;
         }
     }

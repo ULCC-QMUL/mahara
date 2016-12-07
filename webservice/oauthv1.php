@@ -58,7 +58,7 @@ if (!webservice_protocol_is_enabled('oauth')) {
 }
 
 // you must use HTTPS as token based auth is a hazzard without it
-if (!is_https()) {
+if (!is_https() && get_config('productionmode')) {
     header("HTTP/1.0 403 Forbidden - HTTPS must be used");
     die;
 }
@@ -90,9 +90,8 @@ else if ($_SERVER['PATH_INFO'] == '/access_token') {
 }
 else if ($_SERVER['PATH_INFO'] == '/authorize') {
         # logon
-        require_once('pieforms/pieform.php');
         if (!$USER->is_logged_in()) {
-            $form = new Pieform(auth_get_login_form());
+            $form = pieform_instance(auth_get_login_form());
             auth_draw_login_page(null, $form);
             exit;
 

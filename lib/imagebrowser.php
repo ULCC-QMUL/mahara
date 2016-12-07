@@ -153,19 +153,6 @@ class ImageBrowser {
                         'maxlength' => 4
                     )
                 ),
-                'height' => array(
-                    'type' => 'text',
-                    'title' => get_string ( 'height' ),
-                    'size' => 3,
-                    'rules' => array (
-                        'maxlength' => 4
-                    )
-                ),
-                'constrain' => array (
-                    'type' => 'switchbox',
-                    'title' => get_string ( 'constrain' ),
-                    'defaultvalue' => true
-                ),
                 'vspace' => array (
                     'type' => 'text',
                     'title' => get_string ( 'vspace' ),
@@ -239,17 +226,16 @@ class ImageBrowser {
                         'jssuccesscallback' => 'imageBrowserConfigSuccess',
                         'jserrorcallback'   => 'imageBrowserConfigError',
                         'elements' => $elements,
-                        'viewgroup' => $this->get_view()->get('group'),
+                        'viewgroup' => $this->get('view') ? $this->get_view()->get('group') : null,
                         'group' => $this->get('group'),
-                        'viewinstitution' => $this->get_view()->get('institution'),
+                        'viewinstitution' => $this->get('view') ? $this->get_view()->get('institution') : null,
                         'institution' => $this->get('institution'),
                         'configdirs' => $configdirs,
                         'plugintype' => 'blocktype',
                         'pluginname' => $this->get('blocktype'),
         );
 
-        require_once('pieforms/pieform.php');
-        $pieform = new Pieform($form);
+        $pieform = pieform_instance($form);
 
         if ($pieform->is_submitted()) {
             global $SESSION;

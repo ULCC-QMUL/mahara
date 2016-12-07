@@ -18,7 +18,6 @@ define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'progressbar');
 
 require(dirname(dirname(dirname(__FILE__))).'/init.php');
-require_once('pieforms/pieform.php');
 require_once('institution.php');
 define('TITLE', get_string('progressbar', 'admin'));
 define('DEFAULTPAGE', 'home');
@@ -76,6 +75,7 @@ $instlocked = (array) get_column('institution_locked_profile_field', 'profilefie
 $locked = array_merge($sitelocked, $instlocked);
 
 // Figure out the form elements in the configuration form
+safe_require('artefact', 'internal');
 $elements = array();
 $possibleitems = artefact_get_progressbar_items();
 $possibleitemscount = count($possibleitems);
@@ -241,5 +241,4 @@ $smarty->assign('institution', $institution);
 $smarty->assign('institutionselector', $institutionselector);
 $smarty->assign('enabled', get_config('showprogressbar'));
 $smarty->assign('INLINEJAVASCRIPT', $js);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/progressbar.tpl');

@@ -15,7 +15,6 @@ define('TITLE', get_string('Institutions', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'institutions');
-require_once('pieforms/pieform.php');
 require_once('license.php');
 define('MENUITEM', 'manageinstitutions/institutions');
 
@@ -23,17 +22,12 @@ $institution = param_variable('i', '');
 $add         = param_boolean('add');
 $edit        = param_boolean('edit');
 $delete      = param_boolean('delete');
+define('SUBSECTIONHEADING', get_field('institution', 'displayname', 'name', $institution));
 
 $query = param_variable('query', '');
 $offset = param_integer('offset', 0);
 $limit = param_integer('limit', 0);
-$userlimit = get_account_preference($USER->get('id'), 'viewsperpage');
-if ($limit > 0 && $limit != $userlimit) {
-    $USER->set_account_preference('viewsperpage', $limit);
-}
-else {
-    $limit = $userlimit;
-}
+$limit = user_preferred_limit($limit, 'itemsperpage');
 
 $customthemedefaults = array(
     'background'   => array('type' => 'color', 'value' => '#530E53'),
@@ -122,6 +116,7 @@ if ($institution || $add) {
                 }
             }
             if ($artefactids) {
+                require_once(get_config('docroot') . 'artefact/lib.php');
                 foreach ($artefactids as $artefactid) {
                     try {
                         $a = artefact_instance_from_id($artefactid);
@@ -147,6 +142,7 @@ if ($institution || $add) {
 
             foreach ($authinstanceids as $id) {
                 delete_records('auth_instance_config', 'instance', $id);
+                delete_records('auth_remote_user', 'authinstance', $id);
             }
 
             foreach ($regdataids as $id) {
@@ -213,6 +209,7 @@ if ($institution || $add) {
         $data = get_record('institution', 'name', $institution);
         $data->commentsortorder = get_config_institution($institution, 'commentsortorder');
         $data->commentthreaded = get_config_institution($institution, 'commentthreaded');
+        $data->allowinstitutionsmartevidence = get_config_institution($institution, 'allowinstitutionsmartevidence');
         $lockedprofilefields = (array) get_column('institution_locked_profile_field', 'profilefield', 'name', $institution);
 
         // TODO: Find a better way to work around Smarty's minimal looping logic
@@ -246,6 +243,7 @@ if ($institution || $add) {
         $data->defaultmembershipperiod = null;
         $data->showonlineusers = 2;
         $data->allowinstitutionpublicviews = get_config('allowpublicviews') ? 1 : 0;
+        $data->allowinstitutionsmartevidence = 0;
         $data->licensemandatory = 0;
         $data->licensedefault = '';
         $data->dropdownmenu = get_config('dropdownmenu') ? 1 : 0;
@@ -267,17 +265,6 @@ if ($institution || $add) {
 
     safe_require('artefact', 'internal');
     $elements = array(
-        'name' => array(
-            'type' => 'text',
-            'title' => get_string('institutionname', 'admin'),
-            'rules' => array(
-                'required'  => true,
-                'maxlength' => 255,
-                'regex'     => '/^[a-zA-Z]+$/'
-            ),
-            'ignore' => !$add,
-            'help'   => true,
-        ),
         'add' => array(
             'type'   => 'hidden',
             'value'  => true,
@@ -296,7 +283,7 @@ if ($institution || $add) {
         ),
         'displayname' => array(
             'type' => 'text',
-            'title' => get_string('institutiondisplayname', 'admin'),
+            'title' => get_string('institutionname', 'admin'),
             'defaultvalue' => $data->displayname,
             'rules' => array(
                 'required'  => true,
@@ -305,6 +292,15 @@ if ($institution || $add) {
             'help'   => true,
         ),
     );
+    if (!$add) {
+        $elements['shortname'] = array(
+                'type' => 'select',
+                'title' => get_string('institutionshortname', 'admin'),
+                'defaultvalue' => $data->name,
+                'description' => get_string('institutionshortnamedescription', 'admin'),
+                'options' => array($data->name => $data->name),
+        );
+    }
     if ($USER->get('admin') && $institution != 'mahara') {
        $elements['expiry'] = array(
             'type'         => 'date',
@@ -343,14 +339,14 @@ if ($institution || $add) {
         $elements['registerallowed'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('registrationallowed', 'admin'),
-            'description'  => get_string('registrationalloweddescription4', 'admin'),
+            'description'  => get_string('registrationalloweddescription5', 'admin'),
             'defaultvalue' => $data->registerallowed,
             'help'   => true,
         );
         $elements['registerconfirm'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('registrationconfirm', 'admin'),
-            'description'  => get_string('registrationconfirmdescription2', 'admin'),
+            'description'  => get_string('registrationconfirmdescription3', 'admin'),
             'disabled'     => get_config('requireregistrationconfirm') == true,
             'defaultvalue' => $data->registerconfirm,
         );
@@ -401,7 +397,7 @@ if ($institution || $add) {
         $elements['deletelogo'] = array(
             'type'        => 'switchbox',
             'title'       => get_string('deletelogo', 'admin'),
-            'description' => get_string('deletelogodescription1', 'admin'),
+            'description' => get_string('deletelogodescription2', 'admin'),
         );
     }
     if (empty($data->name) || $data->name != 'mahara') {
@@ -434,12 +430,12 @@ if ($institution || $add) {
             'type'         => 'switchbox',
             'class'        => 'nojs-hidden-inline',
             'title'        => get_string('resetcolours', 'admin'),
-            'description'  => get_string('resetcoloursdesc1', 'admin'),
+            'description'  => get_string('resetcoloursdesc2', 'admin'),
         );
         $elements['dropdownmenu'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('dropdownmenu', 'admin'),
-            'description'  => get_string('dropdownmenudescriptioninstitution1','admin'),
+            'description'  => get_string('dropdownmenudescriptioninstitution2','admin'),
             'defaultvalue' => $data->dropdownmenu,
             'help'         => true,
         );
@@ -449,7 +445,7 @@ if ($institution || $add) {
         $elements['skins'] = array(
             'type' => 'switchbox',
             'title' => get_string('skins', 'admin'),
-            'description' => get_string('skinsinstitutiondescription1', 'admin'),
+            'description' => get_string('skinsinstitutiondescription2', 'admin'),
             'defaultvalue' => $data->skins,
         );
     }
@@ -484,7 +480,7 @@ if ($institution || $add) {
             $elements['licensemandatory'] = array(
                 'type'         => 'switchbox',
                 'title'        => get_string('licensemandatory', 'admin'),
-                'description'  => get_string('licensemandatorydescription','admin'),
+                'description'  => get_string('licensemandatorydescription1','admin'),
                 'defaultvalue' => $data->licensemandatory,
             );
             $elements['licensedefault'] = license_form_el_basic(null, true);
@@ -504,7 +500,7 @@ if ($institution || $add) {
             $elements['updateuserquotas'] = array(
                 'type'         => 'switchbox',
                 'title'        => get_string('updateuserquotas', 'artefact.file'),
-                'description'  => get_string('updateinstitutionuserquotasdesc1', 'admin'),
+                'description'  => get_string('updateinstitutionuserquotasdesc2', 'admin'),
             );
         }
         else {
@@ -519,7 +515,7 @@ if ($institution || $add) {
         $elements['allowinstitutionpublicviews'] = array(
             'type'         => 'switchbox',
             'title'        => get_string('allowinstitutionpublicviews', 'admin'),
-            'description'  => get_string('allowinstitutionpublicviewsdescription1','admin'),
+            'description'  => get_string('allowinstitutionpublicviewsdescription2','admin'),
             'defaultvalue' => get_config('allowpublicviews') && $data->allowinstitutionpublicviews,
             'disabled'     => get_config('allowpublicviews') == false,
             'help'         => true,
@@ -539,7 +535,14 @@ if ($institution || $add) {
             );
         }
     }
-
+    $elements['allowinstitutionsmartevidence'] = array(
+        'type'         => 'switchbox',
+        'title'        => get_string('allowinstitutionsmartevidence', 'admin'),
+        'description'  => get_string('allowinstitutionsmartevidencedescription','admin'),
+        'defaultvalue' => is_plugin_active('framework', 'module') && $data->allowinstitutionsmartevidence,
+        'disabled'     => is_plugin_active('framework', 'module') == false,
+        'help'         => true,
+    );
     $elements['lockedfields'] = array(
         'type' => 'fieldset',
         'class' => 'last with-formgroup',
@@ -635,8 +638,8 @@ else {
                         'type'  => 'text',
                         'defaultvalue' => $query,
                         'hiddenlabel' => true,
-                        'value' => get_string('search'),
-                        'class' => 'emptyonfocus',
+                        'value' => '',
+                        'placeholder' => get_string('search'),
                         'title' => get_string('search'),
                     ),
                     'submit' => array(
@@ -671,11 +674,8 @@ EOF;
 }
 
 function institution_validate(Pieform $form, $values) {
-    global $USER;
+    global $USER, $institution, $add;
 
-    if (!empty($values['name']) && !$form->get_error('name') && record_exists('institution', 'name', $values['name'])) {
-        $form->set_error('name', get_string('institutionnamealreadytaken', 'admin'));
-    }
     if ($USER->get('admin') || get_config_plugin('artefact', 'file', 'institutionaloverride')) {
         if (get_config_plugin('artefact', 'file', 'maxquotaenabled') && get_config_plugin('artefact', 'file', 'maxquota') < $values['defaultquota']) {
             $form->set_error('defaultquota', get_string('maxquotatoolow', 'artefact.file'));
@@ -716,6 +716,9 @@ function institution_validate(Pieform $form, $values) {
     if (!empty($values['lang']) && $values['lang'] != 'sitedefault' && !array_key_exists($values['lang'], get_languages())) {
         $form->set_error('lang', get_string('institutionlanginvalid', 'admin'));
     }
+    if (!is_plugin_active('framework', 'module') && (!empty($values['allowinstitutionsmartevidence']))) {
+        $form->set_error('allowinstitutionsmartevidence', get_string('institutionsmartevidencenotallowed', 'admin'));
+    }
 
     // Validate plugins settings.
     plugin_institution_prefs_validate($form, $values);
@@ -727,8 +730,9 @@ function institution_submit(Pieform $form, $values) {
     db_begin();
     // Update the basic institution record...
     if ($add) {
+        $institution = institution_generate_name($values['displayname']);
         $newinstitution = new Institution();
-        $newinstitution->initialise($values['name'], $values['displayname']);
+        $newinstitution->initialise($institution, $values['displayname']);
         $institution = $newinstitution->name;
     }
     else {
@@ -815,13 +819,12 @@ function institution_submit(Pieform $form, $values) {
             );
             // get all the users from the institution and make sure that they are still below
             // their quota threshold
-            if ($users = get_records_sql_array('SELECT * FROM {usr} u LEFT JOIN {usr_institution} ui ON u.id = ui.usr AND ui.institution = ?', array($institution))) {
+            if ($users = get_records_sql_array('SELECT * FROM {usr} u INNER JOIN {usr_institution} ui ON u.id = ui.usr AND ui.institution = ?', array($institution))) {
                 $quotanotifylimit = get_config_plugin('artefact', 'file', 'quotanotifylimit');
                 if ($quotanotifylimit <= 0 || $quotanotifylimit >= 100) {
                     $quotanotifylimit = 100;
                 }
                 foreach ($users as $user) {
-                    $user->quota = $values['defaultquota'];
                     // check if the user has gone over the quota notify limit
                     $user->quotausedpercent = $user->quotaused / $user->quota * 100;
                     $overlimit = false;
@@ -833,7 +836,7 @@ function institution_submit(Pieform $form, $values) {
                         require_once(get_config('docroot') . 'artefact/file/lib.php');
                         ArtefactTypeFile::notify_users_threshold_exceeded(array($user), false);
                         // no need to email admin as we can alert them right now
-                        $SESSION->add_error_msg(get_string('useroverquotathreshold', 'artefact.file', display_name($user)));
+                        $SESSION->add_error_msg(get_string('useroverquotathreshold', 'artefact.file', display_name($user), ceil((int) $user->quotausedpercent), display_size($user->quota)));
                     }
                     else if ($notified && !$overlimit) {
                         set_account_preference($user->id, 'quota_exceeded_notified', false);
@@ -852,6 +855,7 @@ function institution_submit(Pieform $form, $values) {
     }
 
     $newinstitution->allowinstitutionpublicviews  = (isset($values['allowinstitutionpublicviews']) && $values['allowinstitutionpublicviews']) ? 1 : 0;
+    $newinstitution->allowinstitutionsmartevidence  = (isset($values['allowinstitutionsmartevidence']) && $values['allowinstitutionsmartevidence']) ? 1 : 0;
 
     // TODO: Move handling of authentication instances within the Institution class as well?
     if (!empty($values['authplugin'])) {
@@ -1168,7 +1172,6 @@ if (isset($suspended)) {
 }
 
 $smarty->assign('PAGEHEADING', get_string('admininstitutions', 'admin'));
-$smarty->assign('subsectionheading', get_field('institution', 'displayname', 'name', $institution));
 $smarty->display('admin/users/institutions.tpl');
 
 function theme_sort($a, $b) {

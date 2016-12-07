@@ -19,7 +19,7 @@ defined('INTERNAL') || die();
 function ensure_sanity() {
 
     // PHP version
-    $phpversionrequired = '5.3.0';
+    $phpversionrequired = '5.4.0';
     if (version_compare(phpversion(), $phpversionrequired) < 0) {
         throw new ConfigSanityException(get_string('phpversion', 'error', $phpversionrequired));
     }
@@ -143,8 +143,7 @@ function ensure_sanity() {
     }
 
     if (
-        !check_dir_exists(get_config('dataroot') . 'smarty/compile') ||
-        !check_dir_exists(get_config('dataroot') . 'smarty/cache') ||
+        !check_dir_exists(get_config('dataroot') . 'dwoo') ||
         !check_dir_exists(get_config('dataroot') . 'temp') ||
         !check_dir_exists(get_config('dataroot') . 'langpacks') ||
         !check_dir_exists(get_config('dataroot') . 'htmlpurifier') ||
@@ -208,6 +207,7 @@ function ensure_upgrade_sanity() {
 
 /**
  * Upgrade/Install the specified mahara components
+ * (Only used by the CLI installer & upgrader)
  *
  * @param array $upgrades The list of components to install or upgrade
  * @return void
@@ -240,6 +240,8 @@ function upgrade_mahara($upgrades) {
         }
         else if ($install && $name == 'localpostinst') {
             // Update local version
+            $name(array('localdata' => true));
+
             $config = new StdClass;
             require(get_config('docroot') . 'local/version.php');
             set_config('localversion', $config->version);
@@ -277,6 +279,18 @@ function ensure_internal_plugins_exist() {
             }
         }
     }
+}
+
+/**
+ * Check to see whether a language string is present in the
+ * lang files.
+ *
+ * @param string $identifier
+ * @param string $section
+ * @return boolean
+ */
+function string_exists($identifier, $section = 'mahara') {
+    return get_string($identifier, $section) !== '[[' . $identifier . '/' . $section . ']]';
 }
 
 function get_string($identifier, $section='mahara') {
@@ -911,17 +925,18 @@ function load_config() {
 
 /**
  * This function returns a value from $CFG
- * or null if it is not found
+ * or default value if supplied or null if it is not found
  *
- * @param string $key config setting to look for
+ * @param string $key      Config setting to look for
+ * @param string $default  Default value to return if setting not found
  * @return mixed
  */
-function get_config($key) {
+function get_config($key, $default = null) {
     global $CFG;
     if (isset($CFG->$key)) {
         return $CFG->$key;
     }
-    return null;
+    return $default;
 }
 
 
@@ -934,10 +949,16 @@ function get_config($key) {
  */
 function set_config($key, $value) {
     global $CFG;
+    $value = (string) $value;
 
     db_ignore_sql_exceptions(true);
-    if (get_record('config', 'field', $key)) {
-        if (set_field('config', 'value', $value, 'field', $key)) {
+    $dbvalue = get_field('config', 'value', 'field', $key);
+    if (false !== $dbvalue) {
+        if (
+                // No need to update the DB if the value already matches
+                ($dbvalue === $value)
+                || set_field('config', 'value', $value, 'field', $key)
+        ) {
             $status = true;
         }
     }
@@ -997,7 +1018,13 @@ function get_config_plugin($plugintype, $pluginname, $key) {
     else {
 
         // To minimize database calls, get all the records for this plugin from the database at once.
-        $records = get_records_array($plugintype . '_config', 'plugin', $pluginname, 'field');
+        try {
+            $records = get_records_array($plugintype . '_config', 'plugin', $pluginname, 'field');
+        }
+        catch (SQLException $e) {
+            // Db might not exist yet on install
+            return null;
+        }
         if (!empty($records)) {
             foreach ($records as $record) {
                 $storeconfigname = "plugin_{$typename}_{$record->field}";
@@ -1034,10 +1061,18 @@ function get_config_plugin($plugintype, $pluginname, $key) {
 function set_config_plugin($plugintype, $pluginname, $key, $value) {
     global $CFG;
     $table = $plugintype . '_config';
+    $value = (string) $value;
 
     $success = false;
-    if (false !== get_field($table, 'value', 'plugin', $pluginname, 'field', $key)) {
-        $success = set_field($table, 'value', $value, 'plugin', $pluginname, 'field', $key);
+    $dbvalue = get_field($table, 'value', 'plugin', $pluginname, 'field', $key);
+    if (false !== $dbvalue) {
+        if (
+                // No need to update the DB if the value already matches
+                ($dbvalue === $value)
+                || set_field($table, 'value', $value, 'plugin', $pluginname, 'field', $key)
+        ) {
+            $success = true;
+        }
     }
     else {
         $pconfig = new stdClass();
@@ -1061,15 +1096,14 @@ function set_config_plugin($plugintype, $pluginname, $key, $value) {
  * for multiauth. Note that it may go and look in the database
  *
  * @param string $plugintype   E.g. auth
- * @param string $pluginname   E.g. internal
- * @param string $pluginid     Instance id
+ * @param string $instanceid     Instance id
  * @param string $key          The config setting to look for
  */
-function get_config_plugin_instance($plugintype, $pluginid, $key) {
+function get_config_plugin_instance($plugintype, $instanceid, $key) {
     global $CFG;
 
     // Must be unlikely to exist as a config option for any plugin
-    $instance = '_i_n_s_t' . $pluginid;
+    $instance = '_i_n_s_t' . $instanceid;
 
     // Suppress NOTICE with @ in case $key is not yet cached
     $configname = "plugin_{$plugintype}_{$instance}_{$key}";
@@ -1078,7 +1112,7 @@ function get_config_plugin_instance($plugintype, $pluginid, $key) {
         return $value;
     }
 
-    $records = get_records_array($plugintype . '_instance_config', 'instance', $pluginid, 'field', 'field, value');
+    $records = get_records_array($plugintype . '_instance_config', 'instance', $instanceid, 'field', 'field, value');
     if (!empty($records)) {
         foreach($records as $record) {
             $storeconfigname = "plugin_{$plugintype}_{$instance}_{$record->field}";
@@ -1099,28 +1133,34 @@ function get_config_plugin_instance($plugintype, $pluginid, $key) {
  *
  * @param string $plugintype   E.g. auth
  * @param string $pluginname   E.g. internal
- * @param string $pluginid     Instance id
+ * @param string $instanceid     Instance id
  * @param string $key          The config setting to look for
  */
-function set_config_plugin_instance($plugintype, $pluginname, $pluginid, $key, $value) {
+function set_config_plugin_instance($plugintype, $pluginname, $instanceid, $key, $value) {
     global $CFG;
-    $table = $plugintype . '_instance_config';
+    $value = (string) $value;
 
-    if (false !== get_field($table, 'value', 'instance', $pluginid, 'field', $key)) {
-        if (set_field($table, 'value', $value, 'instance', $pluginid, 'field', $key)) {
+    $table = $plugintype . '_instance_config';
+    $dbvalue = get_field($table, 'value', 'instance', $instanceid, 'field', $key);
+    if ($dbvalue !== false) {
+        if (
+                // No need to update the DB if the value already matches
+                ($dbvalue === $value)
+                || set_field($table, 'value', $value, 'instance', $instanceid, 'field', $key)
+        ) {
             $status = true;
         }
     }
     else {
         $pconfig = new StdClass;
-        $pconfig->instance = $pluginid;
+        $pconfig->instance = $instanceid;
         $pconfig->field  = $key;
         $pconfig->value  = $value;
         $status = insert_record($table, $pconfig);
     }
     if ($status) {
         // Must be unlikely to exist as a config option for any plugin
-        $instance = '_i_n_s_t' . $pluginid;
+        $instance = '_i_n_s_t' . $instanceid;
         $configname = "plugin_{$plugintype}_{$instance}_{$key}";
         $CFG->{$configname} = $value;
         return true;
@@ -1415,19 +1455,6 @@ function raw_langstring($string) {
 }
 
 /**
- * Helper function to figure out whether an array is an array or a hash
- * @param array $array array to check
- * @return bool true if the array is a hash
- */
-function is_hash($array) {
-    if (!is_array($array)) {
-        return false;
-    }
-    $diff = array_diff_assoc($array,array_values($array));
-    return !empty($diff);
-}
-
-/**
  * Function to check if a directory exists and optionally create it.
  *
  * @param string absolute directory path
@@ -1474,8 +1501,11 @@ function check_dir_exists($dir, $create=true, $recursive=true) {
  * @param string $filename the name of the file to include within the plugin structure
  * @param string $function (optional, defaults to require) the require/include function to use
  * @param string $nonfatal (optional, defaults to false) just returns false if the file doesn't exist
+ * @param array $returnvars (optional, defaults to null) Variables (defined in the file) to return.
+ * Useful for files like version.php that simply define variables. If null, instead returns the
+ * value of the include/require operation.
  */
-function safe_require($plugintype, $pluginname, $filename='lib.php', $function='require_once', $nonfatal=false) {
+function safe_require($plugintype, $pluginname, $filename='lib.php', $function='require_once', $nonfatal=false, $returnvars = null) {
     $plugintypes = plugin_types();
     if (!in_array($plugintype, $plugintypes)) {
         throw new SystemException("\"$plugintype\" is not a valid plugin type");
@@ -1534,11 +1564,17 @@ function safe_require($plugintype, $pluginname, $filename='lib.php', $function='
         throw new SystemException ("File $fullpath was outside document root!");
     }
 
-    if ($function == 'require') { return require($realpath); }
-    if ($function == 'include') { return include($realpath); }
-    if ($function == 'require_once') { return require_once($realpath); }
-    if ($function == 'include_once') { return include_once($realpath); }
+    if ($function == 'require') { $isloaded = require($realpath); }
+    if ($function == 'include') { $isloaded = include($realpath); }
+    if ($function == 'require_once') { $isloaded = require_once($realpath); }
+    if ($function == 'include_once') { $isloaded = include_once($realpath); }
 
+    if ($isloaded && $returnvars && is_array($returnvars)) {
+        return compact($returnvars);
+    }
+    else {
+        return $isloaded;
+    }
 }
 
 /**
@@ -1556,18 +1592,20 @@ function safe_require($plugintype, $pluginname, $filename='lib.php', $function='
  * @param string $filename the name of the file to include within the plugin structure
  * @param string $function (optional, defaults to require) the require/include function to use
  * @param string $nonfatal (optional, defaults to false) just returns false if the file doesn't exist
+ * @param array $returnvars (optional, defaults to null) Variables (defined in the file) to return.
+ * Useful for files like version.php that simply define variables. If null, instead returns the
+ * value of the include/require operation.
  */
-function safe_require_plugin($plugintype, $pluginname, $filename='lib.php', $function='require_once', $nonfatal=false) {
+function safe_require_plugin($plugintype, $pluginname, $filename='lib.php', $function='require_once', $nonfatal=false, $returnvars = null) {
     try {
-        safe_require($plugintype, $pluginname, $filename, $function, $nonfatal);
-        return true;
+        return safe_require($plugintype, $pluginname, $filename, $function, $nonfatal, $returnvars);
     }
     catch (SystemException $e) {
         if (get_field($plugintype . '_installed', 'active', 'name', $pluginname) == 1) {
             global $SESSION;
 
             set_field($plugintype . '_installed', 'active', 0, 'name', $pluginname);
-            $SESSION->add_error_msg(get_string('missingplugindisabled', 'admin', hsc("$plugintype:$pluginname")));
+            $SESSION->add_error_msg(get_string('missingplugindisabled1', 'admin', hsc("$plugintype:$pluginname")));
 
             // Reset the plugin cache.
             plugins_installed('', TRUE, TRUE);
@@ -1575,7 +1613,7 @@ function safe_require_plugin($plugintype, $pluginname, $filename='lib.php', $fun
             // Alert site admins that the plugin is broken so was disabled
             $message = new stdClass();
             $message->users = get_column('usr', 'id', 'admin', 1);
-            $message->subject = get_string('pluginbrokenanddisabledtitle', 'mahara', $pluginname);
+            $message->subject = get_string('pluginbrokenanddisabledtitle1', 'mahara', $pluginname);
             $message->message = get_string('pluginbrokenanddisabled', 'mahara', $pluginname, $e->getMessage());
 
             require_once('activity.php');
@@ -1589,12 +1627,21 @@ function safe_require_plugin($plugintype, $pluginname, $filename='lib.php', $fun
  * Check to see if a particular plugin is installed and is active by plugin name
  *
  * @param   string $pluginname Name of plugin
+ * @param   string $type       Name of plugin type
  * @return  bool
  */
-function is_plugin_active($pluginname) {
-    foreach (plugin_types() as $type) {
+function is_plugin_active($pluginname, $type = null) {
+    if ($type) {
         if (record_exists($type . '_installed', 'name', $pluginname, 'active', 1)) {
             return true;
+        }
+    }
+    else {
+        log_warn("Calling 'is_plugin_active()' without specifying plugin 'type'. This function may return incorrect results. Please update your 'is_plugin_active()' calls.");
+        foreach (plugin_types() as $type) {
+            if (record_exists($type . '_installed', 'name', $pluginname, 'active', 1)) {
+                return true;
+            }
         }
     }
     return false;
@@ -1611,7 +1658,8 @@ function plugin_types() {
     static $pluginstocheck;
     if (empty($pluginstocheck)) {
         // ORDER MATTERS! artefact has to be before blocktype
-        $pluginstocheck = array('artefact', 'auth', 'notification', 'search', 'blocktype', 'interaction', 'grouptype', 'import', 'export', 'module');
+        // And so does module because module.framework has blocks as foreign keys in DB
+        $pluginstocheck = array('artefact', 'auth', 'notification', 'search', 'module', 'blocktype', 'interaction', 'grouptype', 'import', 'export');
     }
     return $pluginstocheck;
 }
@@ -1861,7 +1909,9 @@ function handle_event($event, $data) {
                 safe_require($name, $sub->plugin);
                 $classname = 'Plugin' . ucfirst($name) . ucfirst($sub->plugin);
                 try {
-                    call_static_method($classname, $sub->callfunction, $event, $data);
+                    if (method_exists($classname, $sub->callfunction)) {
+                        call_static_method($classname, $sub->callfunction, $event, $data);
+                    }
                 }
                 catch (Exception $e) {
                     log_warn("Event $event caused an exception from plugin $classname "
@@ -1909,6 +1959,44 @@ interface IPlugin {
 }
 
 /**
+ * defines for web services types and authentication
+ *
+ *
+ */
+define('WEBSERVICE_TYPE_SOAP', 'soap');
+define('WEBSERVICE_TYPE_XMLRPC', 'xmlrpc');
+define('WEBSERVICE_TYPE_REST', 'rest');
+define('WEBSERVICE_TYPE_OAUTH1', 'oauth1');
+
+define('WEBSERVICE_AUTH_USERPASS', 'user');
+define('WEBSERVICE_AUTH_TOKEN', 'token');
+define('WEBSERVICE_AUTH_CERT', 'cert');
+define('WEBSERVICE_AUTH_WSSE', 'wsse');
+
+/**
+ * Generate an HTTP context object
+ *
+ * @param string $url
+ * @return object - stream context object
+ */
+
+function webservice_create_context($url) {
+    $hostname = parse_url($url, PHP_URL_HOST);
+    $context = array('http' => array ('method' => 'POST',
+                                'request_fulluri' => true,),
+            );
+    if (get_config('disablesslchecks')) {
+        $context['ssl'] = array('verify_host' => false,
+                           'verify_peer' => false,
+                           'verify_peer_name' => false,
+                           'SNI_server_name' => $hostname,
+                           'SNI_enabled'     => true,);
+    }
+    $context = stream_context_create($context);
+    return $context;
+}
+
+/**
  * Base class for all plugintypes.
  */
 abstract class Plugin implements IPlugin {
@@ -1950,6 +2038,197 @@ abstract class Plugin implements IPlugin {
         return array();
     }
 
+    /**
+     * This function returns an array of client connection by unique name.
+     *
+     * The return value should be array of objects. Each object should have these fields:
+     *
+     *  - connection: The name of the client connection handle.
+     *  - name: The descriptive name of the client connection for display purposes
+     *  - version: A version required for the connection
+     *  - notes: descriptive text that developer might want to show user
+     *  - type: Protocol type required eg: WEBSERVICE_CLIENT_TYPE_SOAP
+     *  - isfatal: Should an error be fatal
+     *
+     * @return array
+     */
+    public static function define_webservice_connections() {
+        return array();
+    }
+
+    /**
+     * This function returns an array of client connection records.
+     *
+     * @param array $institutions the institutions for the context of selecting
+     *        the client connections
+     *
+     * @return array
+     */
+    public static function calculate_webservice_connections($institutions) {
+
+        $me = get_called_class();
+        $connection_defs = call_user_func($me . '::define_webservice_connections');
+        $connections = array();
+        foreach ($connection_defs as $def) {
+            if (isset($def['connection'])) {
+                $cname = $def['connection'];
+                if ($results = get_records_sql_assoc(
+                    'SELECT cci.*
+                     FROM {client_connections_institution} AS cci
+                     WHERE cci.class = ? AND
+                           cci.connection = ? AND
+                           cci.institution IN ('.join(',', array_map('db_quote', $institutions)).') AND enable = 1', array($me, $cname))
+                ) {
+                    foreach ($results as $c) {
+                        $c->version = $def['version'];
+                        $c->connectorname = $def['name'];
+                        $connections[]= $c;
+                    }
+                }
+            }
+        }
+        return $connections;
+    }
+
+    /**
+     * This function returns an array of client connections.
+     *
+     * @param object $user the user for the context of selecting the client connections
+     *
+     * @return array
+     */
+    public static function get_webservice_connections($user=null) {
+        global $USER;
+
+        // is the web service connection switch enabled?
+        if (!get_config('webservice_requester_enabled')) {
+            log_debug('get_webservice_connections: disabled');
+            return array();
+        }
+        // do we have any defined connections enabled?
+        if (!get_records_array('client_connections_institution', 'enable', 1, '', 'id', 0, 1)) {
+            log_debug('get_webservice_connections: no active connections');
+            return array();
+        }
+
+        require_once(get_config('docroot') . 'webservice/lib.php');
+
+        $userinstitutions = array();
+        $institutions = ($user == null ? $USER->get('institutions') : load_user_institutions($user->id));
+        if (!empty($institutions)) {
+            foreach ($institutions as $institution) {
+                $userinstitutions[] = $institution->institution;
+            }
+        }
+        else {
+            $userinstitutions[] = 'mahara';
+        }
+        $cdefs = self::calculate_webservice_connections($userinstitutions);
+
+        $connections = array();
+        foreach ($cdefs as $c) {
+            $client = null;
+            $auth = array();
+            $authtype = null;
+            if (!empty($c->token)) {
+                $authtype = 'token';
+                if ($c->useheader) {
+                    $auth['header'] = (empty($c->header) ? 'Authorization' : $c->header . ": " . $c->token);
+                }
+                else {
+                    if (strpos($c->token, '=')) {
+                        list($k, $v) = explode('=', $c->token);
+                        $auth[$k] = $v;
+                    }
+                    else {
+                        $auth['wstoken'] = $c->token;
+                    }
+                }
+            }
+            else if (!empty($c->username) && !empty($c->password) ) {
+                $authtype = 'user';
+                if (strpos($c->username, '=')) {
+                    list($k, $v) = explode('=', $c->token);
+                    $auth[$k] = $v;
+                }
+                else {
+                    $auth['wsusername'] = $c->username;
+                }
+                if (strpos($c->password, '=')) {
+                    list($k, $v) = explode('=', $c->password);
+                    $auth[$k] = $v;
+                }
+                else {
+                    $auth['wspassword'] = $c->password;
+                }
+            }
+
+            // other static parameters - one per line
+            if (!empty($c->parameters)) {
+                $params = explode("\n", $c->parameters);
+                foreach ($params as $p) {
+                    if (strpos($p, '=')) {
+                        list($k, $v) = explode('=', $p);
+                        $auth[$k] = $v;
+                    }
+                }
+            }
+
+            switch ($c->type) {
+                case WEBSERVICE_TYPE_SOAP:
+                    require_once(get_config('docroot') . "webservice/soap/lib.php");
+                    libxml_disable_entity_loader(true);
+                    if ($c->authtype == WEBSERVICE_AUTH_WSSE) {
+                        //force SOAP synchronous mode
+                        $client = new webservice_soap_client($c->url,
+                                          $auth,
+                                          array("features" => SOAP_WAIT_ONE_WAY_CALLS,
+                                                'stream_context' => webservice_create_context($c->url),));
+                        //when function return null
+                        $wsseSoapClient = new webservice_soap_client_wsse(array($client, '_doRequest'), $client->wsdlfile, $client->getOptions());
+                        $wsseSoapClient->__setUsernameToken($c->username, $c->password);
+                        $client->setSoapClient($wsseSoapClient);
+                    }
+                    else {
+                        //force SOAP synchronous mode
+                        $client = new webservice_soap_client($c->url,
+                                        $auth,
+                                        array("features" => SOAP_WAIT_ONE_WAY_CALLS,
+                                              'stream_context' => webservice_create_context($c->url),));
+                    }
+                    $client->setWsdlCache(false);
+                    break;
+
+                case WEBSERVICE_TYPE_XMLRPC:
+                    require_once(get_config('docroot') . "webservice/xmlrpc/lib.php");
+                    $client = new webservice_xmlrpc_client($c->url, $auth);
+                    if ($c->authtype == WEBSERVICE_AUTH_CERT) {
+                        $client->setCertificate($c->certificate);
+                    }
+                    break;
+
+                case WEBSERVICE_TYPE_REST:
+                    require_once(get_config('docroot') . "webservice/rest/lib.php");
+                    if ($c->authtype == WEBSERVICE_TYPE_OAUTH1) {
+                        $client = new webservice_rest_client($c->url, $auth, 'oauth', $c->json);
+                        $client->set_2legged($c->consumer, $c->secret);
+                    }
+                    else {
+                        $client = new webservice_rest_client($c->url, $auth, $c->authtype, $c->json);
+                    }
+                    break;
+
+                default:
+                    log_error("Unknown WEBSERVICE_TYPE: ".$c->type);
+                    break;
+            }
+            if ($client) {
+                $client->set_connection($c);
+                $connections[]= $client;
+            }
+        }
+        return $connections;
+    }
 
     /**
      * This function will be run after every upgrade to the plugin.
@@ -2045,6 +2324,14 @@ abstract class Plugin implements IPlugin {
     }
 
     /**
+     * Can be overridden by plugins to assert when they are able to be used.
+     * For example, a plugin might check that a certain PHP extension is loaded
+     */
+    public static function is_usable() {
+        return true;
+    }
+
+    /**
      * Check whether this plugin is okay to be installed.
      *
      * To prevent installation, throw an InstallationException
@@ -2119,6 +2406,22 @@ abstract class Plugin implements IPlugin {
     public static function accountprefs_submit(Pieform $form, $values) {
         return;
     }
+
+    /**
+     * Is plugin deprecated - going to be obsolete / removed
+     * @return bool
+     */
+    public static function is_deprecated() {
+        return false;
+    }
+
+    /**
+     * Fetch plugin's display name rather than plugin name that is based on dir name.
+     * @return $tring or null
+     */
+    public static function get_plugin_display_name() {
+        return null;
+    }
 }
 
 /**
@@ -2140,6 +2443,52 @@ function format_date($date, $formatkey='strftimedatetime', $notspecifiedkey='str
         return strftime($fixedkey, $date);
     }
     return strftime(get_string($formatkey), $date);
+}
+
+/**
+ * Formats the difference of two unix timestamps as time lapsed.
+ *
+ * @param int $timestamp1 Older unix timestamp to compare
+ * @param int $timestamp2 Newer unix timestamp or current time if not supplied
+ *
+ * @return formatted time difference or false
+ */
+function format_timelapse($timestamp1, $timestamp2 = NULL) {
+    if (!is_numeric($timestamp2)) {
+        $timestamp2 = time();
+    }
+
+    $datetime1 = date_create_from_format('U', $timestamp2);
+    $datetime2 = date_create_from_format('U', $timestamp1); // a timestamp to test against first timestamp
+    $interval = date_diff($datetime1, $datetime2);
+
+    if ($interval->invert == 0 && $interval->s != 0) {
+        // We are in the future so exit
+        return false;
+    }
+    else if ($interval->invert == 0) {
+        // We are at exact current time - this can happen when adding something
+        // so we will make it 1 sec in the past for display purposes
+        $interval->s = 1;
+    }
+
+    if ($interval->days < 1) {
+        if ($interval->h != 0) {
+            if ($interval->h < 2) {
+                return get_string('timelapsestringhour', 'mahara', $interval->i, $interval->h, $interval->i);
+            }
+            else {
+                return get_string('timelapsestringhours', 'mahara', $interval->i, $interval->h, $interval->i);
+            }
+        }
+        else if ($interval->i != 0) {
+            return get_string('timelapsestringminute', 'mahara', $interval->i, $interval->i);
+        }
+        else {
+            return get_string('timelapsestringseconds', 'mahara', $interval->s, $interval->s);
+        }
+    }
+    return false;
 }
 
 /**
@@ -2185,7 +2534,7 @@ function pieform_configure() {
         'language'  => current_language(),
         'autofocus' => true,
         'renderer'  => $renderer,
-        'requiredmarker' => true,
+        'requiredmarker' => '*',
         'elementclasses' => true,
         'descriptionintwocells' => true,
         'jsdirectory'    => get_config('wwwroot') . 'lib/pieforms/static/core/',
@@ -2385,7 +2734,15 @@ function can_view_view($view, $user_id=null) {
     }
 
     if ($SESSION->get('mnetuser')) {
+        // TODO: The mviewaccess cookie is used by the old token-based Mahara assignment submission
+        // access system, which is now deprecated. Remove eventually.
         $mnettoken = get_cookie('mviewaccess:' . $view_id);
+
+        // On the other hand, the $SESSION 'mnetviews' field is used by the NEW system, so don't
+        // delete this!
+        if (is_array($SESSION->get('mnetviews')) && in_array($view_id, $SESSION->get('mnetviews'))) {
+            return true;
+        }
     }
 
     // If the page has been marked "objectionable" admins should be able to view
@@ -2431,6 +2788,8 @@ function can_view_view($view, $user_id=null) {
             if ($a->token == $usertoken && $publicviews) {
                 return true;
             }
+            // TODO: This section is used by the old token-based Mahara assignment submission
+            // access system, which is now deprecated. Remove eventually.
             if (!empty($mnettoken) && $a->token == $mnettoken) {
                 $mnetviewlist = $SESSION->get('mnetviewaccess');
                 if (empty($mnetviewlist)) {
@@ -2718,6 +3077,7 @@ function _get_views_trim_list(&$list, &$users, $limit, &$results) {
  */
 function artefact_in_view($artefact, $view) {
     if (!is_object($artefact)) {
+        require_once(get_config('docroot') . 'artefact/lib.php');
         $artefact = artefact_instance_from_id($artefact);
     }
 
@@ -2772,9 +3132,14 @@ function get_dir_contents($directory) {
  * @return string
  */
 function get_mahara_install_subdirectory() {
-    $wwwroot = get_config('wwwroot');
-    $wwwroot = preg_replace('#^https?://#', '', $wwwroot);
-    return substr($wwwroot, strpos($wwwroot, '/'));
+    $path = parse_url(get_config('wwwroot'), PHP_URL_PATH);
+    if (!strlen($path)) {
+        return '/';
+    }
+    if (substr($path, -1) !== '/') {
+        $path = $path . '/';
+    }
+    return $path;
 }
 
 /**
@@ -3260,7 +3625,7 @@ function get_my_tags($limit=null, $cloud=true, $sort='freq') {
         array($id, $id, $id)
     );
     if (!$tagrecords) {
-        return false;
+        return array();
     }
     if ($cloud) {
         $minfreq = $tagrecords[count($tagrecords) - 1]->count;
@@ -3921,7 +4286,7 @@ function build_portfolio_search_html(&$data) {
     );
 
     $smarty = smarty_core();
-    $smarty->assign_by_ref('data', $data->data);
+    $smarty->assign('data', $data->data);
     $smarty->assign('owner', $data->owner->id);
     $data->tablerows = $smarty->fetch('portfoliosearchresults.tpl');
     $pagination = build_pagination(array(
@@ -3958,7 +4323,7 @@ function is_html_editor_enabled () {
     return (
             (!get_config('wysiwyg') && $USER->get_account_preference('wysiwyg')) ||
             (get_config('wysiwyg') == 'enable' && $USER->is_logged_in())
-           ) && $SESSION->get('handheld_device') == false;
+           );
 }
 
 /**
@@ -3971,7 +4336,8 @@ function is_https() {
 }
 
 function sanitize_email($value) {
-    if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
+    require_once('phpmailer/class.phpmailer.php');
+    if (!PHPMailer::validateAddress($value)) {
         return '';
     }
     return $value;
@@ -4336,6 +4702,35 @@ function set_progress_done($token, $data = array()) {
 }
 
 /**
+ * Recursively implode an multidemenional array with optional key inclusion
+ *
+ * Output will be a string like either: value, value, value
+ * or if keys included: key: value, key: value, key: value
+ * Based on: https://gist.github.com/jimmygle/2564610
+ *
+ * @param   array   $array         multi-dimensional array to recursively implode
+ * @param   bool    $include_keys  include keys before their values
+ * @param   string  $separator     value that demarcates value elements
+ * @param   string  $keyseparator  value that demarcates key/value elements
+ * @param   bool    $trim_all      trim ALL whitespace from string
+ *
+ * @return  string  imploded array
+ */
+function recursive_implode(array $array, $include_keys = false, $separator = ',', $keyseparator = ': ', $trim_all = true) {
+    $glued_string = '';
+    // Recursively iterates array and adds key/value to glued string
+    array_walk_recursive($array, function($value, $key) use ($separator, $keyseparator, $include_keys, &$glued_string) {
+        $include_keys and $glued_string .= $key.$keyseparator;
+        $glued_string .= $value.$separator;
+    });
+    // Removes last $separator from string
+    strlen($separator) > 0 and $glued_string = substr($glued_string, 0, -strlen($separator));
+    // Trim all whitespace
+    $trim_all and $glued_string = preg_replace("/(\s)/ixsm", '', $glued_string);
+    return (string) $glued_string;
+}
+
+/**
  * Set libxml internal errors and entity loader
  * state before accessing an external xml document
  *
@@ -4381,30 +4776,123 @@ function libxml_after() {
 }
 
 /**
- * Recursively implode an multidemenional array with optional key inclusion
+ * Wrapper to call Pieform class for new pieform instance.
  *
- * Output will be a string like either: value, value, value
- * or if keys included: key: value, key: value, key: value
- * Based on: https://gist.github.com/jimmygle/2564610
- *
- * @param   array   $array         multi-dimensional array to recursively implode
- * @param   bool    $include_keys  include keys before their values
- * @param   string  $separator     value that demarcates value elements
- * @param   string  $keyseparator  value that demarcates key/value elements
- * @param   bool    $trim_all      trim ALL whitespace from string
- *
- * @return  string  imploded array
+ * See lib/pieforms/pieform.php for more information
  */
-function recursive_implode(array $array, $include_keys = false, $separator = ',', $keyseparator = ': ', $trim_all = true) {
-    $glued_string = '';
-    // Recursively iterates array and adds key/value to glued string
-    array_walk_recursive($array, function($value, $key) use ($separator, $keyseparator, $include_keys, &$glued_string) {
-        $include_keys and $glued_string .= $key.$keyseparator;
-        $glued_string .= $value.$separator;
-    });
-    // Removes last $separator from string
-    strlen($separator) > 0 and $glued_string = substr($glued_string, 0, -strlen($separator));
-    // Trim all whitespace
-    $trim_all and $glued_string = preg_replace("/(\s)/ixsm", '', $glued_string);
-    return (string) $glued_string;
+function pieform_instance($data) {
+    require_once(get_config('libroot') . 'pieforms/pieform.php');
+    return new Pieform($data);
+}
+
+/**
+ * Wrapper to call Pieform class for processed form.
+ *
+ * See lib/pieforms/pieform.php for more information
+ */
+function pieform($data) {
+    require_once(get_config('libroot') . 'pieforms/pieform.php');
+    return Pieform::process($data);
+}
+
+/**
+ * Wrapper for setting up Pieform headdata.
+ * When there is no pieforms on the page but pieforms are called via ajax
+ * HACK: The ideal would be to refactor Pieforms so that Javascript dependencies can be loaded
+ *       dynamically when we load up a form via AJAX
+ *
+ * @param array $elements A Piefrom element array if one needs to set element specific headdata js files
+ */
+function pieform_setup_headdata($elements = null) {
+    $elements = is_null($elements) ? array('dummy' => array('type' => 'hidden', 'value' => 0)) : $elements;
+
+    if (empty($GLOBALS['_PIEFORM_REGISTRY'])) {
+        $fakeform = pieform_instance(array('name' => 'fakeform', 'elements' => $elements));
+    }
+}
+
+/**
+ * Check if the given input is a serialized string
+ * @param varied $sstr
+ */
+function is_serialized_string($sstr) {
+    if (is_string($sstr)) {
+        return (preg_match('/^s:\d+:".*";$/s', $sstr) === 1);
+    }
+    return false;
+}
+
+/**
+ * Check if the given input is a valid serialized stdClass object of a skin attribute
+ * Each object's property can only be a string, integer or null
+ * @param string $sobj
+ */
+function is_valid_serialized_skin_attribute($sobj) {
+    if (is_string($sobj) && preg_match('/^O:8:"stdClass":\d+:{.*}$/s', $sobj)) {
+        // Make sure each property is a string, integer or null.
+        $pos = strpos($sobj, '{');
+        $sattrs = substr($sobj, $pos + 1, -1);
+        $cur = 0;
+        while ($cur < strlen($sattrs)) {
+            switch ($sattrs[$cur]) {
+                case 's':
+                    $cur+=2;
+                    $strsize = "";
+                    while ($sattrs[$cur] >= '0' && $sattrs[$cur] <= '9') {
+                        $strsize .= $sattrs[$cur];
+                        $cur++;
+                    }
+                    if ($sattrs[$cur] == ':') {
+                        $cur += (int) $strsize + 4;
+                    }
+                    break;
+                case 'i':
+                    $cur+=2;
+                    $strsize = "";
+                    while ($sattrs[$cur] >= '0' && $sattrs[$cur] <= '9') {
+                        $cur++;
+                    }
+                    $cur ++ ;
+                    break;
+                case 'N':
+                    $cur+=2;
+                    break;
+                default:
+                    // Wrong serialized format
+                    return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+/*
+ * Crear all Mahara chaches.
+ *
+ * @return bool True if success, false otherwise.
+ */
+function clear_all_caches() {
+    require_once(get_config('libroot') . 'file.php');
+
+    try {
+        clear_menu_cache();
+        update_safe_iframe_regex();
+        bump_cache_version();
+
+        $dwoo_dir = get_config('dataroot') . 'dwoo';
+        if (check_dir_exists($dwoo_dir) && !rmdirr($dwoo_dir)) {
+            throw new SystemException('Can not remove dwoo directory ' . $dwoo_dir);
+        }
+
+        handle_event('clearcaches', array());
+
+        $result = true;
+    }
+    catch (Exception $e) {
+        log_info("Error while cleaning caches: " . $e->GetMessage());
+        $result = false;
+    }
+
+    return $result;
 }

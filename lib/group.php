@@ -289,6 +289,11 @@ function group_user_can_assess_submitted_views($groupid, $userid) {
  *                ...
  *            )
  * @return int The ID of the created group
+ * @throws InvalidArgumentException
+ *         UserException
+ *         SystemException
+ *         NotFoundException
+ *         AccessDeniedException
  */
 function group_create($data) {
     if (!is_array($data)) {
@@ -349,39 +354,31 @@ function group_create($data) {
     $data['invitefriends'] = (isset($data['invitefriends'])) ? intval($data['invitefriends']) : 0;
     $data['suggestfriends'] = (isset($data['suggestfriends'])) ? intval($data['suggestfriends']) : 0;
 
-    if (isset($data['shortname']) && strlen($data['shortname'])) {
-        // This is a group whose details and membership can be updated automatically, using a
-        // webservice api or possibly csv upload.
-
-        // On updates to this group, it will be identified using the institution and shortname
-        // which must be unique.
-
-        // The $USER object will be set to someone with at least institutional admin permission.
-        global $USER;
-
-        if (empty($data['institution'])) {
-            throw new SystemException("group_create: a group with a shortname must have an institution; shortname: " . $data['shortname']);
+    if (!empty($data['shortname'])) {
+        // make sure it is unique and is correct length
+        $shortname = group_generate_shortname($data['shortname']);
+        // If we want to retain the supplied shortname we need to make sure it can be done
+        if (!empty($data['retainshortname'])) {
+            if ($shortname != $data['shortname']) {
+                throw new UserException('group_create: The supplied shortname \'' . $data['shortname'] .
+                        '\' is already taken. This shortname \'' . $shortname . '\' is available.');
+            }
         }
+        $data['shortname'] = $shortname;
+    }
+    else {
+        // Create it from group name
+        $data['shortname'] = group_generate_shortname($data['name']);
+    }
+
+    if (!empty($data['institution']) && $data['institution'] != 'mahara') {
+        global $USER;
         if (!$USER->can_edit_institution($data['institution'])) {
             throw new AccessDeniedException("group_create: cannot create a group in this institution");
         }
-        if (!preg_match('/^[a-zA-Z0-9_.-]{2,255}$/', $data['shortname'])) {
-            $message = get_string('invalidshortname', 'group') . ': ' . $data['shortname'];
-            $message .= "\n" . get_string('shortnameformat', 'group');
-            throw new UserException($message);
-        }
-        if (record_exists('group', 'shortname', $data['shortname'], 'institution', $data['institution'])) {
-            throw new UserException('group_create: group with shortname ' . $data['shortname'] . ' and institution ' . $data['institution'] . ' already exists');
-        }
-        if (empty($data['members'])) {
-            $data['members'] = array($USER->get('id') => 'admin');
-        }
     }
     else {
-        if (!empty($data['institution'])) {
-            throw new SystemException("group_create: group institution only available for api-controlled groups");
-        }
-        $data['shortname'] = null;
+        $data['institution'] = 'mahara';
     }
 
     if (get_config('cleanurls') && (!isset($data['urlid']) || strlen($data['urlid']) == 0)) {
@@ -389,8 +386,9 @@ function group_create($data) {
         $data['urlid'] = group_get_new_homepage_urlid($data['urlid']);
     }
 
-    if (!is_array($data['members']) || count($data['members']) == 0) {
-        throw new InvalidArgumentException("group_create: at least one member must be specified for adding to the group");
+    // Need to make sure group has at least one member
+    if (empty($data['members'])) {
+        $data['members'] = array($USER->get('id') => 'admin');
     }
 
     if (!isset($data['submittableto'])) {
@@ -465,7 +463,7 @@ function group_create($data) {
     }
 
     // Copy views for the new group
-    $templates = get_column('view_autocreate_grouptype', 'view', 'grouptype', $data['grouptype']);
+    $artefactcopies = array();
     $templates = get_records_sql_array("
         SELECT v.id, v.title, v.description
         FROM {view} v
@@ -480,7 +478,7 @@ function group_create($data) {
                 'group'       => $id,
                 'title'       => $template->title,
                 'description' => $template->description,
-            ), $template->id, null, false);
+            ), $template->id, null, false, false, $artefactcopies);
             $view->set_access(array(array(
                 'type'      => 'group',
                 'id'        => $id,
@@ -506,16 +504,37 @@ function group_create($data) {
     }
     $data['id'] = $id;
     // install the homepage
-    if ($t = get_record('view', 'type', 'grouphomepage', 'template', 1, 'owner', 0)) {
-        require_once('view.php');
+    require_once('view.php');
+    if ($t = get_record('view', 'type', 'grouphomepage', 'template', View::SITE_TEMPLATE, 'institution', 'mahara')) {
         $template = new View($t->id, (array)$t);
         list($homepage) = View::create_from_template(array(
             'group' => $id,
             'title' => $template->get('title'),
             'description' => $template->get('description'),
             'type' => 'grouphomepage',
-        ), $t->id, 0, false);
+        ), $t->id, 0, false, false, $artefactcopies);
     }
+    else {
+        throw new NotFoundException("group_create: group homepage is not found");
+    }
+
+    // If 'Allow submissions' is true we need to update the 'Group pages' block to show
+    // the 'Submissions to this group' section by default
+    if ($data['submittableto']) {
+        $groupview = get_record_sql("SELECT bi.id, bi.configdata
+                                     FROM {block_instance} bi
+                                     INNER JOIN {view} v ON v.id = bi.view
+                                     WHERE bi.blocktype = 'groupviews'
+                                     AND v.id = ?", array($homepage->get('id')));
+        if ($groupview) {
+            $configdata = unserialize($groupview->configdata);
+            if (!isset($configdata['showsubmitted'])) {
+                $configdata['showsubmitted'] = 1;
+                set_field('block_instance', 'configdata', serialize($configdata), 'id', $groupview->id);
+            }
+        }
+    }
+
     insert_record('view_access', (object) array(
         'view'       => $homepage->get('id'),
         'accesstype' => $data['public'] ? 'public' : 'loggedin',
@@ -555,14 +574,6 @@ function group_update($new, $create=false) {
         throw new NotFoundException("group_update: group not found");
     }
 
-    if (!empty($old->institution) && $old->institution != 'mahara') {
-        // Api-controlled group; check permissions.
-        global $USER;
-
-        if (!$USER->can_edit_institution($old->institution)) {
-            throw new AccessDeniedException("group_update: cannot update a group in this institution");
-        }
-    }
     if (
         (isset($new->submittableto) && empty($new->submittableto)) ||
         (!isset($new->submittableto) && empty($old->submittableto))
@@ -570,9 +581,8 @@ function group_update($new, $create=false) {
         $new->allowarchives = 0;
     }
 
-    // Institution and shortname cannot be updated (yet)
+    // Institution cannot be updated (yet)
     unset($new->institution);
-    unset($new->shortname);
 
     foreach (array('id', 'grouptype', 'public', 'request', 'submittableto', 'allowarchives', 'editroles',
         'hidden', 'hidemembers', 'hidemembersfrommembers', 'groupparticipationreports') as $f) {
@@ -747,9 +757,10 @@ function group_get_groups_for_editing($ids=null) {
  * necessary}}
  */
 function group_delete($groupid, $shortname=null, $institution=null, $notifymembers=true) {
+    global $USER;
+
     if (empty($groupid) && !empty($institution) && !is_null($shortname) && strlen($shortname)) {
         // External call to delete a group, check permission of $USER.
-        global $USER;
         if (!$USER->can_edit_institution($institution)) {
             throw new AccessDeniedException("group_delete: cannot delete a group in this institution");
         }
@@ -834,6 +845,9 @@ function group_delete($groupid, $shortname=null, $institution=null, $notifymembe
         )
     );
     db_commit();
+    // Need to reset grouproles - normally done via group_remove_user() but we don't call
+    // it due to notification reasons (see above)
+    $USER->reset_grouproles();
 }
 
 /**
@@ -905,6 +919,24 @@ function group_user_can_leave($group, $userid=null) {
     }
 
     return ($result[$group->id][$userid] = true);
+}
+
+/**
+ * Checks whether a user is allowed to change the group's configuration settings.
+ * (via edit/group.php)
+ *
+ * @param int $groupid Group to check
+ * @param int $userid User to check (default: current user)
+ * @param boolean $refresh Whether to re-check the user's role in the database (default: false)
+ */
+function group_user_can_configure($groupid, $userid = null, $refresh = false) {
+
+    if ('admin' === group_user_access($groupid, $userid, $refresh)) {
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 
 /**
@@ -1183,7 +1215,6 @@ function group_get_adduser_form($userid, $groupid) {
  * Form for removing a user from a group
  */
 function group_get_removeuser_form($userid, $groupid) {
-    require_once('pieforms/pieform.php');
     return pieform(array(
         'name'                => 'removeuser' . $userid,
         'validatecallback'    => 'group_removeuser_validate',
@@ -1213,7 +1244,6 @@ function group_get_removeuser_form($userid, $groupid) {
  * Form for denying request (request group)
  */
 function group_get_denyuser_form($userid, $groupid) {
-    require_once('pieforms/pieform.php');
     return pieform(array(
         'name'                => 'denyuser' . $userid,
         'successcallback'     => 'group_denyuser_submit',
@@ -1544,6 +1574,7 @@ function group_prepare_usergroups_for_display($groups, $returnto='mygroups') {
         $group->editwindow = group_format_editwindow($group);
 
         $group->settingsdescription = group_display_settings($group);
+        $group->homeurl = group_homepage_url($group);
     }
 }
 
@@ -1575,9 +1606,10 @@ function group_format_editwindow($group) {
 /*
  * Used by admin/groups/groups.php and admin/groups/groups.json.php for listing groups.
  */
-function build_grouplist_html($query, $limit, $offset, &$count=null) {
+function build_grouplist_html($query, $limit, $offset, &$count=null, $institution) {
+    global $USER;
 
-    $groups = search_group($query, $limit, $offset, 'all');
+    $groups = search_group($query, $limit, $offset, 'all', '', $institution);
     $count = $groups['count'];
 
     if ($ids = array_map(create_function('$a', 'return intval($a->id);'), $groups['data'])) {
@@ -1605,6 +1637,27 @@ function build_grouplist_html($query, $limit, $offset, &$count=null) {
             $group->categorytitle = ($group->category) ? get_field('group_category', 'title', 'id', $group->category) : '';
         }
         $group->homepage_url = group_homepage_url($group);
+
+        $group->displayname = $group->name;
+        $group->submitpages = $group->submittableto;
+        $group->roles = $group->grouptype;
+
+        switch ($group->jointype) {
+            case 'open':
+                $group->open = 1;
+                $group->controlled = 0;
+                break;
+            case 'controlled':
+                $group->open = 0;
+                $group->controlled = 1;
+                break;
+            case 'approve':
+            default:
+                $group->open = 0;
+                $group->controlled = 0;
+                break;
+        }
+        $group->quota = display_size($group->quota);
     }
 
     $smarty = smarty_core();
@@ -1629,6 +1682,10 @@ function build_grouplist_html($query, $limit, $offset, &$count=null) {
 
     $data['pagination'] = $pagination['html'];
     $data['pagination_js'] = $pagination['javascript'];
+
+    $csvfields = group_get_allowed_group_csv_keys();
+    $USER->set_download_file(generate_csv($groups['data'], $csvfields), 'groups.csv', 'text/csv');
+    $data['csv'] = true;
 
     return $data;
 }
@@ -1681,7 +1738,7 @@ function group_get_membersearch_data($results, $group, $query, $membershiptype, 
 
     $results['cdata'] = array_chunk($results['data'], 2);
     $results['roles'] = group_get_role_info($group);
-    $smarty->assign_by_ref('results', $results);
+    $smarty->assign('results', $results);
     $smarty->assign('searchurl', $searchurl);
     $smarty->assign('pagebaseurl', $searchurl);
     $smarty->assign('caneditroles', group_user_access($group) == 'admin');
@@ -1832,12 +1889,6 @@ function group_get_menu_tabs() {
         'title' => get_string('Collections', 'group'),
         'weight' => 60,
     );
-    $menu['blogs'] = array(
-        'path' => 'groups/blogs',
-        'url' => 'artefact/blog/index.php?group=' . $group->id,
-        'title' => get_string('Blogs', 'artefact.blog'),
-        'weight' => 65,
-    );
     if (group_role_can_edit_views($group, $role)) {
         $menu['share'] = array(
             'path' => 'groups/share',
@@ -1877,6 +1928,25 @@ function group_get_menu_tabs() {
             $menu[$key]['selected'] = true;
         }
     }
+
+    // Sort the menu items by weight
+    uasort($menu, function($a, $b){
+
+        // Only items with a "weight" component need to get sorted. Ones without weight can go first.
+        if (!array_key_exists('weight', $a)) {
+            return -1;
+        }
+        if (!array_key_exists('weight', $b)) {
+            return 1;
+        }
+
+        $aweight = $a['weight'];
+        $bweight = $b['weight'];
+        if ($aweight == $bweight) {
+            return 0;
+        }
+        return ($aweight < $bweight) ? -1 : 1;
+    });
 
     return $menu;
 }
@@ -2073,6 +2143,11 @@ function group_get_associated_groups($userid, $filter='all', $limit=20, $offset=
         ORDER BY g1.name';
 
     $groups = get_records_sql_array($sql, $values, $offset, $limit);
+    if ($groups) {
+        foreach ($groups as $group) {
+            $group->homeurl = group_homepage_url($group);
+        }
+    }
 
     return array('groups' => $groups ? $groups : array(), 'count' => $count);
 
@@ -2122,6 +2197,11 @@ function group_get_user_groups($userid=null, $roles=null, $sort=null, $limit=nul
             ORDER BY g.name, gm.role = 'admin' DESC, gm.role, g.id",
             array($loggedinid, $userid)
         );
+        if ($groups) {
+            foreach ($groups as $key => $group) {
+                $group->homeurl = group_homepage_url($group);
+            }
+        }
         $usergroups[$userid] = $groups ? $groups : array();
     }
 
@@ -2322,11 +2402,11 @@ function install_system_grouphomepage_view() {
     require_once(get_config('libroot') . 'view.php');
     $view = View::create(array(
         'type'        => 'grouphomepage',
-        'owner'       => 0,
-        'numcolumns'  => 2,
+        'owner'       => null,
+        'institution' => 'mahara',
+        'template'    =>  View::SITE_TEMPLATE,
         'numrows'     => 1,
         'columnsperrow' => array((object)array('row' => 1, 'columns' => 1)),
-        'template'    => 1,
         'title'       => get_string('grouphomepage', 'view'),
     ));
     $view->set_access(array(array(
@@ -2511,4 +2591,352 @@ function group_sendnow($groupid) {
         return false;
     }
     return !empty($sendnow);
+}
+
+/**
+ * Generate a valid shortname for the group.shortname column, based on the specified display name
+ *
+ * @param string $groupname
+ * @return string
+ */
+function group_generate_shortname($groupname) {
+    // iconv can crash on strings that are too long, so truncate before converting
+    $basename = mb_substr($groupname, 0, 255);
+    $basename = iconv('UTF-8', 'ASCII//TRANSLIT', $groupname);
+    $basename = strtolower($basename);
+    $basename = preg_replace('/[^a-z0-9_.-]/', '', $basename);
+    if (strlen($basename) < 2) {
+        $basename = 'group' . $basename;
+    }
+    else {
+        $basename = substr($basename, 0, 255);
+    }
+
+    // Make sure the name is unique. If it is not, add a suffix and see if
+    // that makes it unique
+    $finalname = $basename;
+    $suffix = 'a';
+    while (record_exists('group', 'shortname', $finalname)) {
+        // Add the suffix but make sure the name length doesn't go over 255
+        $finalname = substr($basename, 0, 255 - strlen($suffix)) . $suffix;
+
+        // Will iterate a-z, aa-az, ba-bz, etc.
+        // See: http://php.net/manual/en/language.operators.increment.php
+        $suffix++;
+    }
+
+    return $finalname;
+}
+
+/**
+ * Return an element for the shortname field of the group form.
+ *
+ * @param object $group_data Group data object.
+ *
+ * @return array
+ */
+function group_get_shortname_element($group_data) {
+    global $USER;
+
+    $required = $USER->can_edit_group_shortname($group_data);
+    $title = get_string('groupshortname', 'group');
+    $disabled = !$USER->can_edit_group_shortname($group_data);
+
+    $element =  array(
+        'title' => $title,
+        'rules' => array(
+            'required' => $required,
+            'maxlength' => 255
+        ),
+        'disabled' => $disabled,
+        'description' => get_string('shortnameformat', 'group'),
+    );
+
+    if (isset($group_data->id)) {
+        $element['type'] = 'text';
+        $element['defaultvalue'] = isset($group_data->shortname) ? $group_data->shortname : null;
+    }
+    else{
+        $element['type'] = 'hidden';
+        $element['value'] = isset($group_data->shortname) ? $group_data->shortname : null;
+    }
+
+    return $element;
+}
+
+/**
+ * Return a list of allowed group keys for csv import/export.
+ *
+ * @return array A list of keys.
+ */
+function group_get_allowed_group_csv_keys() {
+    global $USER;
+
+    $keys = array(
+        'shortname',
+        'displayname',
+        'description',
+        'open',
+        'controlled',
+        'request',
+        'roles',
+        'public',
+        'submitpages',
+        'allowarchives',
+        'editroles',
+        'hidden',
+        'hidemembers',
+        'hidemembersfrommembers',
+        'invitefriends',
+        'suggestfriends',
+    );
+
+    if ($USER->get('admin')) {
+        $keys[] = 'usersautoadded';
+        $keys[] = 'quota';
+    }
+
+    return $keys;
+}
+
+/**
+ * Generates group membership file data.
+ *
+ * @param int $group_id Id of the group.
+ * @param string $file_format A format of the file.
+ * @param string $mimetype A mimetype of the file.
+ *
+ * @return array An empty array if error || array with following keys 'mimetype', 'name' and 'file'.
+ */
+function group_get_membership_file_data($group_id, $file_format = 'csv', $mimetype = 'text/csv') {
+    global $USER;
+
+    $data = array();
+
+    if (!$USER->get('admin')) {
+        return $data;
+    }
+
+    $group = get_record('group', 'id', $group_id);
+
+    if (!$group) {
+        return $data;
+    }
+
+    $membership_data = get_records_sql_array(
+        "SELECT g.shortname, u.username, gm.role, u.firstname, u.lastname, u.email, u.preferredname
+        FROM {group} g
+        INNER JOIN {group_member} gm ON g.id = gm.group
+        INNER JOIN {usr} u ON gm.member = u.id
+        WHERE g.id = ?
+        ORDER BY u.username",
+        array($group_id)
+    );
+
+    $csv_fields = array(
+        'shortname',
+        'username',
+        'role',
+        'firstname',
+        'lastname',
+        'email',
+        'preferredname',
+    );
+
+    $file_content = generate_csv($membership_data, $csv_fields);
+
+    if (empty($file_content)) {
+        return $data;
+    }
+
+    $filename = get_random_key();
+    $dir = get_config('dataroot') . 'export/' . $USER->get('id') . '/';
+
+    if (!check_dir_exists($dir)) {
+        return $data;
+    }
+
+    if (!file_put_contents($dir . $filename, $file_content)) {
+        return $data;
+    }
+
+    $data['mimetype'] = $mimetype;
+    $data['name'] = $group->shortname . '.' . $file_format;
+    $data['file'] = $filename;
+
+    return $data;
+}
+
+/**
+ * Duplicate group - make a copy of the the group's pages, collections and group settings.
+ * @param  string/int $groupid The id of the group to copy
+ * @param  string     $return  The place to return to after the copying
+ *
+ * @TODO: Copy forums / files / journals not associated with views/blocks.
+ * @TODO: Copy existing members to new group.
+ */
+function group_copy($groupid, $return) {
+    global $USER, $SESSION;
+
+    $userid = $USER->get('id');
+    $role = group_user_access($groupid, $userid);
+    if (!($USER->get('admin') || $role == 'admin')) {
+         throw new AccessDeniedException();
+    }
+    // Copy the group
+    $group = get_record_select('group', 'id = ? AND deleted = 0', array($groupid), '*, ' . db_format_tsfield('ctime'));
+    unset($group->id);
+    $group->ctime = $group->mtime = db_format_timestamp(time());
+
+    // need to update the name
+    $group->name = new_group_name($group->name);
+    $group->shortname = group_generate_shortname($group->shortname);
+    if (empty($group->institution)) {
+        $group->institution = 'mahara';
+    }
+    if (isset($group->urlid)) {
+        // need to sort out the cleanurl
+        $group->urlid = generate_urlid($group->name, get_config('cleanurlgroupdefault'), 3, 30);
+        $group->urlid = group_get_new_homepage_urlid($group->urlid);
+    }
+
+    db_begin();
+    $newvalues = (array)$group;
+    $newvalues[$newvalues['jointype']] = 1;
+    unset($newvalues['jointype']);
+
+    $newvalues['members'] = array($USER->get('id') => 'admin');
+    $new_groupid = group_create($newvalues);
+    $USER->reset_grouproles();
+
+    // Now update the description with any embedded image info
+    $newvalues['description'] = EmbeddedImage::prepare_embedded_images($newvalues['description'], 'group', $new_groupid, $groupid);
+    $newvalues['id'] = $new_groupid;
+    unset($newvalues['members']);
+    unset($newvalues['ctime']);
+    unset($newvalues['mtime']);
+    group_update((object)$newvalues);
+
+/*
+    @TODO: Allow copying of the file artefacts
+    $artefactmap = array(); // store the old ids and have them map to new ids
+    $oldartefacts = get_records_assoc('artefact', 'group', $groupid, 'artefacttype, id');
+    foreach ($oldartefacts as $artefact) {
+        $a = artefact_instance_from_id($artefact->id);
+        $artefactmap[$artefact->id] = $a->copy_for_new_owner(null, $new_groupid, null);
+        $a->commit();
+    }
+*/
+    // Copy views for the new group
+    $artefactcopies = array();
+    $templates = get_records_sql_array("
+          SELECT v.id, v.title, v.description, v.type
+          FROM {view} v
+          LEFT JOIN {collection_view} cv ON v.id = cv.view
+          WHERE v.group = ?
+          AND cv.view IS NULL", array($groupid));
+    if ($templates) {
+        require_once(get_config('libroot') . 'view.php');
+        foreach ($templates as $template) {
+            list($view) = View::create_from_template(array(
+                'group'       => $new_groupid,
+                'title'       => $template->title,
+                'description' => $template->description,
+            ), $template->id, null, false, false, $artefactcopies);
+
+            if ($template->type == 'grouphomepage') {
+                $duplicate_homepage = $view;
+            }
+
+            $view->set_access(array(array(
+                'type'      => 'group',
+                'id'        => $new_groupid,
+                'startdate' => null,
+                'stopdate'  => null,
+                'role'      => null
+            )));
+        }
+
+        // Now update new homepage with the duplicated old one - it's blocks should be connected
+        // to any new artefacts created.
+        $new_homepage = get_record('view', 'group', $new_groupid, 'type', 'grouphomepage');
+        delete_records('block_instance', 'view', $new_homepage->id);
+
+        $old_homepage_blocks = get_records_sql_array("
+            SELECT bi.* FROM {block_instance} bi
+            JOIN {view} v ON v.id = bi.view
+            WHERE v.id = ?", array($duplicate_homepage->get('id')));
+        foreach ($old_homepage_blocks as $block) {
+            unset($block->id);
+            $block->view = $new_homepage->id;
+            insert_record('block_instance', $block);
+        }
+        // Add back correct layout
+        update_record('view', array(
+                'layout' => $duplicate_homepage->get('layout'),
+                'numrows' => $duplicate_homepage->get('numrows'),
+            ), array('id' => $new_homepage->id));
+
+        // Clear the existing view_rows_columns and add in correct ones
+        delete_records('view_rows_columns', 'view', $new_homepage->id);
+        $rowscolumns = $duplicate_homepage->get('columnsperrow');
+        foreach ($rowscolumns as $row) {
+            insert_record('view_rows_columns', array(
+                'row' => $row->row,
+                'columns' => $row->columns,
+                'view' => $new_homepage->id)
+            );
+        }
+        // Now delete the duplicate homepage
+        $duplicate_homepage->delete();
+    }
+    // Copy collections for the new group
+    $templates = get_records_sql_array("
+       SELECT DISTINCT c.id, c.name
+          FROM {view} v
+          INNER JOIN {collection_view} cv ON v.id = cv.view
+          INNER JOIN {collection} c ON cv.collection = c.id
+          WHERE v.group = ?", array($groupid));
+    if ($templates) {
+        require_once('collection.php');
+        foreach ($templates as $template) {
+            Collection::create_from_template(array('group' => $new_groupid), $template->id, null, false, true);
+        }
+    }
+
+    db_commit();
+
+    $SESSION->add_ok_msg(get_string('groupsaved', 'group'));
+    // now return to somewhere useful
+    switch ($return) {
+        case 'adminlist':
+            $path = get_config('wwwroot') . 'admin/groups/groups.php';
+            break;
+        case 'mylist':
+            $path = get_config('wwwroot') . 'groups/mygroups.php';
+            break;
+        default:
+            $path = get_config('wwwroot') . 'group/view.php?id=' . $new_groupid;
+    }
+    redirect($path);
+}
+
+/**
+ * Generates a name for a newly created group
+ * @param   string $name The name of the group
+ * @return  string       The name with extension added, eg 'Mygroup v.2'
+ */
+function new_group_name($name) {
+    $extText = get_string('version.', 'mahara');
+    $temptitle = preg_split('/ '. $extText . '[0-9]$/', $name);
+    $title = $temptitle[0];
+    $taken = get_column_sql("SELECT name FROM {group} WHERE name LIKE ? || '%'", array($title));
+    $ext = '';
+    $i = 1;
+    if ($taken) {
+        while (in_array($title . $ext, $taken)) {
+            $ext = ' ' . $extText . ++$i;
+        }
+    }
+    return $title . $ext;
 }

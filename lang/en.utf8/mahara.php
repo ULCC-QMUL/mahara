@@ -12,6 +12,7 @@
 defined('INTERNAL') || die();
 
 // General form strings
+$string['active'] = 'Active';
 $string['add']     = 'Add';
 $string['addone']  = 'Add one';
 $string['cancel']  = 'Cancel';
@@ -25,6 +26,7 @@ $string['moveitemup']  = 'Move up';
 $string['moveitemdown']  = 'Move down';
 $string['edit']    = 'Edit';
 $string['editspecific']    = 'Edit "%s"';
+$string['connectspecific']    = 'Connect "%s"';
 $string['editing'] = 'Editing';
 $string['settingsspecific'] = 'Settings for "%s"';
 $string['move']    = 'Move';
@@ -104,7 +106,7 @@ $string['plugindisableduser'] = 'The %s plugin has been disabled. Please check w
 $string['pluginnotenabled'] = 'Plugin is hidden. You must make the %s plugin visible first.';
 $string['pluginexplainaddremove'] = 'Plugins in Mahara are always installed and can be accessed if users know the URLs and would otherwise have access. Rather than enabling and disabling the functionality, plugins are hidden or made visible by clicking on the \'Hide\' or \'Show\' links beside the plugins below.';
 $string['pluginexplainartefactblocktypes'] = 'When hiding an \'artefact\' type plugin, Mahara also stops the display of the blocks related to it.';
-$string['pluginbrokenanddisabledtitle'] = 'A broken plugin (%s) was disabled.';
+$string['pluginbrokenanddisabledtitle1'] = 'The broken plugin "%s" was disabled.';
 $string['pluginbrokenanddisabled'] = 'A user attempted to load the %s plugin, but it could not be loaded.
 To prevent further errors, the plugin has been disabled.
 
@@ -139,8 +141,8 @@ $string['select'] = 'Select';
 
 // Tags
 $string['tags'] = 'Tags';
-$string['tagsdesc'] = 'Enter comma-separated tags for this item.';
-$string['tagsdescprofile'] = 'Enter comma-separated tags for this item. Items tagged with \'profile\' are displayed in your sidebar.';
+$string['tagsdesc'] = 'Search for/enter tags for this item.';
+$string['tagsdescprofile'] = 'Search for/enter tags for this item. Items tagged with \'profile\' are displayed in your sidebar.';
 $string['youhavenottaggedanythingyet'] = 'You have not tagged anything yet';
 $string['mytags'] = 'My tags';
 $string['Tag'] = 'Tag';
@@ -193,9 +195,8 @@ $string['license'] = 'License';
 $string['licenseother'] = 'Other license (enter URL)';
 $string['licenseotherurl'] = 'Enter URL';
 $string['licensedesc'] = 'The license for this content.';
-$string['licensenone'] = 'None selected';
-$string['licensenonedetailed'] = '%s has not chosen a license for this content.';
-$string['licensenonedetailedowner'] = 'You have not chosen a license for this content.';
+$string['licensenone1'] = 'All rights reserved';
+$string['licensenonedetailed1'] = '© %s, all rights reserved';
 $string['licensingadvanced'] = 'Advanced licensing';
 $string['licensor'] = 'Licensor';
 $string['licensordesc'] = 'The original licensor for this content.';
@@ -243,6 +244,8 @@ $string['linksandresources'] = 'Links and resources';
 
 // auth
 $string['accesstotallydenied_institutionsuspended'] = 'Your institution %s has been suspended. Until it is unsuspended, you will not be able to log in to %s.
+Please contact your institution for help.';
+$string['accesstotallydenied_institutionexpired'] = 'Your institution %s has expired. Until it is unexpired, you will not be able to log in to %s.
 Please contact your institution for help.';
 $string['accessforbiddentoadminsection'] = 'You are forbidden from accessing the administration section.';
 $string['accountdeleted'] = 'Sorry, your account has been deleted. You can <a href="%scontact.php">contact the site administrator</a>.';
@@ -630,6 +633,23 @@ $string['datepicker_timezoneText'] = 'Timezone';
 $string['datepicker_amNames'] = "['AM', 'A']";
 $string['datepicker_pmNames'] = "['PM', 'P']";
 
+$string['timelapsestringhour'] = array(
+    0 => '%2$s hour %s min ago',
+    1 => '%2$s hour %s mins ago'
+);
+$string['timelapsestringhours'] = array(
+    0 => '%2$s hours %s min ago',
+    1 => '%2$s hours %s mins ago'
+);
+$string['timelapsestringminute'] = array(
+    0 => '%s min ago',
+    1 => '%s mins ago'
+);
+$string['timelapsestringseconds'] = array(
+    0 => '%s sec ago',
+    1 => '%s secs ago',
+);
+
 // Site content pages
 $string['sitecontentnotfound'] = '%s text not available';
 
@@ -790,7 +810,6 @@ $string['attachment'] = 'Attachment';
 $string['editaccess'] = 'Edit access';
 
 // Upload manager
-$string['quarantinedirname'] = 'quarantine';
 $string['clammovedfile'] = 'The file has been moved to a quarantine directory.';
 $string['clamdeletedfile'] = 'The file has been deleted.';
 $string['clamdeletedfilefailed'] = 'The file could not be deleted.';
@@ -803,7 +822,7 @@ $string['clamunknownerror'] = 'There was an unknown error with ClamAV.';
 $string['image'] = 'Image';
 $string['imageformattingoptions'] = 'Image formatting options';
 $string['filenotimage'] = 'The file you uploaded is not a valid image. It must be a PNG, JPEG or GIF file.';
-$string['uploadedfiletoobig'] = 'The file was too big. Please ask your administrator for more information.';
+$string['uploadedfiletoobig1'] = 'The file exceeded the maximum upload file size of %s. Please upload a smaller file.';
 $string['notphpuploadedfile'] = 'The file was lost in the upload process. This should not happen. Please contact your administrator for more information.';
 $string['virusfounduser'] = 'The file you have uploaded, %s, has been scanned by a virus checker and found to be infected! Your file upload was NOT successful.';
 $string['fileunknowntype'] = 'The type of your uploaded file could not be determined. Your file may be corrupted, or it could be a configuration problem. Please contact your administrator.';
@@ -819,9 +838,14 @@ $string['phpuploaderror_6'] = 'Missing a temporary folder.';
 $string['phpuploaderror_7'] = 'Failed to write file to disk. Check that your filesystem has enough space to write to the Mahara dataroot and/or the PHP \'upload_tmp_dir\' directories.';
 $string['phpuploaderror_8'] = 'File upload stopped by extension.';
 $string['adminphpuploaderror'] = 'A file upload error was probably caused by your server configuration.';
+$string['noinputnamesupplied'] = 'No input name is provided.';
+$string['cannotrenametempfile'] = 'Can not rename the temporary file.';
+$string['failedmovingfiletodataroot'] = 'Can not move uploaded file to dataroot.';
 
 $string['youraccounthasbeensuspendedtext2'] = 'Your account at %s has been suspended by %s.'; // @todo: more info?
+$string['youraccounthasbeensuspendedtextcron'] = 'Your account at %s has been suspended.';
 $string['youraccounthasbeensuspendedreasontext'] = "Your account at %s has been suspended by %s. Reason:\n\n%s";
+$string['youraccounthasbeensuspendedreasontextcron'] = "Your account at %s has been suspended. Reason:\n\n%s";
 $string['youraccounthasbeenunsuspendedtext2'] = 'Your account at %s has been unsuspended. You may once again log in and use the site.'; // can't provide a login link because we don't know how they log in - it might be by xmlrpc
 
 // size of stuff
@@ -860,6 +884,7 @@ $string['country.bj'] = 'Benin';
 $string['country.bm'] = 'Bermuda';
 $string['country.bt'] = 'Bhutan';
 $string['country.bo'] = 'Bolivia';
+$string['country.bq'] = 'Bonaire';
 $string['country.ba'] = 'Bosnia and Herzegovina';
 $string['country.bw'] = 'Botswana';
 $string['country.bv'] = 'Bouvet Island';
@@ -889,6 +914,7 @@ $string['country.cr'] = 'Costa Rica';
 $string['country.ci'] = 'Cote D\'ivoire';
 $string['country.hr'] = 'Croatia';
 $string['country.cu'] = 'Cuba';
+$string['country.cw'] = 'Curacao';
 $string['country.cy'] = 'Cyprus';
 $string['country.cz'] = 'Czech Republic';
 $string['country.dk'] = 'Denmark';
@@ -927,7 +953,7 @@ $string['country.gn'] = 'Guinea';
 $string['country.gw'] = 'Guinea-bissau';
 $string['country.gy'] = 'Guyana';
 $string['country.ht'] = 'Haiti';
-$string['country.hm'] = 'Heard Island and Mcdonald Islands';
+$string['country.hm'] = 'Heard Island and McDonald Islands';
 $string['country.va'] = 'Holy See (Vatican City State)';
 $string['country.hn'] = 'Honduras';
 $string['country.hk'] = 'Hong Kong';
@@ -957,7 +983,7 @@ $string['country.lv'] = 'Latvia';
 $string['country.lb'] = 'Lebanon';
 $string['country.ls'] = 'Lesotho';
 $string['country.lr'] = 'Liberia';
-$string['country.ly'] = 'Libyan Arab Jamahiriya';
+$string['country.ly'] = 'Libya';
 $string['country.li'] = 'Liechtenstein';
 $string['country.lt'] = 'Lithuania';
 $string['country.lu'] = 'Luxembourg';
@@ -987,7 +1013,6 @@ $string['country.na'] = 'Namibia';
 $string['country.nr'] = 'Nauru';
 $string['country.np'] = 'Nepal';
 $string['country.nl'] = 'Netherlands';
-$string['country.an'] = 'Netherlands Antilles';
 $string['country.nc'] = 'New Caledonia';
 $string['country.nz'] = 'New Zealand';
 $string['country.ni'] = 'Nicaragua';
@@ -1000,7 +1025,7 @@ $string['country.no'] = 'Norway';
 $string['country.om'] = 'Oman';
 $string['country.pk'] = 'Pakistan';
 $string['country.pw'] = 'Palau';
-$string['country.ps'] = 'Palestinian Territory, Occupied';
+$string['country.ps'] = 'Palestine, State of';
 $string['country.pa'] = 'Panama';
 $string['country.pg'] = 'Papua New Guinea';
 $string['country.py'] = 'Paraguay';
@@ -1015,9 +1040,11 @@ $string['country.re'] = 'Reunion';
 $string['country.ro'] = 'Romania';
 $string['country.ru'] = 'Russian Federation';
 $string['country.rw'] = 'Rwanda';
+$string['country.bl'] = 'Saint Barthelemy';
 $string['country.sh'] = 'Saint Helena';
 $string['country.kn'] = 'Saint Kitts and Nevis';
 $string['country.lc'] = 'Saint Lucia';
+$string['country.mf'] = 'Saint Martin (French part)';
 $string['country.pm'] = 'Saint Pierre and Miquelon';
 $string['country.vc'] = 'Saint Vincent and The Grenadines';
 $string['country.ws'] = 'Samoa';
@@ -1025,16 +1052,18 @@ $string['country.sm'] = 'San Marino';
 $string['country.st'] = 'Sao Tome and Principe';
 $string['country.sa'] = 'Saudi Arabia';
 $string['country.sn'] = 'Senegal';
-$string['country.cs'] = 'Serbia and Montenegro';
+$string['country.cs'] = 'Serbia';
 $string['country.sc'] = 'Seychelles';
 $string['country.sl'] = 'Sierra Leone';
 $string['country.sg'] = 'Singapore';
+$string['country.sx'] = 'Sint Maarten (Dutch part)';
 $string['country.sk'] = 'Slovakia';
 $string['country.si'] = 'Slovenia';
 $string['country.sb'] = 'Solomon Islands';
 $string['country.so'] = 'Somalia';
 $string['country.za'] = 'South Africa';
 $string['country.gs'] = 'South Georgia and The South Sandwich Islands';
+$string['country.ss'] = 'South Sudan';
 $string['country.es'] = 'Spain';
 $string['country.lk'] = 'Sri Lanka';
 $string['country.sd'] = 'Sudan';
@@ -1196,6 +1225,11 @@ $string['maximumSelected'] = "Maximum items selected";
 $string['noResults'] = "No results found";
 $string['searching'] = "Searching...";
 
+// Style guide
+$string['styleguide_title'] = 'Style guide';
+$string['styleguide_description'] = 'This style guide describes all the different types of components used by Mahara. They are in one place so you can easily check if you have styled everything when you are developing a new theme or plugin. Apply a different theme to your site to see what the individual components look like.';
+
 // Miscellaneous (please keep these alphabetized)
 $string['cli_incorrect_value'] = 'Incorrect value, please retry.';
+$string['scroll_to_top'] = 'Back to top';
 $string['version.'] = 'v.'; // version shortname, used when duplicating pages and collections

@@ -38,8 +38,41 @@ jQuery(document).ready(function() {
         maxThumbnailFilesize: 1,
         clickable: false,
         createImageThumbnails: false,
-        paramName: 'userfile'
+        paramName: 'userfile',
+        accept : function(file, done) {
+            // Check if provided file is a folder.
+            if ((file.size) || (file.type) || (file.fullPath)) {
+                // Folders shouldn't be more than 1MB.
+                if (file.size > 1048576) {
+                    return done();
+                }
+                else {
+                    // Folders in some browsers potentially can have size. (e.g. in Safari)
+                    // Let's try to load the file. This should be quick as it's small.
+                    var fileLoaded = false;
+                    var reader = new FileReader();
+                    // Reading as a string.
+                    reader.readAsBinaryString(file);
 
+                    // This should be triggered on files only and never triggered on folders.
+                    reader.onload = (function (event) {
+                        fileLoaded = true;
+                        return done();
+                    });
+
+                    // This should be triggered on files and folders.
+                    reader.onloadend = (function (event) {
+                        // Looks like loading the file has been failed. It is folder!
+                        if (fileLoaded == false ) {
+                            return done(strings.fileisfolder.replace("{{filename}}", file.name));
+                        }
+                    });
+                }
+            }
+            else {
+                return done(strings.fileisfolder.replace("{{filename}}", file.name));
+            }
+        },
     });
 
     // on sending the file append the form field data and the

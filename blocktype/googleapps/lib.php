@@ -71,7 +71,7 @@ class PluginBlocktypeGoogleApps extends MaharaCoreBlocktype {
             'appsid' => array(
                 'type'  => 'textarea',
                 'title' => get_string('appscodeorurl','blocktype.googleapps'),
-                'description' => get_string('appscodeorurldesc','blocktype.googleapps') . self::get_html_of_supported_googleapps(),
+                'description' => get_string('appscodeorurldesc1','blocktype.googleapps', get_config('series')) . self::get_html_of_supported_googleapps(),
                 'rows' => 5,
                 'cols' => 76,
                 'defaultvalue' => (!empty($configdata['appsid']) ? $configdata['appsid'] : null),
@@ -105,12 +105,24 @@ class PluginBlocktypeGoogleApps extends MaharaCoreBlocktype {
             // $2 - id, key, etc. of the collection
             array(
                 'match' => '#.*docs.google.com/([a-zA-Z0-9\_\-\.\/]*)leaf\?id=([a-zA-Z0-9\_\-]+).*#',
-                'url'   => $httpstr . '://docs.google.com/$1leaf?id=$2',
+                'url'   => $httpstr . '://drive.google.com/$1folderview?id=$2',
                 'type'  => 'spanicon',
             ),
             array(
                 'match' => '#.*docs.google.com/([a-zA-Z0-9\_\-\.\/]*)open\?id=([a-zA-Z0-9\_\-]+).*#',
-                'url'   => $httpstr . '://docs.google.com/$1open?id=$2',
+                'url'   => $httpstr . '://drive.google.com/$1folderview?id=$2',
+                'type'  => 'spanicon',
+            ),
+            // drive.google.com/folderview or drive.google.com/open - Google Drive folders
+            // (formerly Google Docs collections)
+            array(
+                'match' => '#.*drive.google.com/([a-zA-Z0-9\_\-\.\/]*)open\?id=([a-zA-Z0-9\_\-]+).*#',
+                'url'   => $httpstr . '://drive.google.com/$1folderview?id=$2',
+                'type'  => 'spanicon',
+            ),
+            array(
+                'match' => '#.*drive.google.com/([a-zA-Z0-9\_\-\.\/]*)folderview\?id=([a-zA-Z0-9\_\-]+).*#',
+                'url'   => $httpstr . '://drive.google.com/$1folderview?id=$2',
                 'type'  => 'spanicon',
             ),
             // docs.google.com/present - Google presentation incl. custom domain presentation
@@ -263,10 +275,16 @@ class PluginBlocktypeGoogleApps extends MaharaCoreBlocktype {
                 'url'   => $httpstr . '://docs.google.com/file/d/$1/preview',
                 'type'  => 'iframe',
             ),
-                // www.google.com/calendar - Google calendar
+            // www.google.com/calendar - Google calendar
             array(
                 'match' => '#.*www.google.com/calendar.*src=([a-zA-Z0-9\.\_\-\&\%\=/]+).*#',
-                'url'   => $httpstr . '://www.google.com/calendar/embed?src=$1',
+                'url'   => $httpstr . '://calendar.google.com/calendar/embed?src=$1',
+                'type'  => 'iframe',
+            ),
+            // calendar.google.com - Google Calendar (mid-2016)
+            array(
+                'match' => '#.*calendar.google.com/calendar.*src=([a-zA-Z0-9\.\_\-\&\%\=/]+).*#',
+                'url'   => $httpstr . '://calendar.google.com/calendar/embed?src=$1',
                 'type'  => 'iframe',
             ),
             // (maps|www).google.com - Google My Maps (IMPORTANT: this is ONLY for My Maps)

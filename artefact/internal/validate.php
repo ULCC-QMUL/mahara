@@ -15,7 +15,6 @@ define('SECTION_PLUGINTYPE', 'artefact');
 define('SECTION_PLUGINNAME', 'internal');
 define('SECTION_PAGE', 'validate');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 safe_require('artefact', 'internal');
 define('TITLE', get_string('emailactivation','artefact.internal'));
 
@@ -27,7 +26,7 @@ $row = get_record('artefact_internal_profile_email', 'email', $email, 'key', $ke
 
 if ($row) {
     if ($decline) {
-        delete_records_select('artefact_internal_profile_email', 'verified=0 AND key=? AND email=?', array($key, $email));
+        delete_records_select('artefact_internal_profile_email', 'verified = 0 AND "key" = ? AND email = ?', array($key, $email));
         $SESSION->add_ok_msg(get_string('emailactivationdeclined', 'artefact.internal'));
         redirect(get_config('wwwroot'));
     }
@@ -86,6 +85,5 @@ else {
 }
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('message', $message);
 $smarty->display('artefact:internal:validate.tpl');

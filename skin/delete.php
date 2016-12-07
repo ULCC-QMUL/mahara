@@ -13,7 +13,6 @@
 define('INTERNAL', 1);
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once('skin.php');
-require_once('pieforms/pieform.php');
 
 $skinid = param_integer('id');
 $siteskin = param_boolean('site', false);
@@ -37,7 +36,7 @@ if (!$skin->can_edit()) {
     throw new AccessDeniedException(get_string('cantdeleteskin', 'skin'));
 }
 
-define('TITLE', get_string('deletespecifiedskin', 'skin', $skin->get('title')));
+define('TITLE', $skin->get('title'));
 
 $numberofpagesuseskin = count_records('view', 'skin', $skin->get('id'));
 
@@ -57,7 +56,6 @@ $form = pieform(array(
 ));
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', $skin->get('title'));
 $smarty->assign('subheading', get_string('deletespecifiedskin','skin', $skin->get('title')));
 $smarty->assign('safemessage', (($numberofpagesuseskin > 0) ? get_string('deleteskinusedinpages', 'skin', $numberofpagesuseskin) . '<br/>' : '') . get_string('deleteskinconfirm', 'skin'));
 $smarty->assign('form', $form);

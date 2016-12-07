@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'view');
 
 require(dirname(dirname(__FILE__)).'/init.php');
 require_once('group.php');
-require_once('pieforms/pieform.php');
 require_once(get_config('libroot') . 'view.php');
 
 if (param_variable('acceptfriend_submit', null)) {
@@ -96,12 +95,15 @@ if (!$restrictedview) {
 $javascript = array('paginator', 'lib/pieforms/static/core/pieforms.js');
 $blocktype_js = $view->get_all_blocktype_javascript();
 $javascript = array_merge($javascript, $blocktype_js['jsfiles']);
+if (is_plugin_active('externalvideo', 'blocktype')) {
+    $javascript = array_merge($javascript, array((is_https() ? 'https:' : 'http:') . '//cdn.embedly.com/widgets/platform.js'));
+}
 $inlinejs = "addLoadEvent( function() {\n" . join("\n", $blocktype_js['initjs']) . "\n});";
 
 // Set up theme
 $viewtheme = $view->get('theme');
 if ($viewtheme && $THEME->basename != $viewtheme) {
-    $THEME = new Theme($viewtheme);
+    $THEME = new Theme($view);
 }
 $stylesheets = array();
 $stylesheets = array_merge($stylesheets, $view->get_all_blocktype_css());
@@ -349,7 +351,7 @@ $smarty->assign('canmessage', $loggedinid != $userid && can_send_message($logged
 $smarty->assign('USERID', $userid);
 $smarty->assign('viewtitle', get_string('usersprofile', 'mahara', display_name($user, null, true)));
 $smarty->assign('viewtype', 'profile');
-
+$smarty->assign('PAGEHEADING', null);
 $smarty->assign('user', $user);
 if ($loggedinid && $loggedinid == $userid) {
     $smarty->assign('ownprofile', true);

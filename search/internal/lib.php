@@ -39,11 +39,10 @@ class PluginSearchInternal extends PluginSearch {
 
     public static function get_config_options() {
         return array(
-            'class' => 'panel panel-body',
             'elements'   => array(
                 'exactusersearch' =>  array(
                     'title'        => get_string('exactusersearch', 'search.internal'),
-                    'description'  => get_string('exactusersearchdescription1', 'search.internal'),
+                    'description'  => get_string('exactusersearchdescription2', 'search.internal'),
                     'help'         => true,
                     'type'         => 'switchbox',
                     'defaultvalue' => get_config_plugin('search', 'internal', 'exactusersearch'),
@@ -462,53 +461,58 @@ class PluginSearchInternal extends PluginSearch {
         $firstcols = 'u.id';
         if (!empty($constraints)) {
             foreach ($constraints as $f) {
-                if ($f['field'] == 'institution') {
-                    if ($f['string'] == 'mahara') {
-                        $where .= ' AND u.id NOT IN (SELECT usr FROM {usr_institution})';
-                    }
-                    else {
-                        $where .= '
-                            AND u.id IN (
-                                SELECT usr FROM {usr_institution} WHERE institution '
-                            . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike) . '
-                            )';
-                    }
-                }
-                else if ($f['field'] == 'duplicateemail') {
-                    if (!empty($f['string'])) {
-                        $where .= '
-                            AND u.id IN (
-                                SELECT owner
-                                FROM {artefact}
-                                WHERE id IN (' . join(',', array_map('db_quote', $f['string'])) . ')
-                            )';
-                    }
-                    else {
-                        // No duplicate email is found, return empty list
-                        $where .= ' AND FALSE';
-                    }
-                }
-                else if ($f['field'] == 'exportqueue') {
-                    $firstcols = 'e.id AS eid,
-                      (SELECT case WHEN e.starttime IS NOT NULL THEN ' . db_format_tsfield('e.starttime', false) . ' ELSE ' . db_format_tsfield('e.ctime', false) . ' END) AS status,
-                      ' . $firstcols;
-                    $join .= 'JOIN {export_queue} e ON e.usr = u.id ';
-                    $where .= ' AND u.id'
-                        . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
-                }
-                else if ($f['field'] == 'archivesubmissions') {
-                    $firstcols = 'e.id AS eid, a.group,
-                      (SELECT name FROM {group} WHERE id = a.group) AS submittedto,
-                      (SELECT case WHEN a.externalid IS NOT NULL THEN a.externalid ELSE CAST(e.id AS char) END) AS specialid,
-                      e.filetitle, e.filename, e.filepath, ' . db_format_tsfield('e.ctime', 'archivectime') . ', ' . $firstcols;
-                    $join .= 'JOIN {export_archive} e ON e.usr = u.id ';
-                    $join .= 'JOIN {archived_submissions} a ON a.archiveid = e.id ';
-                    $where .= ' AND u.id'
-                        . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
-                }
-                else {
-                    $where .= ' AND u.' . $f['field']
-                        . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
+                switch ($f['field']) {
+                    case 'institution':
+                        if ($f['string'] == 'mahara') {
+                            $where .= ' AND u.id NOT IN (SELECT usr FROM {usr_institution})';
+                        }
+                        else {
+                            $where .= '
+                                AND u.id IN (
+                                    SELECT usr FROM {usr_institution} WHERE institution '
+                                . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike) . '
+                                )';
+                        }
+                        break;
+                    case 'duplicateemail':
+                        if (!empty($f['string'])) {
+                            $where .= '
+                                AND u.id IN (
+                                    SELECT owner
+                                    FROM {artefact}
+                                    WHERE id IN (' . join(',', array_map('db_quote', $f['string'])) . ')
+                                )';
+                        }
+                        else {
+                            // No duplicate email is found, return empty list
+                            $where .= ' AND FALSE';
+                        }
+                        break;
+                    case 'exportqueue':
+                        $firstcols = 'e.id AS eid,
+                          (SELECT case WHEN e.starttime IS NOT NULL THEN ' . db_format_tsfield('e.starttime', false) . ' ELSE ' . db_format_tsfield('e.ctime', false) . ' END) AS status,
+                          ' . $firstcols;
+                        $join .= 'JOIN {export_queue} e ON e.usr = u.id ';
+                        $where .= ' AND u.id'
+                            . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
+                        break;
+                    case 'archivesubmissions':
+                        $firstcols = 'e.id AS eid, a.group,
+                          (SELECT name FROM {group} WHERE id = a.group) AS submittedto,
+                          (SELECT case WHEN a.externalid IS NOT NULL THEN a.externalid ELSE CAST(e.id AS char) END) AS specialid,
+                          e.filetitle, e.filename, e.filepath, ' . db_format_tsfield('e.ctime', 'archivectime') . ', ' . $firstcols;
+                        $join .= 'JOIN {export_archive} e ON e.usr = u.id ';
+                        $join .= 'JOIN {archived_submissions} a ON a.archiveid = e.id ';
+                        $where .= ' AND u.id'
+                            . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
+                        break;
+                    case 'authname':
+                        $join .= 'JOIN {auth_instance} ai ON ai.id = u.authinstance ';
+                        $where .= ' AND ai.authname ' . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
+                        break;
+                    default:
+                        $where .= ' AND u.' . $f['field']
+                            . PluginSearchInternal::match_expression($f['type'], $f['string'], $values, $ilike);
                 }
             }
         }
@@ -782,6 +786,8 @@ class PluginSearchInternal extends PluginSearch {
      * @param integer How many results to return
      * @param integer What result to start at (0 == first result)
      * @param string  Which groups to search (all, member, notmember)
+     * @param string  Category the group belongs to
+     * @param string  The institution the group belongs
      * @return array  A data structure containing results looking like ...
      *         $results = array(
      *               count   => integer, // total number of results
@@ -810,7 +816,7 @@ class PluginSearchInternal extends PluginSearch {
      *               ),
      *           );
      */
-    public static function search_group($query_string, $limit, $offset=0, $type='member', $category='') {
+    public static function search_group($query_string, $limit, $offset=0, $type='member', $category='', $institution='all') {
         global $USER;
         $data = array();
 
@@ -820,8 +826,9 @@ class PluginSearchInternal extends PluginSearch {
             WHERE (
                 name " . db_ilike() . " '%' || ? || '%'
                 OR description " . db_ilike() . " '%' || ? || '%'
+                OR shortname " . db_ilike() . " '%' || ? || '%'
             ) AND deleted = 0 ";
-        $values = array($query_string, $query_string);
+        $values = array($query_string, $query_string, $query_string);
 
         if (!$grouproles = join(',', array_keys($USER->get('grouproles')))) {
             $grouproles = '-1';
@@ -852,11 +859,15 @@ class PluginSearchInternal extends PluginSearch {
                 $values[] = $category;
             }
         }
+        if ($institution != 'all') {
+            $sql .= ' AND institution = ?';
+            $values[] = $institution;
+        }
 
         $count = get_field_sql('SELECT COUNT(*) '.$sql, $values);
 
         if ($count > 0) {
-            $sql = 'SELECT id, name, description, grouptype, jointype, request, public, ctime, mtime, category, urlid ' . $sql . ' ORDER BY name';
+            $sql = 'SELECT * ' . $sql . ' ORDER BY name';
             $data = get_records_sql_array($sql, $values, $offset, $limit);
         }
 

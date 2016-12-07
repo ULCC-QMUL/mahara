@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups/find');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('findgroups'));
 require_once('group.php');
 require_once('searchlib.php');
@@ -192,7 +191,6 @@ function search_submit(Pieform $form, $values) {
 }
 
 $smarty = smarty(array('paginator'));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('groups', $groups['data']);
 $html = $smarty->fetch('group/mygroupresults.tpl');
 $smarty->assign('groupresults', $html);

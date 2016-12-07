@@ -19,7 +19,6 @@ define('INTERNAL_SUBPAGE', 'social');
 
 require_once(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('profile','artefact.internal'));
-require_once('pieforms/pieform.php');
 safe_require('artefact', 'internal');
 
 
@@ -140,7 +139,6 @@ else {
 }
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('navtabs', PluginArtefactInternal::submenu_items());
 $smarty->assign('subheading', $subheading);
 $smarty->assign('form', $form);

@@ -13,7 +13,9 @@ defined('INTERNAL') || die();
 
 // my groups
 $string['groupname'] = 'Group name';
+$string['groupshortname'] = 'Short name';
 $string['creategroup'] = 'Create group';
+$string['copygroup'] = 'Copy group "%s"';
 $string['groupmemberrequests'] = 'Pending membership requests';
 $string['membershiprequests'] = 'Membership requests';
 $string['sendinvitation'] = 'Send invite';
@@ -57,6 +59,7 @@ $string['reason']                    = 'Reason';
 $string['approve']                   = 'Approve';
 $string['reject']                    = 'Reject';
 $string['groupalreadyexists'] = 'A group by this name already exists.';
+$string['groupshortnamealreadyexists'] = 'A group by this short name already exists.';
 $string['invalidshortname'] = 'Invalid group short name.';
 $string['shortnameformat'] = 'Group short names can be from 2 to 255 characters in length and contain only alphanumeric characters, ".", "-", and "_".';
 $string['Created'] = 'Created';
@@ -92,8 +95,8 @@ $string['groupinvitesfrom'] = 'Invited to join:';
 $string['requestedmembershipin'] = 'Requested membership in:';
 $string['viewnotify'] = 'Shared page notifications';
 $string['viewnotifydescription2'] = 'Select which group members should receive a notification when a new group page is created and when a group member shares one of their pages with the group. The group member sharing the page will not receive this notification. For very large groups it would be best to limit this to non ordinary members as it can produce a lot of notifications.';
-$string['feedbacknotify'] = 'Feedback notifications';
-$string['feedbacknotifydescription1'] = 'Select which group members should receive a notification when feedback is placed on a group page and artefacts.';
+$string['commentnotify'] = 'Comment notifications';
+$string['commentnotifydescription1'] = 'Select which group members should receive a notification when comments are placed on a group page and artefacts.';
 $string['allowsendnow'] = 'Send forum posts immediately';
 $string['allowsendnowdescription1'] = 'Any group member can choose to send forum posts immediately. If this option is set to "Off", only group administrators, tutors and moderators can do so.';
 $string['hiddengroup'] = 'Hide group';
@@ -111,17 +114,26 @@ $string['suggesttofriends'] = 'Recommend to friends';
 $string['userstosendrecommendationsto'] = 'Users who will be sent a recommendation';
 $string['suggestgroupnotificationsubject'] = '%s suggested you join a group';
 $string['suggestgroupnotificationmessage'] = '%s suggested that you join the group "%s" on %s';
-$string['recommendationssent'] = '%d recommendation(s) sent';
+$string['nrecommendationssent'] = array(
+    0 => '1 recommendation sent',
+    1 => '%d recommendations sent',
+);
 $string['suggestinvitefriends'] = 'You cannot enable both friend invitations and recommendations.';
 $string['suggestfriendsrequesterror'] = 'You can only enable friend recommendations on open or request groups.';
 $string['editwindowendbeforestart'] = 'The end date must be after the start date.';
 
 $string['editgroupmembership'] = 'Edit group membership';
 $string['editmembershipforuser'] = 'Edit membership for %s';
-$string['changedgroupmembership'] = 'Group membership updated sucessfully.';
+$string['changedgroupmembership'] = 'Group membership updated successfully.';
 $string['changedgroupmembershipsubject'] = 'Your group memberships have been changed.';
-$string['addedtogroupsmessage'] = "%s has added you to the group(s):\n\n%s\n\n.";
-$string['removedfromgroupsmessage'] = "%s has removed you from the group(s):\n\n%s\n\n.";
+$string['addedtongroupsmessage'] = array(
+        0 => "%2\$s has added you to the group:\n\n%3\$s\n\n",
+        1 => "%2\$s has added you to the groups:\n\n%3\$s\n\n",
+);
+$string['removedfromngroupsmessage'] = array(
+        0 => "%2\$s has removed you from the group:\n\n%3\$s\n\n",
+        1 => "%2\$s has removed you from the groups:\n\n%3\$s\n\n",
+);
 $string['cantremovememberfromgroup'] = "You cannot remove users from %s.";
 $string['current'] = "Current";
 $string['requests'] = "Requests";
@@ -212,7 +224,7 @@ $string['Group'] = 'Group';
 $string['groups'] = 'groups';
 $string['notamember'] = 'You are not a member of this group.';
 $string['notmembermayjoin'] = 'You must join the group \'%s\' to see this page.';
-$string['declinerequestsuccess'] = 'Group membership request has been declined sucessfully.';
+$string['declinerequestsuccess'] = 'Group membership request has been declined successfully.';
 $string['notpublic'] = 'This group is not public.';
 $string['moregroups'] = 'More groups';
 $string['deletegroupnotificationsubject'] = 'The group "%s" was deleted';
@@ -331,7 +343,7 @@ $string['notinanygroups'] = 'Not in any groups';
 $string['addusertogroup'] = 'Add to ';
 $string['inviteusertojoingroup'] = 'Invite to ';
 $string['invitemembertogroup'] = 'Invite %s to join \'%s\'';
-$string['cannotinvitetogroup'] = 'You cannnot invite this user to this group.';
+$string['cannotinvitetogroup'] = 'You cannot invite this user to this group.';
 $string['useralreadyinvitedtogroup'] = 'This user has already been invited to, or is already a member of, this group.';
 $string['removefriend'] = 'Remove friend';
 $string['denyfriendrequestlower'] = 'Deny friend request';

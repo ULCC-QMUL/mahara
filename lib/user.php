@@ -169,6 +169,35 @@ function get_account_preference($userid, $field) {
     return $expected[$field];
 }
 
+/**
+ * Returns the user preferred limit if there is one
+ *
+ * @param int    $limit
+ * @param string $field   The account preference to check. To allow for having more than one limit
+ *                        for different parts of the system.
+ * @param mixed  $userid  Can be user object or id. If left blank then current $USER id will be used
+ *
+ * @return int $limit
+ */
+function user_preferred_limit($limit, $field = 'viewsperpage', $userid = null) {
+    global $USER;
+
+    if ($userid instanceof User) {
+        $userid = $userid->id;
+    }
+    else if ($userid === null) {
+        $userid = $USER->get('id');
+    }
+
+    $userlimit = get_account_preference($userid, $field);
+    if ($limit > 0 && $limit != $userlimit) {
+        set_account_preference($userid, $field, $limit);
+    }
+    else {
+        $limit = $userlimit;
+    }
+    return $limit;
+}
 
 function get_user_language($userid) {
     $langpref = get_account_preference($userid, 'lang');
@@ -213,6 +242,7 @@ function expected_account_preferences() {
                  'devicedetection' => 1,
                  'licensedefault' => '',
                  'viewsperpage' => 20,
+                 'itemsperpage' => 10,
                  'orderpagesby' => 'atoz',
                  );
 }
@@ -632,6 +662,9 @@ function get_profile_field($userid, $field) {
             safe_require('artefact', 'internal');
             $value = ArtefactTypeSocialprofile::get_social_profiles();
         }
+    }
+    else if ($field == 'introduction') {
+        $value = get_field('artefact', 'description', 'owner', $userid, 'artefacttype', $field);
     }
     else {
         $value = get_field('artefact', 'title', 'owner', $userid, 'artefacttype', $field);
@@ -1193,6 +1226,7 @@ function get_user_for_display($user=null) {
     $fields = array(
         'id', 'username', 'preferredname', 'firstname', 'lastname', 'admin', 'staff',
         'profileicon', 'email', 'deleted', 'urlid', 'suspendedctime',
+        'studentid',
     );
 
     if (is_numeric($user) && isset($usercache[$user])) {
@@ -1393,6 +1427,15 @@ function suspend_user($suspendeduserid, $reason, $suspendinguserid=null) {
         $suspendinguserid = $USER->get('id');
     }
 
+    $iscron = false;
+    if ($suspendinguserid == 0) {
+        // root user has ID = 0 -> happens when run in cron.
+        // Use a valid site admin ID.
+        $iscron = true;
+        $admins = get_site_admins();
+        $suspendinguserid = $admins[0]->id;
+    }
+
     $suspendrec = new StdClass;
     $suspendrec->id              = $suspendeduserid;
     $suspendrec->suspendedcusr   = $suspendinguserid;
@@ -1409,12 +1452,26 @@ function suspend_user($suspendeduserid, $reason, $suspendinguserid=null) {
     $message->users = array($suspendeduserid);
     $message->subject = get_string_from_language($lang, 'youraccounthasbeensuspended');
     if ($reason == '') {
-        $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedtext2', 'mahara',
-            get_config('sitename'), display_name($suspendinguserid, $suspendeduserid));
+        if ($iscron) {
+            // Suspended by a cron task
+            $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedtextcron', 'mahara',
+                get_config('sitename'));
+        }
+        else {
+            $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedtext2', 'mahara',
+                get_config('sitename'), display_name($suspendinguserid, $suspendeduserid));
+        }
     }
     else {
-        $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedreasontext', 'mahara',
-            get_config('sitename'), display_name($suspendinguserid, $suspendeduserid), $reason);
+        if ($iscron) {
+            // Suspended by a cron task
+            $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedreasontextcron', 'mahara',
+                get_config('sitename'), $reason);
+        }
+        else {
+            $message->message = get_string_from_language($lang, 'youraccounthasbeensuspendedreasontext', 'mahara',
+                get_config('sitename'), display_name($suspendinguserid, $suspendeduserid), $reason);
+        }
     }
     require_once('activity.php');
     activity_occurred('maharamessage', $message);
@@ -1517,6 +1574,7 @@ function delete_user($userid) {
     delete_records('usr_account_preference', 'usr', $userid);
     delete_records('usr_activity_preference', 'usr', $userid);
     delete_records('usr_infectedupload', 'usr', $userid);
+    delete_records('framework_assessment_feedback', 'usr', $userid);
     delete_records('usr_institution', 'usr', $userid);
     delete_records('usr_institution_request', 'usr', $userid);
     delete_records('usr_password_request', 'usr', $userid);
@@ -1538,6 +1596,7 @@ function delete_user($userid) {
     // @todo: test all artefact bulk_delete stuff, then replace the one-by-one
     // artefact deletion below with ArtefactType::delete_by_artefacttype($artefactids);
     if ($artefactids) {
+        require_once(get_config('docroot') . 'artefact/lib.php');
         foreach ($artefactids as $artefactid) {
             try {
                 $a = artefact_instance_from_id($artefactid, true);
@@ -2362,7 +2421,7 @@ function create_user($user, $profile=array(), $institution=null, $remoteauth=nul
         $user->ctime = db_format_timestamp(time());
         // Ensure this user has a profile urlid
         if (get_config('cleanurls') && (!isset($user->urlid) || is_null($user->urlid))) {
-            $user->urlid = generate_urlid($user->username, get_config('cleanurluserdefault'), 3, 30);
+            $user->urlid = generate_urlid(get_raw_user_urlid($user), get_config('cleanurluserdefault'), 3, 30);
             $user->urlid = get_new_profile_urlid($user->urlid);
         }
         if (empty($user->quota)) {
@@ -2567,23 +2626,22 @@ function add_user_to_autoadd_groups($eventdata) {
  * @throws SystemException if the system profile view is already installed
  */
 function install_system_profile_view() {
-    $viewid = get_field('view', 'id', 'owner', 0, 'type', 'profile');
+    require_once(get_config('libroot') . 'view.php');
+    $viewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'profile');
     if ($viewid) {
         throw new SystemException('A system profile view already seems to be installed');
     }
-    require_once(get_config('libroot') . 'view.php');
     require_once(get_config('docroot') . 'blocktype/lib.php');
     $view = View::create(array(
         'type'        => 'profile',
-        'owner'       => 0,
-        'numcolumns'  => 2,
+        'institution' => 'mahara',
+        'template'    => View::SITE_TEMPLATE,
         'numrows'     => 1,
         'columnsperrow' => array((object)array('row' => 1, 'columns' => 2)),
         'ownerformat' => FORMAT_NAME_PREFERREDNAME,
         'title'       => get_string('profileviewtitle', 'view'),
         'description' => get_string('profiledescription'),
-        'template'    => 1,
-    ));
+    ), 0);
     $view->set_access(array(array(
         'type' => 'loggedin'
     )));
@@ -2614,22 +2672,21 @@ function install_system_profile_view() {
  * @throws SystemException if the system dashboard view is already installed
  */
 function install_system_dashboard_view() {
-    $viewid = get_field('view', 'id', 'owner', 0, 'type', 'dashboard');
+    require_once(get_config('libroot') . 'view.php');
+    $viewid = get_field('view', 'id', 'institution', 'mahara', 'template', View::SITE_TEMPLATE, 'type', 'dashboard');
     if ($viewid) {
         throw new SystemException('A system dashboard view already seems to be installed');
     }
-    require_once(get_config('libroot') . 'view.php');
     require_once(get_config('docroot') . 'blocktype/lib.php');
     $view = View::create(array(
         'type'        => 'dashboard',
-        'owner'       => 0,
-        'numcolumns'  => 2,
+        'institution' => 'mahara',
+        'template'    => View::SITE_TEMPLATE,
         'numrows'     => 1,
         'columnsperrow' => array((object)array('row' => 1, 'columns' => 2)),
         'ownerformat' => FORMAT_NAME_PREFERREDNAME,
         'title'       => get_string('dashboardviewtitle', 'view'),
-        'template'    => 1,
-    ));
+    ), 0);
     $view->set_access(array(array(
         'type' => 'loggedin'
     )));
@@ -2661,6 +2718,7 @@ function install_system_dashboard_view() {
                 'institutionmessage' => true,
                 'maharamessage' => true,
                 'usermessage' => true,
+                'wallpost' => true,
                 'viewaccess' => true,
                 'watchlist' => true,
                 'maxitems' => '5',
@@ -2823,17 +2881,36 @@ function remote_avatar_url($email, $size) {
  * @returns string The URL of the image or $notfound if none was found
  */
 function remote_avatar($email, $size, $notfound) {
+    global $SESSION;
+
     if (!get_config('remoteavatars')) {
         return false;
     }
-    require_once('file.php');
 
+    require_once('file.php');
     $md5sum = md5(strtolower($email));
 
     $s = 100;
     $newsize = image_get_new_dimensions($s, $s, $size);
     if ($newsize) {
         $s = min($newsize['w'], $newsize['h']);
+    }
+
+    if ($avatars = $SESSION->get('remoteavatar')) {
+        if (isset($avatars[$md5sum])) {
+            if ($avatars[$md5sum] == 'notfound') {
+                return $notfound;
+            }
+            return $avatars[$md5sum] . "?r=g&s=$s";
+        }
+    }
+    $avatars = (is_array($avatars)) ? $avatars : array();
+
+    // HACK: To speed up the user search page we avoid doing an avatar fetch for each of the users in the list
+    // as this can make things very slow if we are return a long list. The speed increase is worth the loss of showing
+    // the correct image here.
+    if (defined('IGNORE_FETCH_REMOTE_AVATAR') && IGNORE_FETCH_REMOTE_AVATAR === 1) {
+        return $notfound;
     }
 
     $baseurl = 'http://www.gravatar.com/avatar/';
@@ -2844,18 +2921,14 @@ function remote_avatar($email, $size, $notfound) {
         $baseurl = get_config('remoteavatarbaseurl');
     }
     // Check if it is a valid avatar
-    $result = mahara_http_request(
-            array(
-                    CURLOPT_URL => "{$baseurl}{$md5sum}.jpg?d=404",
-                    CURLOPT_HEADER => true,
-                    CURLOPT_NOBODY => true,
-            ),
-            true
-    );
-    if (!$result || $result->error || $result->info['http_code'] == 404) {
+    $isvalid = is_valid_url("{$baseurl}{$md5sum}.jpg?d=404");
+    if (!$isvalid) {
+        $SESSION->set('remoteavatar', array_merge($avatars, array($md5sum => 'notfound')));
         return $notfound;
     }
-    return "{$baseurl}{$md5sum}.jpg?r=g&s=$s";
+    $avatar = "{$baseurl}{$md5sum}.jpg?r=g&s=$s";
+    $SESSION->set('remoteavatar', array_merge($avatars, array($md5sum => $avatar)));
+    return $avatar;
 }
 
 /**
@@ -3114,4 +3187,24 @@ function get_user_favorites($userid, $limit=5, $offset=0) {
     }
 
     return $users;
+}
+
+/**
+ * Returns a list of a site admin user IDs order by the oldest ID first.
+ *
+ * @returns array of stdclass objects containing site admin ids.
+ */
+function get_site_admins() {
+    // get a list of all the admins ordered by oldest ID.
+    // There will always be at least one site admin in the system.
+    if ($admins = get_records_sql_array('
+            SELECT u.id
+            FROM {usr} u
+            WHERE u.admin = 1
+            AND   u.active = 1
+            ORDER BY u.id', array())) {
+            return $admins;
+    }
+    // just in case there is something horribly wrong.
+    return false;
 }

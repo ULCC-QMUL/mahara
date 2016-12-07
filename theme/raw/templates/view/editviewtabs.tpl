@@ -20,16 +20,19 @@
         </a>
     {/if}
 </div>
-{if !$issitetemplate}
 <div class="with-heading">
+    {if !$issitetemplate}
     <a href="{$displaylink}">
         {str tag=displayview section=view}
     </a>
-    {if $edittitle || $viewtype == 'profile'}
-    <a href="{$WWWROOT}view/access.php?id={$viewid}{if $collectionid}&collection={$collectionid}{/if}{if $new}&new=1{/if}">
-        <span class="icon icon-unlock-alt" role="presentation" aria-hidden="true"></span>
-        {str tag=shareview section=view}
-    </a>
+        {if $edittitle || $viewtype == 'profile'}
+        <a href="{$WWWROOT}view/access.php?id={$viewid}{if $collectionid}&collection={$collectionid}{/if}{if $new}&new=1{/if}">
+            <span class="icon icon-unlock-alt" role="presentation" aria-hidden="true"></span>
+            {str tag=shareview section=view}
+        </a>
+        {/if}
+    {else}
+        &nbsp;
     {/if}
 </div>
-{/if}
+

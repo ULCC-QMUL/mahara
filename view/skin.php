@@ -12,7 +12,6 @@
 
 define('INTERNAL', 1);
 require_once(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('skin.php');
 require_once('view.php');
 require_once(get_config('libroot') . 'group.php');
@@ -71,7 +70,7 @@ $favorskins  = Skin::get_favorite_skins();
 $siteskins   = Skin::get_site_skins();
 $defaultskin = Skin::get_default_skin();
 
-if (!$USER->can_edit_view($view) || $view->get('owner') == "0") {
+if (!$USER->can_edit_view($view)) {
     throw new AccessDeniedException();
 }
 
@@ -119,7 +118,6 @@ $smarty->assign('defaultskin', $defaultskin);
 $smarty->assign('form', $skinform);
 $smarty->assign('viewid', $view->get('id'));
 $smarty->assign('viewtype', $view->get('type'));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('edittitle', $view->can_edit_title());
 $smarty->assign('displaylink', $displaylink);
 $smarty->assign('new', $new);

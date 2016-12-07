@@ -17,7 +17,6 @@ define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'pendingregistrations');
 define('MENUITEM', 'manageinstitutions/pendingregistrations');
-require_once('pieforms/pieform.php');
 require_once('institution.php');
 
 if (!is_logged_in()) {
@@ -78,7 +77,6 @@ EOF;
 $smarty = smarty();
 setpageicon($smarty, 'icon-university');
 
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('data', $data);
 $smarty->assign('institutionselector', $institutionselector);

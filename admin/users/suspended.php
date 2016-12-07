@@ -17,7 +17,6 @@ define('TITLE', get_string('suspendeduserstitle', 'admin'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'suspendedusers');
-require_once('pieforms/pieform.php');
 
 $type = param_alpha('type', 'suspended');
 $enc_type = json_encode($type);
@@ -162,7 +161,7 @@ jQuery(window).on('pageupdated', {}, function(e, data) {
 EOF
 );
 
-$form = new Pieform(array(
+$form = pieform_instance(array(
     'name'      => 'buttons',
     'renderer'  => 'div',
     'autofocus' => false,
@@ -206,7 +205,6 @@ $smarty->assign('suspendhtml', $html);
 $smarty->assign('pagination', $pagination['html']);
 $smarty->assign('buttonformopen', $form->get_form_tag());
 $smarty->assign('buttonform', $form->build(false));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/suspended.tpl');
 
 function buttons_submit_unsuspend(Pieform $form, $values) {

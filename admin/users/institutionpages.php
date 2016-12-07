@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'institutionstaticpages');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 define('TITLE', get_string('institutionstaticpages', 'admin'));
-require_once('pieforms/pieform.php');
 require_once('license.php');
 define('DEFAULTPAGE', 'home');
 require_once('institution.php');
@@ -52,7 +51,6 @@ else if (empty($institutionelement['options'])) {
     $smarty = smarty();
     $smarty->assign('noinstitutionsadmin', (($USER->admin) ? get_string('noinstitutionstaticpagesadmin', 'admin', get_config('wwwroot') . 'admin/site/pages.php') : false));
     $smarty->assign('noinstitutions', get_string('noinstitutionstaticpages', 'admin'));
-    $smarty->assign('PAGEHEADING', TITLE);
     $smarty->display('admin/site/pages.tpl');
     exit;
 }
@@ -82,7 +80,7 @@ $form = pieform(array(
         'pageusedefault' => array(
             'type'    => 'switchbox',
             'title'   => get_string('usedefault', 'admin'),
-            'description'  => get_string('usedefaultdescription2', 'admin'),
+            'description'  => get_string('usedefaultdescription3', 'admin'),
             'defaultvalue' => (get_config_institution($institutionelement['defaultvalue'], 'sitepages_' . DEFAULTPAGE) == 'mahara' ? 1 : 0),
         ),
         'pagetext' => array(
@@ -157,5 +155,4 @@ setpageicon($smarty, 'icon-university');
 
 $smarty->assign('noinstitutionsadmin', (($USER->admin) ? get_string('noinstitutionstaticpagesadmin', 'admin', get_config('wwwroot') . 'admin/site/pages.php') : false));
 $smarty->assign('pageeditform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/site/pages.tpl');

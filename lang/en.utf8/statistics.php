@@ -67,7 +67,7 @@ $string['artefact_type_workskill'] = 'Artefact: Work skills';
 $string['blocktype_annotation'] = 'Block: Annotation';
 $string['blocktype_blog'] = 'Block: Journal';
 $string['blocktype_blogpost'] = 'Block: Journal entry';
-$string['blocktype_comment'] = 'Block: Feedback';
+$string['blocktype_comment'] = 'Block: Comments';
 $string['blocktype_contactinfo'] = 'Block: Contact information';
 $string['blocktype_creativecommons'] = 'Block: Creative Commons';
 $string['blocktype_entireresume'] = 'Block: Entire résumé';
@@ -191,7 +191,7 @@ $string['wwwroot'] = 'WWW root';
 $string['sitedataweekly'] = 'Weekly site data';
 
 $string['group-count'] = 'Groups';
-$string['view-count'] = 'Views';
+$string['view-count'] = 'Pages';
 $string['user-count'] = 'User';
 $string['institutiondataweekly'] = 'Institution weekly data';
 $string['usersbytype'] = 'Users by type';

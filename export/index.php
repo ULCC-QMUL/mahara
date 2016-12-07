@@ -55,8 +55,8 @@ $elements = array(
     'includefeedback' => array(
         'type' => 'switchbox',
         'class' => 'last',
-        'title' => get_string('includefeedback', 'export'),
-        'description' => get_string('includefeedbackdescription', 'export'),
+        'title' => get_string('includecomments', 'export'),
+        'description' => get_string('includecommentsdescription', 'export'),
         'defaultvalue' => 1,
     ),
 );
@@ -204,7 +204,6 @@ function export_submit(Pieform $form, $values) {
 $smarty = smarty(
     $jsfiles
 );
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('pagedescription', get_string('exportportfoliodescription', 'export'));
 $smarty->assign('form', $form);
 $smarty->display('form.tpl');

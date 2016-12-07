@@ -84,6 +84,7 @@ $string['overrideaccess'] = 'Override access';
 $string['potentialviews'] = 'Potential pages';
 $string['saveapply'] = 'Apply and save';
 $string['savecollection'] = 'Save collection';
+$string['smartevidence'] = 'SmartEvidence';
 $string['update'] = 'Update';
 $string['usecollectionname'] = 'Use collection name?';
 $string['usecollectionnamedesc'] = 'If you wish to use the collection name instead of the block title, leave this checked.';
@@ -96,6 +97,7 @@ $string['viewsaddedtocollection1different'] = array(
     '%s pages added to collection. The shared access has changed for all pages in the collection.',
 );
 $string['viewsaddedaccesschanged'] = 'Access permissions have changed for the following pages:';
+$string['viewaddedsecreturl'] = 'Available publically via secret URL';
 $string['viewcollection'] = 'View collection details';
 $string['viewcount'] = 'Pages';
 $string['viewremovedsuccessfully'] = 'Page removed successfully.';

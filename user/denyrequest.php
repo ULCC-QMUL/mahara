@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups/findfriends');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('denyfriendrequest', 'group'));
 require_once('searchlib.php');
 safe_require('search', 'internal');
@@ -61,7 +60,6 @@ $form = pieform(array(
 ));
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('form', $form);
 $smarty->assign('user', $user);
 $smarty->display('user/denyrequest.tpl');

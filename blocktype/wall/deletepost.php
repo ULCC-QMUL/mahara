@@ -14,7 +14,7 @@ define('INTERNAL', 1);
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once('view.php');
 safe_require('blocktype', 'wall');
-
+define('TITLE', get_string('deletepost', 'blocktype.wall'));
 $postid = param_integer('postid');
 $return = param_variable('return');
 
@@ -53,6 +53,10 @@ $form = pieform(array(
 function deletepost_submit(Pieform $form, $values) {
     global $SESSION, $postid, $goto;
     delete_records('blocktype_wall_post', 'id', $postid);
+
+    require_once('embeddedimage.php');
+    EmbeddedImage::remove_embedded_images('wallpost', $postid);
+
     $SESSION->add_ok_msg(get_string('deletepostsuccess', 'blocktype.wall'));
     redirect($goto);
 }
@@ -60,5 +64,4 @@ function deletepost_submit(Pieform $form, $values) {
 
 $smarty = smarty();
 $smarty->assign('deleteform', $form);
-$smarty->assign('PAGEHEADING', get_string('deletepost', 'blocktype.wall'));
 $smarty->display('blocktype:wall:deletepost.tpl');

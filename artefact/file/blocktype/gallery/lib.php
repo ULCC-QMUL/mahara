@@ -346,6 +346,7 @@ class PluginBlocktypeGallery extends MaharaCoreBlocktype {
 
                 if ($image instanceof ArtefactTypeProfileIcon) {
                     $src = get_config('wwwroot') . 'thumb.php?type=profileiconbyid&id=' . $artefactid;
+                    $src .= '&view=' . $instance->get('view');
                     $description = $image->get('title');
                 }
                 else if ($image instanceof ArtefactTypeImage) {
@@ -449,13 +450,13 @@ class PluginBlocktypeGallery extends MaharaCoreBlocktype {
                 'useslimbox2' => array(
                     'type'         => 'switchbox',
                     'title'        => get_string('useslimbox2', 'blocktype.file/gallery'),
-                    'description'  => get_string('useslimbox2desc1', 'blocktype.file/gallery'),
+                    'description'  => get_string('useslimbox2desc2', 'blocktype.file/gallery'),
                     'defaultvalue' => get_config_plugin('blocktype', 'gallery', 'useslimbox2'),
                 ),
                 'photoframe' => array(
                     'type'         => 'switchbox',
                     'title'        => get_string('photoframe', 'blocktype.file/gallery'),
-                    'description'  => get_string('photoframedesc1', 'blocktype.file/gallery'),
+                    'description'  => get_string('photoframedesc2', 'blocktype.file/gallery'),
                     'defaultvalue' => get_config_plugin('blocktype', 'gallery', 'photoframe'),
                 ),
                 'previewwidth' => array(
@@ -507,6 +508,8 @@ class PluginBlocktypeGallery extends MaharaCoreBlocktype {
         );
         return array(
             'elements' => $elements,
+            // Don't apply "panel panel-body" style to this form.
+            'class' => null,
         );
 
     }

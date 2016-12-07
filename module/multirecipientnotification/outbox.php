@@ -16,8 +16,8 @@ define('SECTION_PLUGINNAME', 'multirecipientnotification');
 define('SECTION_PAGE', 'outbox');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once(get_config('docroot') . 'lib/pieforms/pieform.php');
 safe_require('module', 'multirecipientnotification');
+define('SUBSECTIONHEADING', get_string('labeloutbox1',  'module.multirecipientnotification'));
 
 global $THEME;
 global $USER;
@@ -59,7 +59,7 @@ if ($type == '') {
 if (!isset($options[$type])) {
     // Comma-separated list; filter out anything that's not an installed type
     $type = join(',', array_unique(array_filter(
-        split(',', $type),
+        explode(',', $type),
         function ($a) {global $installedtypes; return isset($installedtypes[$a]);}
     )));
 }
@@ -163,11 +163,6 @@ $smarty->assign('options', $options);
 $smarty->assign('type', $type);
 
 $smarty->assign('INLINEJAVASCRIPT', $paginationjavascript);
-
-// Adding the links to out- and inbox
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign('subsectionheading', get_string('labeloutbox1',  'module.multirecipientnotification'));
-
 
 // show urls and titles
 define('NOTIFICATION_SUBPAGE', 'outbox');

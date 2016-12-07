@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('ADMIN', 1);
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('institution.php');
 require_once(get_config('docroot') . '/lib/htmloutput.php');
 safe_require('artefact', 'internal');
@@ -68,6 +67,7 @@ $form = array(
         ),
         'submit' => array(
             'type' => 'submit',
+            'class' => 'btn-primary',
             'value' => get_string('Import', 'admin')
         )
     )
@@ -323,5 +323,4 @@ $form = pieform($form);
 
 $smarty = smarty();
 $smarty->assign('form', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/users/bulkimport.tpl');

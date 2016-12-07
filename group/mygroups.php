@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups/mygroups');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('mygroups'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'group');
@@ -105,7 +104,6 @@ $smarty->assign('pagination', $pagination['html']);
 $smarty->assign('pagination_js', $pagination['javascript']);
 $smarty->assign('searchingforgroups', array('<a href="' . get_config('wwwroot') . 'group/find.php">', '</a>'));
 $smarty->assign('headingclass', 'page-header');
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('group/mygroups.tpl');
 
 function filter_submit(Pieform $form, $values) {

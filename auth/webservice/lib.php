@@ -89,41 +89,53 @@ class PluginAuthWebservice extends PluginAuth {
 
     public static function admin_menu_items() {
 
-        if (!is_plugin_active('webservice')) {
+        if (!is_plugin_active('webservice', 'auth')) {
             return array();
         }
 
         $map = array(
-            'configextensions/webservices' => array(
-                'path'   => 'configextensions/webservices',
+            'webservices' => array(
+                'path'   => 'webservices',
                 'url'    => 'webservice/admin/index.php',
                 'title'  => get_string('webservice', 'auth.webservice'),
-                'weight' => 50,
+                'weight' => 70,
+                'accesskey' => 'w',
             ),
-
-            'configextensions/webservices/oauthconfig' => array(
-                'path'   => 'configextensions/webservices/oauthconfig',
-                'url'    => 'webservice/admin/oauthv1sregister.php',
-                'title'  => get_string('oauth', 'auth.webservice'),
+            'webservices/config' => array(
+                'path'   => 'webservices/config',
+                'url'    => 'webservice/admin/index.php',
+                'title'  => get_string('webservicesconfig', 'auth.webservice'),
                 'weight' => 10,
             ),
-            'configextensions/webservices/logs' => array(
-                'path'   => 'configextensions/webservices/logs',
+            'webservices/oauthconfig' => array(
+                'path'   => 'webservices/oauthconfig',
+                'url'    => 'webservice/admin/oauthv1sregister.php',
+                'title'  => get_string('oauth', 'auth.webservice'),
+                'weight' => 40,
+            ),
+            'webservices/logs' => array(
+                'path'   => 'webservices/logs',
                 'url'    => 'webservice/admin/webservicelogs.php',
-                'title'  => get_string('webservicelogs', 'auth.webservice'),
-                'weight' => 20,
+                'title'  => get_string('webservicelogsnav', 'auth.webservice'),
+                'weight' => 50,
             ),
-            'configextensions/webservices/testclient' => array(
-                'path'   => 'configextensions/webservices/testclient',
+            'webservices/testclient' => array(
+                'path'   => 'webservices/testclient',
                 'url'    => 'webservice/testclient.php',
-                'title'  => get_string('testclient', 'auth.webservice'),
-                'weight' => 30,
+                'title'  => get_string('testclientnav', 'auth.webservice'),
+                'weight' => 60,
             ),
-            'configextensions/webservices/apps' => array(
-                'path'   =>  'configextensions/webservices/apps',
+            'webservices/apps' => array(
+                'path'   =>  'webservices/apps',
                 'url'    => 'webservice/apptokens.php',
                 'title'  => get_string('apptokens', 'auth.webservice'),
-                'weight' => 40,
+                'weight' => 20,
+            ),
+            'webservices/connections' => array(
+                'path'   =>  'webservices/connections',
+                'url'    => 'webservice/admin/connections.php',
+                'title'  => get_string('connections', 'auth.webservice'),
+                'weight' => 30,
             ),
         );
 
@@ -176,7 +188,7 @@ class PluginAuthWebservice extends PluginAuth {
 
             // activate webservices
             foreach (array('soap', 'xmlrpc', 'rest', 'oauth') as $proto) {
-                set_config('webservice_' . $proto.'_enabled', 1);
+                set_config('webservice_provider_' . $proto.'_enabled', 1);
             }
         }
     }

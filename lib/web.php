@@ -133,7 +133,7 @@ function get_stylesheets_for_current_page($stylesheets, $extraconfig) {
  * @param $headers    A list of additional headers.  These are to be specified as
  *                    actual HTML.
  * @param $strings    A list of language strings required by the javascript code.
- * @return Smarty
+ * @return Dwoo_Mahara
  */
 
 
@@ -200,7 +200,6 @@ function smarty($javascript = array(), $headers = array(), $pagestrings = array(
 
     // Make jQuery accessible with $j (Mochikit has $)
     $javascript_array[] = $jsroot . 'jquery/jquery.js';
-    $javascript_array[] = $jsroot . 'jquery/deprecated_jquery.js';
     $headers[] = '<script type="application/javascript">$j=jQuery;</script>';
 
     // If necessary, load MathJax configuration
@@ -213,7 +212,7 @@ function smarty($javascript = array(), $headers = array(), $pagestrings = array(
     // Note: we do not display tinyMCE for mobile devices
     // as it doesn't work on some of them and can
     // disable the editing of a textarea field
-    if ($SESSION->get('handheld_device') == false) {
+    if (is_html_editor_enabled()) {
         $checkarray = array(&$javascript, &$headers);
         $found_tinymce = false;
         foreach ($checkarray as &$check) {
@@ -278,6 +277,7 @@ function smarty($javascript = array(), $headers = array(), $pagestrings = array(
     menubar: false,
     fix_list_elements: true,
     image_advtab: true,
+    table_style_by_css: true,
     {$spellchecker_config}
 EOF;
                     }
@@ -319,9 +319,12 @@ tinyMCE.init({
                 ed.focus();
             }
         });
+        ed.on('keyup change', function (e) {
+            checkTextareaMaxLength(ed.settings.id);
+        });
         ed.on('LoadContent', function(e) {
             // Hide all the 2nd/3rd row menu buttons
-            jQuery('.mce-toolbar.mce-first').siblings().toggleClass('hidden');
+            jQuery('.mce-toolbar.mce-first').siblings().addClass('hidden');
             // The tinymce fullscreen mode does not work properly in a transformed container div
             // such as div.vertcentre
             // and IE doesn't like a preset z-index
@@ -515,9 +518,7 @@ EOF;
 
     $javascript_array[] = $jsroot . 'mahara.js';
     $javascript_array[] = $jsroot . 'formchangechecker.js';
-    if (get_config('developermode') & DEVMODE_DEBUGJS) {
-        $javascript_array[] = $jsroot . 'debug.js';
-    }
+    $javascript_array[] = $jsroot . 'textareamaxlengthchecker.js';
 
     foreach ($jsstrings['mahara'] as $section => $tags) {
         foreach ($tags as $tag) {
@@ -593,6 +594,15 @@ EOF;
 
     $smarty->assign('MOBILE', $SESSION->get('mobile'));
     $smarty->assign('HANDHELD_DEVICE', $SESSION->get('handheld_device'));
+    if (defined('FILEBROWSERS') ||
+        (defined('SECTION_PAGE') && SECTION_PAGE == 'blocks')) {
+        // Need to add the headers for select2 here so filebrowser has correct language
+        require_once(get_config('libroot') . 'form/elements/autocomplete.php');
+        $select2lang = pieform_element_autocomplete_language();
+        $select2headdata = pieform_element_autocomplete_get_headdata();
+        $headers = array_merge($headers, $select2headdata);
+        $smarty->assign('select2_language', $select2lang);
+    }
 
     $sitename = get_config('sitename');
     if (!$sitename) {
@@ -607,10 +617,21 @@ EOF;
 
     if (defined('TITLE')) {
         $smarty->assign('PAGETITLE', TITLE . ' - ' . $sitename);
-        $smarty->assign('heading', TITLE);
     }
     else {
         $smarty->assign('PAGETITLE', $sitename);
+    }
+    if (defined('PAGEHEADING')) {
+        $smarty->assign('PAGEHEADING', PAGEHEADING);
+    }
+    else {
+        if (defined('TITLE')) {
+            $smarty->assign('PAGEHEADING', TITLE);
+        }
+    }
+
+    if (defined('SUBSECTIONHEADING')) {
+        $smarty->assign('SUBSECTIONHEADING', SUBSECTIONHEADING);
     }
 
     $smarty->assign('PRODUCTIONMODE', get_config('productionmode'));
@@ -664,19 +685,18 @@ EOF;
     }
     $smarty->assign('FOOTERMENU', footer_menu());
 
-    $smarty->assign_by_ref('USER', $USER);
+    $smarty->assign('USER', $USER);
     $smarty->assign('SESSKEY', $USER->get('sesskey'));
     $smarty->assign('CC_ENABLED', get_config('cookieconsent_enabled'));
     $javascript_array = append_version_number($javascript_array);
-    $smarty->assign_by_ref('JAVASCRIPT', $javascript_array);
+    $smarty->assign('JAVASCRIPT', $javascript_array);
     $smarty->assign('RELEASE', get_config('release'));
     $smarty->assign('SERIES', get_config('series'));
-    $smarty->assign('CACHEVERSION', get_config('cacheversion'));
-    $siteclosedforupgrade = get_config('siteclosed');
-    if ($siteclosedforupgrade && get_config('disablelogin')) {
+    $smarty->assign('CACHEVERSION', get_config('cacheversion', 0));
+    if (get_config('siteclosedforupgrade')) {
         $smarty->assign('SITECLOSED', 'logindisabled');
     }
-    else if ($siteclosedforupgrade || get_config('siteclosedbyadmin')) {
+    else if (get_config('siteclosedbyadmin')) {
         $smarty->assign('SITECLOSED', 'loginallowed');
     }
 
@@ -781,7 +801,7 @@ EOF;
             );
         }
 
-        $isloginblockvisible = !$USER->is_logged_in() && !(get_config('siteclosed') && get_config('disablelogin'))
+        $isloginblockvisible = !$USER->is_logged_in() && !get_config('siteclosedforupgrade')
                 && get_config('showloginsideblock');
         if ($isloginblockvisible) {
             $sideblocks[] = array(
@@ -835,7 +855,7 @@ EOF;
     if (is_array($HEADDATA) && !empty($HEADDATA)) {
         $headers = array_merge($HEADDATA, $headers);
     }
-    $smarty->assign_by_ref('HEADERS', $headers);
+    $smarty->assign('HEADERS', $headers);
 
     if ($USER->get('parentuser')) {
         $smarty->assign('USERMASQUERADING', true);
@@ -966,6 +986,18 @@ class Theme {
         else if ($arg instanceof User) {
             $themedata = $arg->get_themedata();
         }
+        else if ($arg instanceof View) {
+            $themename = $arg->get('theme');
+            $themedata = null;
+            $userid = $arg->get('owner');
+            if ($userid) {
+                $user = new User();
+                $user->find_by_id($userid);
+                $themedata = $user->get_themedata();
+                $themedata->viewbasename = $themedata->basename;
+                unset($themedata->basename);
+            }
+        }
         else if (is_int($arg)) {
             $user = new User();
             $user->find_by_id($arg);
@@ -975,7 +1007,7 @@ class Theme {
             throw new SystemException("Argument to Theme::__construct was not a theme name, user object or user ID");
         }
 
-        if (isset($themedata)) {
+        if (isset($themedata) && isset($themedata->basename)) {
             $themename = $themedata->basename;
         }
 
@@ -1023,10 +1055,17 @@ class Theme {
         $themeconfig = $getthemeconfig($themename);
 
         if (!$themeconfig) {
-            // We can safely assume that the default theme is installed, users
-            // should never be able to remove it
-            $themename ='default';
-            $themeconfig = $getthemeconfig($themename);
+            // We can check if we have been given a viewbasename
+            if (!empty($themedata->viewbasename)) {
+                $themename = $themedata->viewbasename;
+                $themeconfig = $getthemeconfig($themename);
+            }
+            if (!$themeconfig) {
+                // We can safely assume that the default theme is installed, users
+                // should never be able to remove it
+                $themename = 'default';
+                $themeconfig = $getthemeconfig($themename);
+            }
         }
 
         $this->basename = $themename;
@@ -1309,9 +1348,11 @@ function jsstrings() {
                 'toggletoolbarson',
                 'toggletoolbarsoff',
                 'imagexofy',
+                'remove',
             ),
             'pieforms' => array(
-                'element.calendar.opendatepicker'
+                'element.calendar.opendatepicker',
+                'rule.maxlength.maxlength'
             )
         ),
         'tablerenderer' => array(
@@ -1325,7 +1366,7 @@ function jsstrings() {
         'views' => array(
             'view' => array(
                 'confirmdeleteblockinstance',
-                'blocksinstructionajax',
+                'blocksinstructionajaxlive',
             ),
         ),
     );
@@ -1879,13 +1920,7 @@ function set_cookie($name, $value='', $expires=0, $access=false) {
     if (!$domain = get_config('cookiedomain')) {
         $domain = $url['host'];
     }
-
-    // If Cookie Consent is enabled with cc_necessary cookie set to 'yes'
-    // or Cookie Consent is not enabled
-    if (empty($_COOKIE['cc_necessary']) || (isset($_COOKIE['cc_necessary']) && $_COOKIE['cc_necessary'] == 'yes')) {
-        setcookie($name, $value, $expires, $url['path'], $domain, is_https(), true);
-    }
-
+    setcookie($name, $value, $expires, $url['path'], $domain, is_https(), true);
     if ($access) {  // View access cookies may be needed on this request
         $_COOKIE[$name] = $value;
     }
@@ -1930,6 +1965,7 @@ function getoptions_country() {
         'bm',
         'bt',
         'bo',
+        'bq',
         'ba',
         'bw',
         'bv',
@@ -1958,6 +1994,7 @@ function getoptions_country() {
         'cr',
         'ci',
         'hr',
+        'cw',
         'cu',
         'cy',
         'cz',
@@ -2057,7 +2094,6 @@ function getoptions_country() {
         'nr',
         'np',
         'nl',
-        'an',
         'nc',
         'nz',
         'ni',
@@ -2085,9 +2121,11 @@ function getoptions_country() {
         'ro',
         'ru',
         'rw',
+        'bl',
         'sh',
         'kn',
         'lc',
+        'mf',
         'pm',
         'vc',
         'ws',
@@ -2099,12 +2137,14 @@ function getoptions_country() {
         'sc',
         'sl',
         'sg',
+        'sx',
         'sk',
         'si',
         'sb',
         'so',
         'za',
         'gs',
+        'ss',
         'es',
         'lk',
         'sd',
@@ -2189,7 +2229,7 @@ function get_help_icon($plugintype, $pluginname, $form, $element, $page='', $sec
         $content = get_string('Help');
     }
 
-    return ' <span class="help"><a href="" title="' . get_string('Help') . '" onclick="'.
+    return ' <span class="help"><a href="#" title="' . get_string('Help') . '" onclick="'.
         hsc(
             'contextualHelp(' . json_encode($form) . ',' .
             json_encode($element) . ',' . json_encode($plugintype) . ',' .
@@ -3590,7 +3630,7 @@ function clean_html($text, $xhtml=false) {
     // $config->set('Cache.DefinitionImpl', null);
 
     $config->set('HTML.DefinitionID', 'Mahara customisations to default config');
-    $config->set('HTML.DefinitionRev', get_config('cacheversion'));
+    $config->set('HTML.DefinitionRev', get_config('cacheversion', 0));
 
     $config->set('Cache.SerializerPermissions', get_config('directorypermissions'));
     $config->set('Cache.SerializerPath', get_config('dataroot') . 'htmlpurifier');
@@ -3604,6 +3644,7 @@ function clean_html($text, $xhtml=false) {
 
     if (get_config('disableexternalresources')) {
         $config->set('URI.DisableExternalResources', true);
+        $config->set('URI.Host', get_config('wwwhost'));
     }
 
     // Permit embedding contents from other sites
@@ -3688,7 +3729,8 @@ function clean_html($text, $xhtml=false) {
 }
 
 /**
- * Like clean_html(), but for CSS!
+ * Like clean_html(), but for CSS stylesheets! (May not be secure for CSS directly
+ * in an HTML document a la <style>.)
  *
  * Much of the code in this function was taken from the sample code in this post:
  * http://stackoverflow.com/questions/3241616/sanitize-user-defined-css-in-php#5209050
@@ -3711,8 +3753,8 @@ function clean_css($input_css, $preserve_css=false) {
     // $config->set('Cache.DefinitionImpl', null);
 
     $config->set('HTML.DefinitionID', 'Mahara customisations to default config for CSS');
-    $config->set('HTML.DefinitionRev', get_config('cacheversion'));
-    $config->set('CSS.DefinitionRev', get_config('cacheversion'));
+    $config->set('HTML.DefinitionRev', get_config('cacheversion', 0));
+    $config->set('CSS.DefinitionRev', get_config('cacheversion', 0));
 
     $config->set('Cache.SerializerPermissions', get_config('directorypermissions'));
     $config->set('Cache.SerializerPath', get_config('dataroot') . 'htmlpurifier');
@@ -3720,13 +3762,13 @@ function clean_css($input_css, $preserve_css=false) {
     $config->set('Filter.ExtractStyleBlocks', true);
     $config->set('Filter.ExtractStyleBlocks.PreserveCSS', $preserve_css);
 
+    // Prevents "&<>" from being escaped. Escaping those is helpful
+    // if you're dealing with CSS declarations within an HTML document, but is
+    // not necessary for CSS in isolation.
+    $config->set('Filter.ExtractStyleBlocks.Escaping', false);
+
     if (get_config('disableexternalresources')) {
         $config->set('URI.DisableExternalResources', true);
-    }
-
-    $customfilters = get_htmlpurifier_custom_filters();
-    if (!empty($customfilters)) {
-        $config->set('Filter.Custom', $customfilters);
     }
 
     // Create a new purifier instance
@@ -4142,8 +4184,8 @@ function build_pagination($params) {
 
     }
 
-    // Build limitoptions dropbox if results are more than 10 (minimum dropbox pagination)
-    if ($params['setlimit'] && $params['count'] > 10) {
+    // Build limitoptions dropbox if results are more than 10 (minimum dropbox pagination) and that we are not in the block editor screen
+    if ($params['setlimit'] && $params['count'] > 10 && (!isset($params['editing']) || $params['editing'] === false)) {
         $strlimitoptions = array();
         $limit = $params['limit'];
         for ($i = 0; $i < count($limitoptions); $i++) {
@@ -4354,7 +4396,8 @@ function mahara_shorturl_request($url, $quiet=false) {
 }
 
 /**
- * Returns a language select form
+ * Generates the language selection form, for logged-out users.
+ * (And though Pieform magic, also handles submission of that form.)
  *
  * @return string      HTML of language select form
  */
@@ -4369,13 +4412,11 @@ function language_select_form() {
         $languages = array_merge(array('default' => get_string('sitedefault', 'admin') . ' (' .
             get_string_from_language(get_config('lang'), 'thislanguage') . ')'), $languages);
 
-        require_once('pieforms/pieform.php');
         $languageform = pieform(array(
             'name'                => 'languageselect',
             'renderer'            => 'div',
             'class'               => 'form-inline with-label-widthauto',
-            'validate'            => false,
-            'presubmitcallback'   => '',
+            'successcallback'      => 'language_select_form_submit',
             'elements'            => array(
                 'inputgroup' => array(
                     'type' => 'fieldset',
@@ -4387,6 +4428,7 @@ function language_select_form() {
                             'hiddenlabel' => true,
                             'options' => $languages,
                             'defaultvalue' => $SESSION->get('lang') ? $SESSION->get('lang') : 'default',
+                            'rules' => array('required' => true),
                         ),
                         'changelang' => array(
                             'type' => 'button',
@@ -4401,6 +4443,20 @@ function language_select_form() {
     }
     return $languageform;
 }
+
+/**
+ * Submission method for the language selection form
+ *
+ * @param object $form
+ * @param array $data
+ */
+function language_select_form_submit($form, $data) {
+    global $SESSION;
+    // Pieforms will have already validated that $lang is an installed language or "default"
+    $SESSION->set('lang', $data['lang']);
+    redirect(get_relative_script_path());
+}
+
 
 /**
  * Sanitises URIs provided before displaying them to the world, as well as checking they are of
@@ -4454,6 +4510,27 @@ function favicon_display_url($host) {
         $url = str_replace('http://', 'https://', $url);
     }
     return $url;
+}
+
+/**
+ * Given an user object, return raw urlid string that will be used in generate_urlid().
+ * to make a clean url.
+ *
+ * @param object  $user     An object containing $username
+ *                                               $firstname
+ *                                               $lastname
+ *                                               $preferredname (optional)
+ *
+ * @return string    A raw urlid string
+ */
+function get_raw_user_urlid($user) {
+    if (!get_config('nousernames')) {
+        $urlid = $user->username;
+    }
+    else {
+        $urlid = display_default_name($user);
+    }
+    return $urlid;
 }
 
 /**
@@ -4542,20 +4619,20 @@ function append_version_number($urls) {
         $formattedurls = array();
         foreach ($urls as $url) {
             if (preg_match('/\?/',$url)) {
-                $url .= '&v=' . get_config('cacheversion');
+                $url .= '&v=' . get_config('cacheversion', 0);
             }
             else {
-                $url .= '?v=' . get_config('cacheversion');
+                $url .= '?v=' . get_config('cacheversion', 0);
             }
             $formattedurls[] = $url;
         }
         return $formattedurls;
     }
     if (preg_match('/\?/',$urls)) {
-        $urls .= '&v=' . get_config('cacheversion');
+        $urls .= '&v=' . get_config('cacheversion', 0);
     }
     else {
-        $urls .= '?v=' . get_config('cacheversion');
+        $urls .= '?v=' . get_config('cacheversion', 0);
     }
     return $urls;
 }
@@ -4649,4 +4726,30 @@ function display_icon($type, $id = false) {
     }
     $html .= '> </span>';
     return $html;
+}
+
+/**
+ * Is the supplied URL valid
+ * That is, can this Mahara reach/resolve the URL at the time
+ * of checking. Useful if you are checking a url field in a form.
+ *
+ * Caution: Probably not want to use this function in a large loop situation.
+ *
+ * @param string    $url    The URL to check
+ *
+ * @return bool
+ */
+function is_valid_url($url) {
+    $result = mahara_http_request(
+        array(
+            CURLOPT_URL => $url,
+            CURLOPT_HEADER => true,
+            CURLOPT_NOBODY => true,
+        ),
+        true
+    );
+    if (!$result || $result->error || $result->info['http_code'] == 404) {
+        return false;
+    }
+    return true;
 }

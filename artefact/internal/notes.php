@@ -186,6 +186,10 @@ $pagination = build_pagination(array(
     'count'     => $count,
     'limit'     => $limit,
     'offset'    => $offset,
+    'jsonscript' => 'artefact/internal/notes.json.php',
+    'setlimit' => true,
+    'jumplinks' => 6,
+    'numbersincludeprevnext' => 2,
 ));
 
 $js = '
@@ -196,11 +200,14 @@ jQuery(function($) {
     });
 });';
 
-$smarty = smarty();
+$smarty = smarty(array('paginator'));
 $smarty->assign('PAGEHEADING', $pageheading);
 $smarty->assign('INLINEJAVASCRIPT', $js);
-$smarty->assign_by_ref('data', $data);
-$smarty->assign('pagination', $pagination);
+$smarty->assign('data', $data);
+$html = $smarty->fetch('artefact:internal:noteresults.tpl');
+$smarty->assign('datarows', $html);
+$smarty->assign('pagination', $pagination['html']);
+$smarty->assign('pagination_js', $pagination['javascript']);
 $smarty->display('artefact:internal:notes.tpl');
 
 function deletenote_form($id, $notedata) {

@@ -430,19 +430,29 @@ abstract class PluginBlocktype extends Plugin implements IPluginBlocktype {
 
     /*
      * The copy_type of a block affects how it should be copied when its view gets copied.
-     * nocopy:    The block doesn't appear in the new view at all.
-     * shallow:   A new block of the same type is created in the new view with a configuration as specified by the
-     *            rewrite_blockinstance_config method
-     * reference: Block configuration is copied as-is.  If the block contains artefacts, the original artefact ids are
-     *            retained in the new block's configuration even though they may have a different owner from the view.
-     * full:      All artefacts referenced by the block are copied to the new owner's portfolio, and ids in the new
-     *            block are updated to point to the copied artefacts.
+     * nocopy:       The block doesn't appear in the new view at all.
+     * shallow:      A new block of the same type is created in the new view with a configuration as specified by the
+     *               rewrite_blockinstance_config method
+     * reference:    Block configuration is copied as-is.  If the block contains artefacts, the original artefact ids are
+     *               retained in the new block's configuration even though they may have a different owner from the view.
+     * full:         All artefacts referenced by the block are copied to the new owner's portfolio, and ids in the new
+     *               block are updated to point to the copied artefacts.
+     * fullinclself: All artefacts referenced by the block are copied, whether we are copying to a new owner's portfolio
+     *               or our own one, and ids in the new block are updated to point to the copied artefacts.
      *
-     * If the old owner and the new owner are the same, reference is always used.
+     * If the old owner and the new owner are the same, reference is used unless 'fullinclself' is specified.
      * If a block contains no artefacts, reference and full are equivalent.
      */
     public static function default_copy_type() {
         return 'shallow';
+    }
+
+    /*
+     * The ignore_copy_artefacttypes of a block affects which artefacttypes should be ignored when copying.
+     * You can specify which artefacts to ignore by an array of artefacttypes.
+     */
+    public static function ignore_copy_artefacttypes() {
+        return array();
     }
 
     /**
@@ -1186,8 +1196,7 @@ class BlockInstance {
             $form['validate'] = false;
         }
 
-        require_once('pieforms/pieform.php');
-        $pieform = new Pieform($form);
+        $pieform = pieform_instance($form);
 
         if ($pieform->is_submitted()) {
             global $SESSION;
@@ -1418,35 +1427,55 @@ class BlockInstance {
     }
 
     /**
-     * Deletes artefacts from the blockinstances given in $records.
-     * $records should be an array of stdclass objects, each containing
-     * a blockid, an artefactid, and the block's configdata
+     * Removes specified artefacts from every block instance that has
+     * any of them selected. (The block instances remain in place, but
+     * with that artefact no longer selected.)
+     *
+     * @param array $artefactids
      */
-    public static function bulk_delete_artefacts($records) {
+    public static function bulk_remove_artefacts($artefactids) {
+
+        if (empty($artefactids)) {
+            return;
+        }
+
+        $paramstr = substr(str_repeat('?, ', count($artefactids)), 0, -2);
+        $records = get_records_sql_array("
+            SELECT va.block, va.artefact, bi.configdata
+            FROM {view_artefact} va JOIN {block_instance} bi ON va.block = bi.id
+            WHERE va.artefact IN ($paramstr)", $artefactids);
+
         if (empty($records)) {
             return;
         }
+
+        // Collate the SQL results so we have a list of blocks, where
+        // each block has its current configdata, and a list of artefacts
+        // to remove
         $blocklist = array();
         foreach ($records as $record) {
-            if (isset($blocklist[$record->block])) {
-                $blocklist[$record->block]->artefacts[] = $record->artefact;
-            }
-            else {
+            // Initialize an array record for this block
+            if (!isset($blocklist[$record->block])) {
                 $blocklist[$record->block] = (object) array(
-                    'artefacts' => array($record->artefact),
+                    'artefactstoremove' => array(),
                     'configdata' => unserialize($record->configdata),
                 );
             }
+
+            $blocklist[$record->block]->artefactstoremove[] = $record->artefact;
         }
+
+        // Go through the collated block list, and remove the specified
+        // artefacts from each one's configdata
         foreach ($blocklist as $blockid => $blockdata) {
             $change = false;
             if (isset($blockdata->configdata['artefactid'])) {
-                if ($change = $blockdata->configdata['artefactid'] == $blockdata->artefacts[0]) {
+                if ($change = $blockdata->configdata['artefactid'] == $blockdata->artefactstoremove[0]) {
                     $blockdata->configdata['artefactid'] = null;
                 }
             }
             else if (isset($blockdata->configdata['artefactids'])) {
-                $blockdata->configdata['artefactids'] = array_values(array_diff($blockdata->configdata['artefactids'], $blockdata->artefacts));
+                $blockdata->configdata['artefactids'] = array_values(array_diff($blockdata->configdata['artefactids'], $blockdata->artefactstoremove));
                 $change = true;
             }
             if ($change) {
@@ -1535,18 +1564,33 @@ class BlockInstance {
             'order'      => $this->get('order'),
         ));
 
-        if ($sameowner || $copytype == 'reference') {
+        if (($sameowner && $copytype != 'fullinclself') || $copytype == 'reference') {
             $newblock->set('configdata', $configdata);
             $newblock->commit();
+            if ($this->get('blocktype') == 'taggedposts' && $copytype == 'tagsonly') {
+                $this->copy_tags($newblock->get('id'));
+            }
             return true;
         }
-        $artefactids = get_column('view_artefact', 'artefact', 'block', $this->get('id'));
+
+        if ($ignore = call_static_method($blocktypeclass, 'ignore_copy_artefacttypes', $view)) {
+            $artefactids = (array)get_column_sql('
+                SELECT artefact FROM {view_artefact} va
+                JOIN {artefact} a ON a.id = va.artefact
+                WHERE va.block = ?
+                AND a.artefacttype NOT IN (' . join(',', array_map('db_quote', $ignore)) . ')', array($this->get('id')));
+        }
+        else {
+            $artefactids = get_column('view_artefact', 'artefact', 'block', $this->get('id'));
+        }
+
         if (!empty($artefactids)
-            && $copytype == 'full') {
+            && ($copytype == 'full' || $copytype == 'fullinclself')) {
             // Copy artefacts & put the new artefact ids into the new block.
             // Artefacts may have children (defined using the parent column of the artefact table) and attachments (currently
             // only for blogposts).  If we copy an artefact we must copy all its descendents & attachments too.
 
+            require_once(get_config('docroot') . 'artefact/lib.php');
             $descendants = artefact_get_descendants($artefactids);
 
             // We need the artefact instance before we can get its attachments
@@ -1605,7 +1649,24 @@ class BlockInstance {
 
         $newblock->set('configdata', $configdata);
         $newblock->commit();
+        if ($this->get('blocktype') == 'taggedposts' && $copytype == 'tagsonly') {
+            $this->copy_tags($newblock->get('id'));
+        }
+
         return true;
+    }
+
+    public function copy_tags($newid) {
+        // Need to copy the tags to the new block
+        if ($tagrecords = get_records_array('blocktype_taggedposts_tags', 'block_instance', $this->get('id'), 'tagtype desc, tag', 'tag, tagtype')) {
+            foreach ($tagrecords as $tags) {
+                $tagobject = new stdClass();
+                $tagobject->block_instance = $newid;
+                $tagobject->tag = $tags->tag;
+                $tagobject->tagtype = $tags->tagtype;
+                insert_record('blocktype_taggedposts_tags', $tagobject);
+            }
+        }
     }
 
     public function get_data($key, $id) {
@@ -1646,12 +1707,12 @@ class BlockInstance {
                 $file = get_config('wwwroot') . $file;
             }
 
-            $js .= '$j.getScript("' . $file . '"';
+            $js .= "jQuery.ajax({url: '{$file}', dataType: 'script', cache:true";
             if (is_array($jsfile) && !empty($jsfile['initjs'])) {
                 // Pass success callback to getScript
-                $js .= ', function(data) {' . $jsfile['initjs'] . '}';
+                $js .= ", success: function(data){\n" . $jsfile['initjs'] . "\n}";
             }
-            $js .= ");\n";
+            $js .= "});\n";
         }
         return $js;
     }

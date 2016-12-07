@@ -13,7 +13,7 @@
 define('INTERNAL', true);
 require_once(dirname(dirname(__FILE__)) . '/init.php');
 require_once('skin.php');
-require_once(get_config('docroot') . 'artefact/file/lib.php');
+safe_require('artefact', 'file');
 
 $exportid = param_integer('id', 0); // id(s) of skin(s) to be exported...
 $exportsiteskins = param_boolean('site', false);
@@ -282,6 +282,6 @@ if (!empty($exportskins)) {
 $content = $xmldoc->saveXML();
 
 header('Content-Type: text/xml; charset=utf-8');
-header('Content-Disposition: attachment; filename=' . $xmlfilename . '.xml');
+header('Content-Disposition: attachment; filename=' . str_replace('"', '\"', $xmlfilename) . '.xml');
 echo($content);
 exit;

@@ -15,7 +15,6 @@ define('INTERNAL', 1);
 define('MENUITEM', '');
 define('PUBLIC', 1);
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once(get_config('libroot') . 'pieforms/pieform.php');
 require_once(get_config('libroot') . 'searchlib.php');
 // to get the license select list
 require_once(get_config('libroot') . 'license.php');
@@ -170,7 +169,6 @@ EOF;
 $javascript = array('paginator');
 
 $smarty = smarty($javascript, array(), array('applychanges' => 'mahara', 'nogroups' => 'group'), array('sideblocks' => array()));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->assign('results', $data);
 $smarty->assign('form', $searchform);

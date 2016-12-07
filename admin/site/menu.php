@@ -17,7 +17,6 @@ define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'sitemenu');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('menus', 'admin'));
 
 $strings = array('edit','delete','update','cancel','add','name','unknownerror');
@@ -73,9 +72,9 @@ function formatrow (item) {
     // item has id, type, name, link, linkedto
     var type = eval(item.type);
     var linkedto = A({'href':item.linkedto},item.linktext);
-    var edit = BUTTON({'type':'button','class':'button btn btn-default btn-sm'}, SPAN({'class':'icon icon-lg icon-pencil left', 'role':'presentation'}), {$getstring['edit']});
+    var edit = BUTTON({'type':'button','class':'button btn btn-default btn-sm','title':{$getstring['edit']}}, SPAN({'class':'icon icon-lg icon-pencil', 'role':'presentation'}), SPAN({'class':'sr-only'}, {$getstring['edit']}));
     connect(edit, 'onclick', function () { edititem(item); });
-    var del = BUTTON({'type':'button','class':'button btn btn-default btn-sm'}, SPAN({'class':'icon icon-lg icon-times text-danger left', 'role':'presentation'}), {$getstring['delete']});
+    var del = BUTTON({'type':'button','class':'button btn btn-default btn-sm','title': {$getstring['delete']}}, SPAN({'class':'icon icon-lg icon-trash text-danger', 'role':'presentation'}), SPAN({'class':'sr-only'}, {$getstring['delete']}));
     connect(del, 'onclick', function () { delitem(item.id); });
     var buttonGroup = SPAN({'class':'btn-group'}, edit, del);
     var cells = map(
@@ -107,7 +106,7 @@ function editform(item) {
 
     // Either a save, a cancel button, or both.
     var savecancel = [];
-    var save = BUTTON({'type':'button','class':'button btn btn-default btn-sm'}, SPAN({'class':'icon icon-plus-circle icon-lg', 'role':'presentation'}));
+    var save = BUTTON({'type':'button','class':'button btn btn-default btn-sm','title': {$getstring['update']}}, SPAN({'class':'icon icon-plus icon-lg', 'role':'presentation'}), SPAN({'class':'sr-only'}, {$getstring['update']}));
     connect(save, 'onclick', function () { saveitem(item.id); });
 
     // The link field will be a text box or a select in the case of an admin file.
@@ -126,6 +125,9 @@ function editform(item) {
         connect(afile, 'onclick', function () { changeaddform('sitefile'); });
         // The save button says 'add', and there's no cancel button.
         setNodeAttribute(save,'value',{$getstring['add']});
+        setNodeAttribute(save,'title',{$getstring['add']});
+        var savesr = getFirstElementByTagAndClassName('span', 'sr-only', save);
+        savesr.innerHTML = {$getstring['add']};
         savecancel = [save];
     }
     else { // Editing an existing menu item.
@@ -223,11 +225,11 @@ function saveitem(itemid) {
     var name = $('name'+itemid).value;
     var linkedto = $('linkedto'+itemid).value;
     if (name == '') {
-        displayMessage(get_string('namedfieldempty',{$getstring['name']}),'error');
+        displayMessage(get_string('namedfieldempty', 'mahara', {$getstring['name']}), 'error');
         return false;
     }
     if (linkedto == '') {
-        displayMessage(get_string('namedfieldempty',{$getstring['linkedto']}),'error');
+        displayMessage(get_string('namedfieldempty', ' mahara', {$getstring['linkedto']}), 'error');
         return false;
     }
 
@@ -331,6 +333,5 @@ setpageicon($smarty, 'icon-bars');
 $smarty->assign('INLINEJAVASCRIPT', $ijs);
 $smarty->assign('MENUS', $menulist);
 $smarty->assign('descriptionstrargs', array('<a href="' . get_config('wwwroot') . 'artefact/file/sitefiles.php">', '</a>'));
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('footerform', $footerform);
 $smarty->display('admin/site/menu.tpl');

@@ -60,6 +60,8 @@ interface IPluginSearch {
      * @param integer How many results to return
      * @param integer What result to start at (0 == first result)
      * @param string  Which groups to search (all, member, notmember)
+     * @param string  Category the group belongs to
+     * @param string  The institution the group belongs
      * @return array  A data structure containing results looking like ...
      *         $results = array(
      *               count   => integer, // total number of results
@@ -88,7 +90,7 @@ interface IPluginSearch {
      *               ),
      *           );
      */
-    public static function search_group($query_string, $limit, $offset=0, $type='member');
+    public static function search_group($query_string, $limit, $offset=0, $type='member', $category='', $institution='all');
 
     /**
      * Returns search results for users in a particular group
@@ -224,8 +226,6 @@ abstract class PluginSearch extends Plugin implements IPluginSearch {
      * @return string
      */
     public static function header_search_form() {
-        require_once('pieforms/pieform.php');
-
         return pieform(array(
                 'name'                => 'usf',
                 'action'              => get_config('wwwroot') . 'user/find.php',
@@ -237,14 +237,16 @@ abstract class PluginSearch extends Plugin implements IPluginSearch {
                 'elements'            => array(
                         'query' => array(
                                 'type'           => 'text',
-                                'defaultvalue'   => get_string('searchusers'),
+                                'defaultvalue'   => '',
                                 'title'          => get_string('searchusers'),
-                                'class'          => 'emptyonfocus',
+                                'placeholder'    => get_string('searchusers'),
                                 'hiddenlabel'    => true,
                         ),
                         'submit' => array(
-                                'type' => 'submit',
-                                'value' => get_string('go'),
+                            'type' => 'button',
+                            'class' => 'btn-primary input-group-btn',
+                            'usebuttontag' => true,
+                            'value' => '<span class="icon icon-search icon-lg" role="presentation" aria-hidden="true"></span><span class="sr-only">'. get_string('go') . '</span>',
                         )
                 )
         ));

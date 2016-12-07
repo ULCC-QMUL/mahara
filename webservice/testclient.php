@@ -11,19 +11,22 @@
 
 define('INTERNAL', 1);
 define('ADMIN', 1);
-define('MENUITEM', 'configextensions/webservices/testclient');
+define('MENUITEM', 'webservices/testclient');
 define('SECTION_PAGE', 'wstestclient');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once(get_config('docroot') . 'webservice/lib.php');
 
-
 define('TITLE', get_string('webservices_title', 'auth.webservice'));
-require_once('pieforms/pieform.php');
+define('SUBSECTIONHEADING', get_string('testclient', 'auth.webservice'));
 
 $protocol  = param_alpha('protocol', '');
 $authtype  = param_alpha('authtype', '');
 $service  = param_integer('service', 0);
+$cancel = param_alpha('cancel_submit', null);
+if ($cancel) {
+    redirect('/webservice/testclient.php');
+}
 if ($service != 0) {
     $dbs = get_record('external_services', 'id', $service);
 }
@@ -45,7 +48,7 @@ if ($result = $SESSION->get('ws_call_results')) {
 // add protocol choice
 $popts = array();
 foreach (array('soap', 'xmlrpc', 'rest') as $proto) {
-    $enabled = (get_config('webservice_'.$proto.'_enabled') || 0);
+    $enabled = (get_config('webservice_provider_'.$proto.'_enabled') || 0);
     if ($enabled) {
         $popts[$proto] = get_string($proto, 'auth.webservice');
     }
@@ -125,18 +128,74 @@ if (!empty($authtype)) {
     // we are go - build the form for function parameters
     if ($function != 0 && !empty($dbsf)) {
         $vars = testclient_get_interface($dbsf->functionname);
+        $iterationtitle = !empty($vars) ? preg_replace('/_NUM_.*/', '', $vars[0]['name']) : '';
         $elements['spacer'] = array('type' => 'html', 'value' => '<br/><h3>' . get_string('enterparameters', 'auth.webservice') . '</h3>');
         for ($i=0;$i<=$iterations; $i++) {
+            if (!empty($vars)) {
+                $elements['spacer'] = array('type' => 'html', 'value' => '<br/><h4>' . get_string('iterationtitle', 'auth.webservice', ucfirst($iterationtitle), ($i + 1)) . '</h4>');
+            }
             foreach ($vars as $var) {
                 $name = preg_replace('/NUM/', $i, $var['name']);
-                $elements[$name] = array('title' => $name, 'type' => 'text',);
+                $title = preg_replace('/^(.*?)_NUM_/', '', $var['name']);
+                $title = preg_replace('/_NUM_/', ' / ', $title);
+                $type = (trim($var['type']) == 'bool') ? 'switchbox' : 'text';
+                if ($title == 'institution') {
+                    // Let see if we can fetch the exact allowed values
+                    $elements[$name] = get_institution_selector();
+                }
+                else if ($title == 'country') {
+                    $countries = getoptions_country();
+                    $options = array('' => get_string('nocountryselected')) + $countries;
+                    $elements[$name] = array(
+                                             'type'         => 'select',
+                                             'title'        => $title,
+                                             'options'      => $options,
+                                             'description'  => $var['desc'],
+                                             );
+                }
+                else if ($title == 'auth') {
+                    $authinstances = auth_get_auth_instances();
+                    $options = array();
+                    foreach ($authinstances as $authinstance) {
+                        $options[$authinstance->instancename] = $authinstance->displayname . ': ' . $authinstance->instancename;
+                    }
+                    $elements[$name] = array(
+                                             'type'         => 'select',
+                                             'title'        => $title,
+                                             'options'      => $options,
+                                             'description'  => $var['desc'],
+                                             );
+                }
+                else if ($title == 'password') {
+                    $elements[$name] = array('title' => $title, 'type' => 'password', 'description' => $var['desc']);
+                }
+                else if ($title == 'socialprofile' && get_record('blocktype_installed', 'active', 1, 'name', 'socialprofile')) {
+                   $socialnetworkoptions = array('' => '');
+                   safe_require('artefact', 'internal');
+                   foreach (ArtefactTypeSocialprofile::$socialnetworks as $socialnetwork) {
+                       $socialnetworkoptions[$socialnetwork] = get_string($socialnetwork . '.input', 'artefact.internal');
+                   }
+                   $elements[$name . '_profiletype'] = array(
+                                            'type'         => 'select',
+                                            'title'        => $title . '_type',
+                                            'options'      => $socialnetworkoptions,
+                                            );
+                   $elements[$name . '_profileurl'] = array(
+                                            'type'         => 'text',
+                                            'title'        => $title . '_url',
+                                            'description'  => $var['desc'],
+                                            );
+                }
+                else {
+                    $elements[$name] = array('title' => $title, 'type' => $type, 'description' => $var['desc']);
+                }
             }
         }
         if ($authtype == 'user') {
-            $username = param_alphanum('wsusername', '');
-            $password = param_alphanum('wspassword', '');
-            $elements['wsusername'] = array('title' => 'wsusername', 'type' => 'text', 'value' => $username);
-            $elements['wspassword'] = array('title' => 'wspassword', 'type' => 'text', 'value' => $password);
+            $username = param_alphanum('cancel_submit', null) ? '' : param_alphanum('wsusername', '');
+            $password = param_alphanum('cancel_submit', null) ? '' : param_alphanum('wspassword', '');
+            $elements['wsusername'] = array('title' => 'wsusername', 'type' => 'text', 'value' => $username, 'autocomplete' => 'off');
+            $elements['wspassword'] = array('title' => 'wspassword', 'type' => 'password', 'value' => $password, 'autocomplete' => 'off');
             if ($username) {
                 $params[]= 'wsusername=' . $username;
             }
@@ -145,8 +204,8 @@ if (!empty($authtype)) {
             }
         }
         else {
-            $wstoken = param_alphanum('wstoken', '');
-            $elements['wstoken'] = array('title' => 'wstoken', 'type' => 'text', 'value' => $wstoken);
+            $wstoken = param_alphanum('cancel_submit', null) ? '' : param_alphanum('wstoken', '');
+            $elements['wstoken'] = array('title' => 'wstoken', 'type' => 'text', 'value' => $wstoken, 'autocomplete' => 'off');
             if ($wstoken) {
                 $params[]= 'wstoken=' . $wstoken;
             }
@@ -178,14 +237,10 @@ setpageicon($smarty, 'icon-puzzle-piece');
 safe_require('auth', 'webservice');
 
 $smarty->assign('form', $form);
-$heading = get_string('testclient', 'auth.webservice');
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign('subsectionheading', $heading);
 
-$webservice_menu = PluginAuthWebservice::admin_menu_items();
-$smarty->assign('SUBPAGENAV', $webservice_menu);
 // Check that webservices is enabled
-$smarty->assign('disabled', (get_config('webservice_enabled') ? false : true));
+$smarty->assign('disabled', (get_config('webservice_provider_enabled') ? false : true));
+$smarty->assign('disabledhttps', ((!is_https() && get_config('productionmode')) ? true : false));
 $smarty->assign('disabledprotocols', (empty($elements['protocol']['options']) ? get_config('wwwroot') . 'webservice/admin/index.php' : false));
 $smarty->display('auth:webservice:testclient.tpl');
 die;
@@ -205,9 +260,29 @@ function testclient_get_interface($functionname) {
         list($name, $type) = explode('=', $str);
         $name = preg_replace('/\]\[/', '_', $name);
         $name = preg_replace('/[\]\[]/', '', $name);
-        $vars[]= array('name' => $name, 'type' => $type);
+        $desc = testclient_parameters_desc($fdesc, $name);
+        $vars[]= array('name' => $name, 'type' => $type, 'desc' => $desc);
     }
     return $vars;
+}
+
+function testclient_parameters_desc($fdesc, $name) {
+    // Do we have any parameter_desc information?
+    $name = explode('_NUM_', $name);
+    if (!isset($fdesc->parameters_desc) && !isset($fdesc->parameters_desc->keys[$name[0]])) {
+        return null;
+    }
+    // Do we have any description information for the field?
+    if (count($name) > 1 && isset($fdesc->parameters_desc->keys[$name[0]]->content->keys[$name[1]])) {
+        if (count($name) == 2) {
+            $result = $fdesc->parameters_desc->keys[$name[0]]->content->keys[$name[1]]->desc;
+        }
+        else if (count($name) == 3) {
+            $result = $fdesc->parameters_desc->keys[$name[0]]->content->keys[$name[1]]->content->keys[$name[2]]->desc;
+        }
+        return $result;
+    }
+    return null;
 }
 
 /**
@@ -240,10 +315,12 @@ function testclient_parameters($paramdescription, $paramstring) {
         $paramstring = $paramstring . '=';
         switch ($paramdescription->type) {
             case PARAM_BOOL:
+                $type = 'bool';
+                break;
             case PARAM_INT:
                 $type = 'int';
                 break;
-            case PARAM_FLOAT;
+            case PARAM_FLOAT:
                 $type = 'double';
                 break;
             default:
@@ -295,8 +372,19 @@ function testclient_submit(Pieform $form, $values) {
         for ($i=0;$i<=$iterations; $i++) {
             foreach ($vars as $var) {
                 $name = preg_replace('/NUM/', $i, $var['name']);
-                $parts = explode('_', $name);
-                testclient_build_inputs($inputs, $parts, $values[$name]);
+                if (preg_match('/_socialprofile$/', $name)) {
+                    // we are dealing with a special case where two fields make up the one artefact
+                    $subname = $name . '_profiletype';
+                    $parts = explode('_', $subname);
+                    testclient_build_inputs($inputs, $parts, $values[$subname]);
+                    $subname = $name . '_profileurl';
+                    $parts = explode('_', $subname);
+                    testclient_build_inputs($inputs, $parts, $values[$subname]);
+                }
+                else {
+                    $parts = explode('_', $name);
+                    testclient_build_inputs($inputs, $parts, $values[$name]);
+                }
             }
         }
 
@@ -341,42 +429,45 @@ function testclient_submit(Pieform $form, $values) {
         // now build the test call
         switch ($values['protocol']) {
             case 'rest':
-                error_log('creating REST client');
                 require_once(get_config('docroot') . '/webservice/rest/lib.php');
                 $client = new webservice_rest_client(get_config('wwwroot')
-                                . '/webservice/rest/server.php',
+                                . 'webservice/rest/server.php',
                                  ($values['authtype'] == 'token' ? array('wstoken' => $values['wstoken']) :
-                                                      array('wsusername' => $values['wsusername'], 'wspassword' => $values['wspassword'])), $values['authtype']);
+                                                      array('wsusername' => $values['wsusername'], 'wspassword' => $values['wspassword'])), $values['authtype'], true);
 
                 break;
 
             case 'xmlrpc':
-                error_log('creating XML-RPC client');
                 require_once(get_config('docroot') . 'webservice/xmlrpc/lib.php');
                 $client = new webservice_xmlrpc_client(get_config('wwwroot')
-                        . '/webservice/xmlrpc/server.php',
+                        . 'webservice/xmlrpc/server.php',
                          ($values['authtype'] == 'token' ? array('wstoken' => $values['wstoken']) :
                                               array('wsusername' => $values['wsusername'], 'wspassword' => $values['wspassword'])));
                 break;
 
             case 'soap':
-                error_log('creating SOAP client');
-                // stop failed to load external entity error
-                libxml_disable_entity_loader(false);
+                // stop failed to load external entity error - nolonger needed as use curl to
+                // prefetch WSDL
+                libxml_disable_entity_loader(true);
                 require_once(get_config('docroot') . 'webservice/soap/lib.php');
                 //force SOAP synchronous mode
                 $client = new webservice_soap_client(get_config('wwwroot') . 'webservice/soap/server.php',
                                 ($values['authtype'] == 'token' ? array('wstoken' => $values['wstoken']) :
                                                      array('wsusername' => $values['wsusername'], 'wspassword' => $values['wspassword'])),
-                                array("features" => SOAP_WAIT_ONE_WAY_CALLS));
+                                array("features" => SOAP_WAIT_ONE_WAY_CALLS, 'stream_context' => webservice_create_context(get_config('wwwroot') . 'webservice/soap/server.php')));
                 $client->setWsdlCache(false);
                 break;
         }
 
         try {
-            $results = $client->call($dbsf->functionname, $inputs, true);
+            $results = $client->call($dbsf->functionname, $inputs);
+            $results = array('url' => $client->serverurl,
+                             'results' => $results,
+                             'inputs' => $inputs);
         } catch (Exception $e) {
-             $results = "exception: " . $e->getMessage();
+            $results = "exception: " . $e->getMessage();
+            # split the string up by sentances and error code for easier reading
+            $results = preg_replace('/(\.|\|)/', "\n", $results);
         }
 
         $SESSION->set('ws_call_results', serialize($results));

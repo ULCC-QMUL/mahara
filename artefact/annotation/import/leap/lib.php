@@ -42,7 +42,6 @@ class LeapImportAnnotation extends LeapImportArtefactPlugin {
             'title'      => '--',
             'type'       => 'portfolio',
             'numrows'    => 1,
-            'numcolumns' => 1,
             'ctime'      => $time,
             'mtime'      => $time,
             'atime'      => $time,
@@ -460,8 +459,7 @@ class LeapImportAnnotation extends LeapImportArtefactPlugin {
             return;
         }
 
-        $annotation_entry = $importer->get_entry_by_id($entry->entryid);
-        $view_entry_request = self::get_referent_entryid($annotation_entry, $importer);
+        $view_entry_request = self::get_referent_entryid($entry, $importer);
         if ($viewid = $importer->get_viewid_imported_by_entryid($view_entry_request)) {
             $annotation->set('view', $viewid);
             $annotation->commit();
@@ -538,7 +536,7 @@ class LeapImportAnnotation extends LeapImportArtefactPlugin {
                             $duplicated_feedback = artefact_instance_from_id($ierfeedback->duplicateditemids[0]);
                             $feedback['duplicateditem']['id'] = $duplicated_feedback->get('id');
                             $feedback['duplicateditem']['title'] = $duplicated_feedback->get('title');
-                            $feedback['duplicateditem']['html'] = $duplicated_feedback->render_self();
+                            $feedback['duplicateditem']['html'] = $duplicated_feedback->render_self(array());
                         }
                         else if (!empty($ierfeedback->existingitemids)) {
                             foreach ($ierfeedback->existingitemids as $id) {
@@ -546,7 +544,7 @@ class LeapImportAnnotation extends LeapImportArtefactPlugin {
                                 $feedback['existingitems'][] = array(
                                     'id'    => $existing_feedback->get('id'),
                                     'title' => $existing_feedback->get('title'),
-                                    'html'  => $existing_feedback->render_self(),
+                                    'html'  => $existing_feedback->render_self(array()),
                                 );
                             }
                         }
@@ -558,8 +556,8 @@ class LeapImportAnnotation extends LeapImportArtefactPlugin {
             }
         }
         $smarty = smarty_core();
-        $smarty->assign_by_ref('displaydecisions', $importer->get('displaydecisions'));
-        $smarty->assign_by_ref('entryannotations', $entryannotations);
+        $smarty->assign('displaydecisions', $importer->get('displaydecisions'));
+        $smarty->assign('entryannotations', $entryannotations);
         return $smarty->fetch('artefact:annotation:import/annotations.tpl');
     }
 }

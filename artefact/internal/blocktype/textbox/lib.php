@@ -241,13 +241,40 @@ forEach(getElementsByTagAndClassName('a', 'copytextboxnote', 'instconf'), functi
         jQuery('#instconf_tags_description').removeClass('hidden');
     });
 });
-augment_tags_control('instconf_tags');
 if (jQuery('#instconf_license').length) {
     jQuery('#instconf_license').removeClass('hidden');
 }
 if (jQuery('#instconf_license_advanced_container').length) {
     removeElementClass(getFirstElementByTagAndClassName('div', null, 'instconf_license_advanced_container'), 'hidden');
 }
+jQuery(function() {
+    jQuery('#instconf_tags').on('change', function() {
+        updatetagbuttons();
+    });
+    updatetagbuttons();
+
+    function updatetagbuttons() {
+        jQuery('#instconf_tags_container ul button').on('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            var li = jQuery(this).parent();
+            var data = jQuery('#instconf_tags').select2('data');
+            var value = null;
+            for (var x in data) {
+                if (li[0].title == data[x].text) {
+                    value = data[x].id;
+                    break;
+                }
+            }
+            var val = jQuery('#instconf_tags').select2('val');
+            var index = val.indexOf(value);
+            if (index > -1) {
+                val.splice(index, 1);
+            }
+            jQuery('#instconf_tags').select2('val', val);
+        });
+    }
+});
 EOF;
     }
 
@@ -321,7 +348,7 @@ EOF;
             'otherblocksmsg' => array(
                 'type' => 'html',
                 'class' => 'message info' . (($otherblockcount && !$readonly) ? '' : ' hidden'),
-                'value' => '<p class="alert alert-info">' . $otherblocksmsg
+                'value' => '<p class="alert alert-warning">' . $otherblocksmsg
                     . ' <a class="copytextboxnote nojs-hidden-inline" href="">' . get_string('makeacopy', 'blocktype.internal/textbox') . '</a></p>',
                 'help' => true,
             ),
@@ -329,7 +356,7 @@ EOF;
             'readonlymsg' => array(
                 'type' => 'html',
                 'class' => 'message info' . ($readonly ? '' : ' hidden'),
-                'value' => '<p class="alert alert-info">' . get_string('readonlymessage', 'blocktype.internal/textbox')
+                'value' => '<p class="alert alert-warning">' . get_string('readonlymessage', 'blocktype.internal/textbox')
                     . ' <a class="copytextboxnote nojs-hidden-inline" href="">' . get_string('makeacopy', 'blocktype.internal/textbox') . '</a></p>',
                 'help' => true,
             ),
@@ -371,7 +398,7 @@ EOF;
                 'type' => 'html',
                 'class' => $readonly ? '' : 'hidden',
                 'title' => get_string('license'),
-                'value' => '<div id="instconf_licensereadonly_display">' . (isset($artefact) ? render_license($artefact) : get_string('licensenone')) . '</div>',
+                'value' => '<div id="instconf_licensereadonly_display">' . (isset($artefact) ? render_license($artefact) : get_string('licensenone1')) . '</div>',
             ),
             'allowcomments' => array(
                 'type'         => 'switchbox',
@@ -443,6 +470,7 @@ EOF;
             else {
                 $title = $values['title'];
             }
+            safe_require('artefact', 'internal');
             $artefact = new ArtefactTypeHtml(0, $data);
             $artefact->set('title', $title);
             $artefact->set('description', $values['text']);

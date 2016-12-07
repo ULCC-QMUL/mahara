@@ -71,11 +71,11 @@ class upload_manager {
                 return false;
             }
             else {
-                return get_string('noinputnamesupplied');
+                return get_string('noinputnamesupplied', 'mahara');
             }
         }
-        $file = $_FILES[$name];
 
+        $file = $_FILES[$name];
         $maxsize = get_config('maxuploadsize');
         if (isset($this->inputindex)) {
             $size = $file['size'][$this->inputindex];
@@ -88,7 +88,7 @@ class upload_manager {
             $tmpname = $file['tmp_name'];
         }
         if ($maxsize && $size > $maxsize) {
-            return get_string('uploadedfiletoobig');
+            return get_string('uploadedfiletoobig1', 'mahara', display_size(get_max_upload_size(false)));
         }
 
         if ($error != UPLOAD_ERR_OK) {
@@ -105,7 +105,7 @@ class upload_manager {
                 activity_occurred('maharamessage', $message);
             }
             else if ($error == UPLOAD_ERR_INI_SIZE || $error == UPLOAD_ERR_FORM_SIZE) {
-                return get_string('uploadedfiletoobig');
+                return get_string('uploadedfiletoobig1', 'mahara', display_size(get_max_upload_size(false)));
             }
         }
 
@@ -190,7 +190,7 @@ class upload_manager {
             chmod($destination . '/' . $newname, get_config('filepermissions'));
             return false;
         }
-        return get_string('failedmovingfiletodataroot');
+        return get_string('failedmovingfiletodataroot', 'mahara');
     }
 
 
@@ -271,7 +271,7 @@ function clam_handle_infected_file($file) {
     global $USER;
     $userid = $USER->get('id');
 
-    $quarantinedir = get_config('dataroot') . get_string('quarantinedirname');
+    $quarantinedir = get_config('dataroot') . 'quarantine';
     check_dir_exists($quarantinedir);
 
     if (is_dir($quarantinedir) && is_writable($quarantinedir)) {

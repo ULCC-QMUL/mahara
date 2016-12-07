@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'networking');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once(get_config('docroot') . 'api/xmlrpc/lib.php');
-require_once('pieforms/pieform.php');
 require_once('searchlib.php');
 define('TITLE', get_string('networking', 'admin'));
 
@@ -31,7 +30,6 @@ if (!$opensslext || !$curlext || !$xmlrpcext) {
     $smarty = smarty();
     setpageicon($smarty, 'icon-exchange');
 
-    $smarty->assign('PAGEHEADING', TITLE);
     $missingextensions = array();
     !$opensslext && $missingextensions[] = 'openssl';
     !$curlext    && $missingextensions[] = 'curl';
@@ -173,5 +171,4 @@ function networkingform_submit(Pieform $form, $values) {
 $smarty = smarty();
 setpageicon($smarty, 'icon-exchange');
 $smarty->assign('networkingform', $networkingform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/site/networking.tpl');

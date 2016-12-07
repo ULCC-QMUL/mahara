@@ -18,7 +18,6 @@ define('SECTION_PAGE', 'deletetopic');
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 safe_require('interaction' ,'forum');
 require_once('group.php');
-require_once('pieforms/pieform.php');
 require_once(get_config('docroot') . 'interaction/lib.php');
 require_once('embeddedimage.php');
 
@@ -74,7 +73,7 @@ $form = pieform(array(
         ),
         'submit' => array(
             'type'  => 'submitcancel',
-            'class' => 'btn-default',
+            'class' => 'btn-primary',
             'value' => array(get_string('yes'), get_string('no')),
             'goto'  => get_config('wwwroot') . ($returnto == 'view' ? 'interaction/forum/view.php?id=' . $topic->forumid : 'interaction/forum/topic.php?id=' . $topicid),
         ),

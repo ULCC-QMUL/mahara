@@ -17,7 +17,6 @@ define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'sitepages');
 
 require(dirname(dirname(dirname(__FILE__))).'/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('staticpages', 'admin'));
 define('DEFAULTPAGE', 'home');
 
@@ -94,5 +93,4 @@ $smarty = smarty(array('adminsitepages'), array(), array('admin' => array('disca
 setpageicon($smarty, 'icon-pencil');
 
 $smarty->assign('pageeditform', $form);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/site/pages.tpl');

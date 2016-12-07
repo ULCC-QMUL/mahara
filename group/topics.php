@@ -15,7 +15,6 @@ define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'group');
 define('SECTION_PAGE', 'topics');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 safe_require('interaction', 'forum');
 require_once('group.php');
 
@@ -42,8 +41,7 @@ $pagination = build_pagination(array(
 ));
 
 $smarty = smarty(array('paginator'));
-$smarty->assign_by_ref('topics', $data['data']);
-$smarty->assign_by_ref('pagination', $pagination['html']);
+$smarty->assign('topics', $data['data']);
+$smarty->assign('pagination', $pagination['html']);
 $smarty->assign('INLINEJAVASCRIPT', 'addLoadEvent(function() { p = ' . $pagination['javascript'] . '});');
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('group/topics.tpl');

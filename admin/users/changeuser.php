@@ -58,14 +58,14 @@ function do_masquerade($why = null) {
         'when' => $when,
         'reason' => $why,
     ));
+    $SESSION->set('nocheckrequiredfields', null);
+    $SESSION->set('remoteavatar', null);
     redirect(get_config('wwwroot'));
 }
 
 if (!get_config('masqueradingreasonrequired')) {
     do_masquerade();
 }
-
-require_once('pieforms/pieform.php');
 
 $form = array(
     'name'       => 'masqueradereason',

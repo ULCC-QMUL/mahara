@@ -43,13 +43,9 @@ function check_upgrades($name=null) {
     $toupgradecount = 0;
     $newinstallcount = 0;
     $installing = false;
-    $disablelogin = false;
     $newinstalls = array();
 
     require('version.php');
-    if (isset($config->disablelogin) && !empty($config->disablelogin)) {
-        $disablelogin = true;
-    }
     // check core first...
     if (empty($name) || $name == 'core') {
         try {
@@ -105,7 +101,6 @@ function check_upgrades($name=null) {
 
     // If we were just checking if the core needed to be upgraded, we can stop here
     if ($name == 'core') {
-        $toupgrade['core']->disablelogin = $disablelogin;
         return $toupgrade['core'];
     }
 
@@ -132,7 +127,6 @@ function check_upgrades($name=null) {
         }
 
         if ($name == 'local') {
-            $toupgrade['local']->disablelogin = $disablelogin;
             return $toupgrade['local'];
         }
     }
@@ -224,9 +218,6 @@ function check_upgrades($name=null) {
 
         $config = new StdClass;
         require(get_config('docroot') . $pluginpath . '/version.php');
-        if (isset($config->disablelogin) && !empty($config->disablelogin)) {
-            $disablelogin = true;
-        }
 
         if (empty($pluginversion)) {
             $newinstall = false;
@@ -246,6 +237,9 @@ function check_upgrades($name=null) {
 
             $classname = generate_class_name($plugintype, $pluginname);
             safe_require($plugintype, $pluginname);
+            // Check if there is a displayname
+            $plugininfo->displayname = call_static_method($classname, 'get_plugin_display_name');
+
             try {
                 $classname::sanity_check();
             }
@@ -289,6 +283,8 @@ function check_upgrades($name=null) {
 
             $classname = generate_class_name($plugintype, $pluginname);
             safe_require($plugintype, $pluginname);
+            // Check if there is a displayname
+            $plugininfo->displayname = call_static_method($classname, 'get_plugin_display_name');
             try {
                 $classname::sanity_check();
             }
@@ -313,7 +309,6 @@ function check_upgrades($name=null) {
             foreach ((array)$toupgrade[$name] as $key => $value) {
                 $upgrade->{$key} = $value;
             }
-            $upgrade->disablelogin = $disablelogin;
             return $upgrade;
         }
         else {
@@ -321,15 +316,8 @@ function check_upgrades($name=null) {
         }
     }
 
-    // Nothing needed to be upgraded or installed
-    if (count($toupgrade) == 0) {
-        if (!empty($name))
-        $disablelogin = false;
-    }
-
     // If we get here, it's because we have an array of objects to return
     uksort($toupgrade, 'sort_upgrades');
-    $settings['disablelogin'] = $disablelogin;
     $settings['newinstallcount'] = $newinstallcount;
     $settings['newinstalls'] = $newinstalls;
     $settings['toupgradecount'] = $toupgradecount;
@@ -768,6 +756,7 @@ function core_install_lastcoredata_defaults() {
     $user->email = 'root@example.org';
     $user->quota = get_config_plugin('artefact', 'file', 'defaultquota');
     $user->authinstance = $auth_instance->id;
+    $user->admin = 1;
 
     if (is_mysql()) { // gratuitous mysql workaround
         $newid = insert_record('usr', $user, 'id', true);
@@ -793,6 +782,10 @@ function core_install_lastcoredata_defaults() {
 
     require_once('skin.php');
     install_skins_default();
+
+    // Remove admin privs from root user as it doesn't need it now
+    $user->admin = 0;
+    update_record('usr', $user, array('id' => 0));
 
     // Insert the admin user
     $user = new StdClass;
@@ -892,6 +885,7 @@ function core_install_firstcoredata_defaults() {
         'removefriendrequest',
         'creategroup',
         'loginas',
+        'clearcaches',
     );
 
     foreach ($eventtypes as $et) {
@@ -1373,7 +1367,7 @@ function update_safe_iframe_regex() {
         // what they're doing, and need something fancy, can always
         // override this in config.php.
         foreach ($prefixes as $key => $r) {
-            if (!preg_match('/^[a-zA-Z0-9\/\._-]+$/', $r)) {
+            if (!preg_match('/^[\?a-zA-Z0-9\/\._-]+$/', $r)) {
                 throw new SystemException('Invalid site passed to update_safe_iframe_regex');
             }
             if (substr($r, -1) == '/') {
@@ -1422,6 +1416,10 @@ function set_antispam_defaults() {
 }
 
 function activate_plugin_form($plugintype, $plugin) {
+    // Check if there is a displayname
+    $classname = generate_class_name($plugintype, $plugin->name);
+    $plugin->displayname = call_static_method($classname, 'get_plugin_display_name');
+
     return pieform(array(
         'name'            => 'activate_' . $plugintype . '_' . $plugin->name,
         'renderer'        => 'div',
@@ -1439,7 +1437,7 @@ function activate_plugin_form($plugintype, $plugin) {
                 'type'  => 'button',
                 'usebuttontag' => true,
                 'class' => 'btn-default',
-                'title' => ($plugin->active ? get_string('hide') : get_string('show')) . ' ' . $plugintype . ' ' . $plugin->name,
+                'title' => ($plugin->active ? get_string('hide') : get_string('show')) . ' ' . $plugintype . ' ' . (($plugin->displayname) ? $plugin->displayname : $plugin->name),
                 'hiddenlabel' => true,
                 'value' => $plugin->active ? get_string('hide') : get_string('show')
             ),
@@ -1503,6 +1501,24 @@ function site_warnings() {
         $warnings[] = get_string('noreplyaddressmissingorinvalid', 'error', get_config('wwwroot') . 'admin/site/options.php?fs=emailsettings');
     }
 
+    // Check if the saml plugin config needs updating
+    if (record_exists_select('auth_config', "plugin = ? AND field = ?", array('saml', 'simplesamlphplib'))) {
+        $warnings[] = get_string('obsoletesamlplugin', 'auth.saml', get_config('wwwroot') . 'admin/extensions/pluginconfig.php?plugintype=auth&pluginname=saml');
+    }
+    // Check if all saml instances are configured for new auth/saml plugin.
+    if ($samls = get_records_sql_array(
+             "SELECT ai.id, ai.instancename, i.name, i.displayname FROM {auth_instance} ai
+              LEFT JOIN {institution} i ON i.name = ai.institution
+              WHERE ai.id NOT IN (
+                                  SELECT instance FROM {auth_instance_config} aic
+                                  WHERE aic.field = ?
+              ) AND ai.authname = ?", array('institutionidpentityid', 'saml'))) {
+
+        foreach ($samls as $saml) {
+            $warnings[] = get_string('obsoletesamlinstance', 'auth.saml', get_config('wwwroot') . 'admin/users/addauthority.php?id=' . $saml->id . '&edit=1&i=' . $saml->name . '&p=saml', $saml->instancename, $saml->displayname);
+        }
+    }
+
     // Check that the GD library has support for jpg, png and gif at least
     $gdinfo = gd_info();
     if (!$gdinfo['JPEG Support']) {
@@ -1541,6 +1557,11 @@ function site_warnings() {
             || trim($sitesalt) === ''
             || preg_match('/^([a-zA-Z0-9]{0,10})$/', $sitesalt)) {
         $warnings[] = get_string('passwordsaltweak', 'error');
+    }
+
+    $urlsecret = get_config('urlsecret');
+    if (!empty($urlsecret) && $urlsecret == 'mysupersecret') {
+        $warnings[] = get_string('urlsecretweak', 'error');
     }
 
     if (!extension_loaded('mbstring')) {

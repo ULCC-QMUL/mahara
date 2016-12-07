@@ -17,7 +17,6 @@ define('SECTION_PLUGINNAME', 'admin');
 define('SECTION_PAGE', 'siteoptions');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('searchlib.php');
 require_once('antispam.php');
 require_once(get_config('libroot') . 'activity.php');
@@ -91,21 +90,21 @@ $siteoptionform = array(
                 'dropdownmenu' => array(
                     'type'         => 'switchbox',
                     'title'        => get_string('dropdownmenu', 'admin'),
-                    'description'  => get_string('dropdownmenudescription1', 'admin'),
+                    'description'  => get_string('dropdownmenudescription2', 'admin'),
                     'defaultvalue' => get_config('dropdownmenu'),
                     'disabled'     => in_array('dropdownmenu', $OVERRIDDEN),
                 ),
                 'homepageinfo' => array(
                     'type'         => 'switchbox',
                     'title'        => get_string('homepageinfo1', 'admin'),
-                    'description'  => get_string('homepageinfodescription2', 'admin'),
+                    'description'  => get_string('homepageinfodescription3', 'admin'),
                     'defaultvalue' => get_config('homepageinfo'),
                     'disabled'     => in_array('homepageinfo', $OVERRIDDEN),
                 ),
                 'registration_sendweeklyupdates' => array(
                     'type'         => 'switchbox',
                     'title'        => get_string('sendweeklyupdates', 'admin'),
-                    'description'  => get_string('sendweeklyupdatesdescription1', 'admin'),
+                    'description'  => get_string('sendweeklyupdatesdescription2', 'admin'),
                     'defaultvalue' => get_config('registration_sendweeklyupdates'),
                     'help'         => true,
                     'disabled'     => in_array('registration_sendweeklyupdates', $OVERRIDDEN),
@@ -299,6 +298,7 @@ $siteoptionform = array(
                     'title'        => get_string('requireregistrationconfirm', 'admin'),
                     'description'  => get_string('requireregistrationconfirmdescription1', 'admin'),
                     'defaultvalue' => get_config('requireregistrationconfirm'),
+                    'help'         => true,
                 ),
                 'usersallowedmultipleinstitutions' => array(
                     'type'         => 'switchbox',
@@ -340,7 +340,8 @@ $siteoptionform = array(
                     'title'        => get_string('sessionlifetime', 'admin'),
                     'description'  => get_string('sessionlifetimedescription', 'admin'),
                     'defaultvalue' => get_config('session_timeout') / 60,
-                    'rules'        => array('integer' => true, 'minvalue' => 1, 'maxvalue' => 10000000),
+                    // Largest amount allowed is 30 days.
+                    'rules'        => array('integer' => true, 'minvalue' => 1, 'maxvalue' => (30 * 24 * 60)),
                     'help'         => true,
                     'disabled'     => in_array('session_timeout', $OVERRIDDEN),
                 ),
@@ -453,7 +454,7 @@ $siteoptionform = array(
                     'type' => 'switchbox',
                     'title' => get_string('recaptchaonregisterform', 'admin'),
                     'description' => get_string('recaptchaonregisterformdesc1', 'admin'),
-                    'defaultvalue' => get_config('recaptchaonregisterform', 'admin'),
+                    'defaultvalue' => get_config('recaptchaonregisterform'),
                     'help' => true,
                     'disabled' => in_array('recaptchaonregisterform', $OVERRIDDEN)
                 ),
@@ -978,6 +979,5 @@ $thispage = json_encode(get_config('wwwroot') . 'admin/site/options.php');
 $smarty = smarty(array('adminsiteoptions'));
 setpageicon($smarty, 'icon-cogs');
 $smarty->assign('siteoptionform', $siteoptionform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->display('admin/site/options.tpl');

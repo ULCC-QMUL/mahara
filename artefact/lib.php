@@ -756,6 +756,7 @@ abstract class ArtefactType implements IArtefactType {
             }
         }
 
+        safe_require('artefact', 'file');
         // Delete non-containers grouped by artefacttype
         foreach ($leaves as $artefacttype => $ids) {
             $classname = generate_artefact_class_name($artefacttype);
@@ -820,13 +821,9 @@ abstract class ArtefactType implements IArtefactType {
         delete_records_select('artefact_attachment', "artefact IN $idstr");
 
         // Make sure that the artefacts are removed from any view blockinstances
-        if ($records = get_records_sql_array("
-            SELECT va.block, va.artefact, bi.configdata
-            FROM {view_artefact} va JOIN {block_instance} bi ON va.block = bi.id
-            WHERE va.artefact IN $idstr", array())) {
-            require_once(get_config('docroot') . 'blocktype/lib.php');
-            BlockInstance::bulk_delete_artefacts($records);
-        }
+        require_once(get_config('docroot') . 'blocktype/lib.php');
+        BlockInstance::bulk_remove_artefacts($artefactids);
+
         delete_records_select('view_artefact', "artefact IN $idstr");
         delete_records_select('artefact_tag', "artefact IN $idstr");
         delete_records_select('artefact_access_role', "artefact IN $idstr");
@@ -858,7 +855,7 @@ abstract class ArtefactType implements IArtefactType {
     }
 
     /**
-     * By default users are notified of all feedback on artefacts
+     * By default users are notified of all comments on artefacts
      * which they own.  Artefact types which want to allow this
      * notification to be turned off should redefine this function.
      */
@@ -1030,7 +1027,8 @@ abstract class ArtefactType implements IArtefactType {
             'childreninstances' => 1,
             'childrenmetadata' => 1,
             'parentinstance' => 1,
-            'parentmetadata' => 1
+            'parentmetadata' => 1,
+            'path' => 1    // the path value will be updated later
         );
         $data = new StdClass;
         foreach (get_object_vars($this) as $k => $v) {

@@ -67,9 +67,6 @@ define('PIEFORM_CANCEL', -2);
  * more information on creating and using forms.
  *
  */
-function pieform($data) {/*{{{*/
-    return Pieform::process($data);
-}/*}}}*/
 
 /**
  * Pieforms throws PieformExceptions when things go wrong
@@ -148,6 +145,9 @@ class Pieform {/*{{{*/
      */
     private $submitted_by_dropzone = false;
 
+    private $has_required_fields = false;
+    private $all_required_field_labels_hidden = false;
+
     private $submitvalue = 'submit';
 
     /*}}}*/
@@ -179,7 +179,13 @@ class Pieform {/*{{{*/
      */
     public function __construct($data) {/*{{{*/
         $GLOBALS['_PIEFORM_REGISTRY'][] = $this;
-
+        /**
+         * The third party recaptcha library inserts this in the POST request, which causes it to be failed further
+         * down in the code when testing if it is a valid PHP identifier. Because of this, it needs to be removed early on
+         */
+        if (isset($data['elements']['g-recaptcha-response'])) {
+            unset($data['elements']['g-recaptcha-response']);
+        }
         if (!isset($data['name']) || !preg_match('/^[a-z_][a-z0-9_]*$/', $data['name'])) {
             throw new PieformException('Forms must have a name, and that name must be valid (validity test: could you give a PHP function the name?)');
         }
@@ -359,7 +365,7 @@ class Pieform {/*{{{*/
         // Check that all elements have names compliant to PHP's variable naming policy
         // (otherwise things get messy later)
         foreach (array_keys($this->elementrefs) as $name) {
-            if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+            if (!preg_match('/^[a-zA-Z0-9_][a-zA-Z0-9_]*$/', $name)) {
                 throw new PieformException('Element "' . $name . '" is badly named (validity test: could you give a PHP variable the name?)');
             }
         }
@@ -585,7 +591,13 @@ class Pieform {/*{{{*/
             }
             else {
                 global $SESSION;
-                $SESSION->add_error_msg($this->get_property('errormessage'));
+                // The login system comes past here twice so we need to pace first error message above form
+                if (!empty($values['login_submitted'])) {
+                    $SESSION->add_error_msg($this->get_property('errormessage'), false, 'loginbox');
+                }
+                else {
+                    $SESSION->add_error_msg($this->get_property('errormessage'));
+                }
             }
         }
     }/*}}}*/
@@ -681,7 +693,7 @@ class Pieform {/*{{{*/
         }
         $result .= '>';
         if (!empty($this->error)) {
-            $result .= '<div class="error">' . $this->error . '</div>';
+            $result .= '<div class="alert alert-danger">' . $this->error . '</div>';
         }
         return $result;
     }/*}}}*/
@@ -768,6 +780,13 @@ class Pieform {/*{{{*/
                 $result = $this->get_form_tag() . "\n";
             }
 
+            if ($this->has_required_fields) {
+                $result .= '<div class="form-group requiredmarkerdesc';
+                if ($this->all_required_field_labels_hidden) {
+                    $result .= ' hidden';
+                }
+                $result .= '">' . get_string('requiredfields', 'pieforms', $this->get_property('requiredmarker')) . '</div>';
+            }
             $this->include_plugin('renderer',  $this->data['renderer']);
 
             // Form header
@@ -1162,7 +1181,7 @@ EOF;
      * @return string        The attributes for the element
      */
     public function element_attributes($element, $exclude=array()) {/*{{{*/
-        static $attributes = array('accesskey', 'autocomplete', 'class', 'dir', 'data-confirm', 'id', 'lang', 'name', 'onclick', 'size', 'style', 'tabindex');
+        static $attributes = array('accesskey', 'autocomplete', 'class', 'dir', 'data-confirm', 'id', 'lang', 'name', 'onclick', 'placeholder', 'size', 'style', 'tabindex');
         $elementattributes = array_diff($attributes, $exclude);
         $result = '';
         foreach ($elementattributes as $attribute) {
@@ -1193,6 +1212,10 @@ EOF;
             if (!empty($element[$attribute])) {
                 $result .= ($attribute == 'readonly') ? ' readonly="readonly" disabled="disabled"' : " $attribute=\"$attribute\"";
             }
+        }
+
+        if (!empty($element['rules']['required'])) {
+            $result .= ' aria-required="true"';
         }
 
         return $result;
@@ -1484,7 +1507,14 @@ EOF;
             $title = self::hsc($element['title']);
 
             if ($this->get_property('requiredmarker') && !empty($element['rules']['required'])) {
-                $requiredmarker = ' <span class="requiredmarker">*</span>';
+                $requiredmarker = ' <span class="requiredmarker">' . $this->get_property('requiredmarker') . '</span>';
+                $this->has_required_fields = true;
+                if (!empty($element['hiddenlabel'])) {
+                    $this->all_required_field_labels_hidden = true;
+                }
+                else {
+                    $this->all_required_field_labels_hidden = false;
+                }
             }
             else {
                 $requiredmarker = '';
@@ -1775,7 +1805,7 @@ function pieform_get_headdata() {/*{{{*/
         foreach ($form->get_elements() as $element) {
             $function = 'pieform_element_' . $element['type'] . '_get_headdata';
             if (function_exists($function)) {
-                $elems = $function($element);
+                $elems = $function($element, $form);
                 $htmlelements = array_merge($htmlelements, $elems);
             }
         }

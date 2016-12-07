@@ -14,7 +14,6 @@ define('MENUITEM', 'myportfolio/sharedviews');
 
 require(dirname(dirname(__FILE__)) . '/init.php');
 require_once(get_config('libroot') . 'view.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('sharedwithme', 'view'));
 define('SECTION_PLUGINTYPE', 'core');
 define('SECTION_PLUGINNAME', 'view');
@@ -168,7 +167,6 @@ $smarty->assign('views', $data->data);
 $smarty->assign('searchform', $searchform);
 $smarty->assign('pagination', $pagination['html']);
 $smarty->assign('INLINEJAVASCRIPT', 'addLoadEvent(function() {' . $pagination['javascript'] . '});');
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('view/sharedviews.tpl');
 exit;
 

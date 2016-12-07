@@ -20,7 +20,7 @@ require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 safe_require('interaction', 'forum');
 require_once('group.php');
 require_once(get_config('docroot') . 'interaction/lib.php');
-require_once('pieforms/pieform.php');
+define('SUBSECTIONHEADING', get_string('nameplural', 'interaction.forum'));
 
 $topicid = param_integer('id');
 
@@ -123,7 +123,7 @@ $posts = get_records_sql_array(
 // This is only needed for the 'no_indent' option
 $lastpostid = null;
 if ($indentmode == 'no_indent') {
-    $lastpost = get_record_select('interaction_forum_post', 'topic = ? ORDER by ctime DESC, id DESC LIMIT 1', array($topicid));
+    $lastpost = get_record_select('interaction_forum_post', 'topic = ?  AND deleted != 1 ORDER by ctime DESC, id DESC LIMIT 1', array($topicid));
     $lastpostid = $lastpost->id;
 }
 // Get extra info of posts
@@ -206,7 +206,6 @@ $smarty->assign('moderator', $moderator);
 $smarty->assign('lastpostid', $lastpostid);
 $smarty->assign('posts', $posts);
 $smarty->assign('pagination', $pagination['html']);
-$smarty->assign('subsectionheading', get_string('nameplural', 'interaction.forum'));
 $smarty->display('interaction:forum:topic.tpl');
 
 /*

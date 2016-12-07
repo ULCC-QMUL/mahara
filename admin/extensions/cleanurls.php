@@ -14,7 +14,6 @@ define('ADMIN', 1);
 define('MENUITEM', 'configextensions/cleanurls');
 
 require(dirname(dirname(dirname(__FILE__))) . '/init.php');
-require_once('pieforms/pieform.php');
 define('TITLE', get_string('cleanurls', 'admin'));
 
 $regenerateform = pieform(array(
@@ -25,6 +24,7 @@ $regenerateform = pieform(array(
         'regenerate' => array(
             'type'         => 'submit',
             'title'        => get_string('regenerateurls', 'admin'),
+            'class'        => 'btn-primary',
             'description'  => get_string('regenerateurlsdescription', 'admin'),
             'confirm'      => get_string('regenerateurlsconfirm', 'admin'),
             'value'        => get_string('submit'),
@@ -47,7 +47,6 @@ setpageicon($smarty, 'icon-puzzle-piece');
 $smarty->assign('cleanurls', get_config('cleanurls'));
 $smarty->assign('cleanurlconfig', $cleanurlconfig);
 $smarty->assign('regenerateform', $regenerateform);
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->display('admin/extensions/cleanurls.tpl');
 
 // Regenerates urlids for users, groups, and portfolio pages.
@@ -84,16 +83,7 @@ function regenerateurls_submit(Pieform $form, $values) {
         $firstid = $lastid;
         $values = array();
         foreach ($records as $r) {
-            if (!empty($r->username)) {
-                $urlid = $r->username;
-            }
-            else if (!empty($r->preferredname)) {
-                $urlid = $r->preferredname;
-            }
-            else {
-                $urlid = $r->firstname . '-' . $r->lastname;
-            }
-            $r->urlid = generate_urlid($urlid, get_config('cleanurluserdefault'), 3, 30);
+            $r->urlid = generate_urlid(get_raw_user_urlid($r), get_config('cleanurluserdefault'), 3, 30);
             array_push($values, $r->id, $r->urlid);
             $lastid = $r->id;
         }

@@ -10,6 +10,7 @@
  */
 
 defined('INTERNAL') || die();
+require_once('activity.php');
 
 class PluginBlocktypeWall extends MaharaCoreBlocktype {
 
@@ -88,7 +89,6 @@ class PluginBlocktypeWall extends MaharaCoreBlocktype {
             ),
         );
         return array(
-            'class' => 'panel panel-body',
             'elements' => $elements,
         );
 
@@ -111,6 +111,22 @@ class PluginBlocktypeWall extends MaharaCoreBlocktype {
         if ($prevversion == 0) {
             set_config_plugin('blocktype', 'wall', 'defaultpostsizelimit', 1500); // 1500 characters
         }
+
+        if ($prevversion < 2016011400) {
+            $status = ensure_record_exists(
+                    'activity_type',
+                    (object)array('name' => 'wallpost'),
+                    (object)array(
+                        'name' => 'wallpost',
+                        'admin' => 0,
+                        'delay' => 0,
+                        'allowonemethod' => 1,
+                        'defaultmethod' => 'email',
+                        'plugintype' => 'blocktype',
+                        'pluginname' => 'wall'
+                    )
+            );
+        }
     }
 
     public static function delete_instance(BlockInstance $instance) {
@@ -124,7 +140,6 @@ class PluginBlocktypeWall extends MaharaCoreBlocktype {
         else {
             $walltoreplyto = $instance->get('id');
         }
-        require_once('pieforms/pieform.php');
         return pieform(array(
             'name'      => 'wallpost_'.$instance->get('id'),
             'renderer'  => 'dev',
@@ -219,7 +234,19 @@ EOF;
             'text'     => $values['text'],
         );
 
-        insert_record('blocktype_wall_post', $record);
+        $newid = insert_record('blocktype_wall_post', $record, 'id', true);
+
+        require_once('embeddedimage.php');
+        $newtext = EmbeddedImage::prepare_embedded_images($values['text'], 'wallpost', $newid);
+        // If there is an embedded image, update the src so users can have visibility
+        if ($values['text'] != $newtext) {
+              $updatedwallpost = new stdClass();
+              $updatedwallpost->id = $newid;
+              $updatedwallpost->text = $newtext;
+              update_record('blocktype_wall_post', $updatedwallpost, 'id');
+        }
+
+        activity_occurred('wallpost', $record, 'blocktype', 'wall');
 
         $instance = new BlockInstance($values['instance']);
         $owner = $instance->get_view()->get('owner');
@@ -309,5 +336,56 @@ EOF;
      */
     public static function get_artefacts(BlockInstance $instance) {
         return array();
+    }
+}
+
+class ActivityTypeBlocktypeWallWallpost extends ActivityTypePlugin {
+    protected $from;
+    protected $text;
+    protected $instance;
+
+    public function get_plugintype() {
+        return 'blocktype';
+    }
+
+    public function get_pluginname() {
+        return 'wall';
+    }
+
+    public function get_required_parameters() {
+        return array('from', 'text', 'instance');
+    }
+
+    public function __construct($data, $cron = false) {
+        global $CFG;
+
+        parent::__construct($data, $cron);
+        $wallinstance = new BlockInstance($data->instance);
+        $owner = $wallinstance->get_view()->get('owner');
+        // Posted on their own wall. Don't send a notification.
+        if ($owner == $data->from) {
+            $this->users = array();
+            return;
+        }
+
+        $this->users = array(get_user($owner));
+        $this->fromuser = $data->from;
+
+        $this->strings = (object) array(
+                'subject' => (object) array(
+                    'key' => 'newwallpostnotificationsubject',
+                    'section' => 'blocktype.wall'
+                ),
+                'message' => (object) array(
+                    'key' => 'newwallpostnotificationmessage',
+                    'section' => 'blocktype.wall',
+                    'args' => array(html2text($data->text))
+                ),
+                'urltext' => (object) array(
+                    'key' => 'wholewall',
+                    'section' => 'blocktype.wall'
+                )
+        );
+        $this->url = 'blocktype/wall/wall.php?id=' . $data->instance;
     }
 }

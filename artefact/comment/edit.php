@@ -57,10 +57,8 @@ $elements['message'] = array(
 );
 if (get_config_plugin('artefact', 'comment', 'commentratings')) {
     $elements['rating'] = array(
-        'type'  => 'radio',
+        'type'  => 'ratings',
         'title' => get_string('rating', 'artefact.comment'),
-        'options' => array('1' => '', '2' => '', '3' => '', '4' => '', '5' => ''),
-        'class' => 'star',
         'defaultvalue' => $comment->get('rating'),
     );
 }
@@ -183,7 +181,6 @@ function edit_comment_notify($view, $author, $owner) {
 
 
 $smarty = smarty();
-$smarty->assign('PAGEHEADING', TITLE);
 $smarty->assign('strdescription', get_string('editcommentdescription', 'artefact.comment', $maxage));
 $smarty->assign('form', $form);
 $smarty->display('artefact:comment:edit.tpl');

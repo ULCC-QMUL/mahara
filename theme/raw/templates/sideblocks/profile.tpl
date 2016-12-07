@@ -12,17 +12,21 @@
             </div>
         {/if}
         {if $sbdata.invitedgroups}
-            <div id="invitedgroups" class="list-group-item list-group-item-warning">
+            <div id="invitedgroups" class="list-group-item list-group-item-warning list-group-item-profile-notification">
                 <a href="{$WWWROOT}group/mygroups.php?filter=invite">
-                    <span id="invitedgroupscount" class="label label-warning">{$sbdata.invitedgroups}</span>
+                    <div>
+                        <span id="invitedgroupscount" class="label label-warning">{$sbdata.invitedgroups}</span>
+                    </div>
                     <span id="invitedgroupsmessage">{$sbdata.invitedgroupsmessage}</span>
                 </a>
             </div>
         {/if}
         {if $sbdata.pendingfriends}
-            <div id="pendingfriends" class="list-group-item list-group-item-warning">
+            <div id="pendingfriends" class="list-group-item list-group-item-warning list-group-item-profile-notification">
                 <a href="{$WWWROOT}user/myfriends.php?filter=pending">
-                    <span id="pendingfriendscount" class="label label-warning">{$sbdata.pendingfriends}</span>
+                    <div>
+                        <span id="pendingfriendscount" class="label label-warning">{$sbdata.pendingfriends}</span>
+                    </div>
                     <span id="pendingfriendsmessage">{$sbdata.pendingfriendsmessage}</span>
                 </a>
             </div>
@@ -32,7 +36,7 @@
                 <div class="list-group-item-heading sidebar-item-heading"><a href="{$WWWROOT}group/mygroups.php">{str tag="mygroups"}:</a></div>
                 <ul class="list-nested list-group-item-text list-unstyled list-group-item-link">
         {foreach from=$sbdata.groups item=group}
-                    <li><a href="{group_homepage_url($group)}" class="bordered">{$group->name} {if $group->role == 'admin'}<small>({str tag=Admin section=group})</small>{/if}</a></li>
+                    <li><a href="{$group->homeurl}" class="bordered">{$group->name} {if $group->role == 'admin'}<small>({str tag=Admin section=group})</small>{/if}</a></li>
         {/foreach}
                </ul>
                 <span class="text-small text-midtone">{$sbdata.grouplimitstr}</span>

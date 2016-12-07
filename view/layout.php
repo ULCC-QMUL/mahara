@@ -13,7 +13,6 @@
 // TODO check security of this page
 define('INTERNAL', 1);
 require_once(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('view.php');
 require_once(get_config('libroot') . 'group.php');
 require_once(get_config('libroot') . 'layoutpreviewimage.php');
@@ -33,6 +32,7 @@ if ($new) {
 else {
   define('TITLE', $view->get('title'));
 }
+define('SUBSECTIONHEADING', TITLE);
 
 if (!$USER->can_edit_view($view)) {
     throw new AccessDeniedException();
@@ -41,7 +41,6 @@ if (!$USER->can_edit_view($view)) {
 $view->set_edit_nav();
 $view->set_user_theme();
 $numrows = $view->get('numrows');
-$numcolumns = $view->get('numcolumns');
 $layoutcolumns = View::$layoutcolumns; // static, all possible column width combinations
 $layoutrows = $view->get_layoutrows();
 $maxlayoutrows = View::$maxlayoutrows; // static, max possible rows for custom layouts
@@ -190,11 +189,8 @@ $smarty->assign('edittitle', $view->can_edit_title());
 $smarty->assign('displaylink', $view->get_url());
 $smarty->assign('new', $new);
 $smarty->assign('issiteview', $view->get('institution') == 'mahara');
-if ($view->get('owner') == "0") {
-    $smarty->assign('issitetemplate', true);
-}
+$smarty->assign('issitetemplate', $view->is_site_template());
 $smarty->assign('PAGEHEADING', $state);
-$smarty->assign('subsectionheading', TITLE);
 $smarty->display('view/layout.tpl');
 
 function viewlayout_validate(Pieform $form, $values) {

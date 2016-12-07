@@ -119,11 +119,17 @@ jQuery(function($) {
     /*
      * Initialise masonry for thumbnail gallery
      */
-     function initThumbnailMasonry() {
+    function initThumbnailMasonry() {
          $('.js-masonry.thumbnails').masonry({
              itemSelector: '.thumb'
          });
      }
+
+    function initUserThumbnailMasonry() {
+        $('.js-masonry.user-thumbnails').masonry({
+             itemSelector: '.user-icon'
+        });
+    }
 
     function handleInputDropdown(context) {
         var val = context.find('select').find('option:selected').text();
@@ -140,10 +146,11 @@ jQuery(function($) {
     }
 
     function attachInputDropdown() {
-
-        var context = $('.js-dropdown-group');
-
-        handleInputDropdown(context);
+        // Sets a new context for every .js-dropdown-group item
+        $('.js-dropdown-group').each(function () {
+            var context = $(this);
+            handleInputDropdown(context);
+        })
 
         $('.js-dropdown-group select').on('change', function(){
             var context = $(this).closest('.js-dropdown-group');
@@ -172,13 +179,37 @@ jQuery(function($) {
         });
     }
 
+    function calculateObjectVideoAspectRatio() {
+        var allVideos = $('.mediaplayer object > object'),
+            i;
+        for (i = 0; i < allVideos.length; i = i + 1) {
+            $(allVideos[i]).attr('data-aspectRatio', allVideos[i].height / allVideos[i].width);
+        }
+    }
+
+    function responsiveObjectVideo() {
+        var allVideos = $('.mediaplayer object > object'),
+            i,
+            fluidEl,
+            newWidth;
+        for (i = 0; i < allVideos.length; i = i + 1) {
+            fluidEl = $(allVideos[i]).parents('.mediaplayer-container'),
+            newWidth = $(fluidEl).width();
+            $(allVideos[i]).removeAttr('height').removeAttr('width');
+            $(allVideos[i]).width(newWidth).height(newWidth * $(allVideos[i]).attr('data-aspectRatio'));
+        }
+    }
+
     $(window).on('resize colresize', function(){
         carouselHeight();
         initThumbnailMasonry();
+        initUserThumbnailMasonry();
+        responsiveObjectVideo()
     });
 
     $(window).on('load', function() {
         carouselHeight();
+        initUserThumbnailMasonry();
     });
 
     $('.block.collapse').on('shown.bs.collapse', function() {
@@ -199,6 +230,8 @@ jQuery(function($) {
     focusOnOpen();
     resetOnCollapse();
     attachTooltip();
+    calculateObjectVideoAspectRatio();
+    responsiveObjectVideo()
 
     if ($('.js-dropdown-group').length > 0){
         attachInputDropdown();

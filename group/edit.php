@@ -12,7 +12,6 @@
 define('INTERNAL', 1);
 define('MENUITEM', 'groups/groupsiown');
 require(dirname(dirname(__FILE__)) . '/init.php');
-require_once('pieforms/pieform.php');
 require_once('group.php');
 require_once(get_config('libroot') . 'antispam.php');
 require_once('embeddedimage.php');
@@ -21,7 +20,7 @@ if ($id = param_integer('id', null)) {
     define('TITLE', get_string('editgroup', 'group'));
     define('GROUP', $id);
 
-    if (!group_user_access($id)) {
+    if (!group_user_can_configure($id)) {
         $SESSION->add_error_msg(get_string('canteditdontown', 'group'));
         redirect('/group/mygroups.php');
     }
@@ -33,7 +32,7 @@ if ($id = param_integer('id', null)) {
     }
 
     $group_data = $group_data[0];
-
+    define('SUBSECTIONHEADING', TITLE);
     // Fix dates to unix timestamps instead of formatted timestamps.
     $group_data->editwindowstart = isset($group_data->editwindowstart) ? strtotime($group_data->editwindowstart) : null;
     $group_data->editwindowend = isset($group_data->editwindowend) ? strtotime($group_data->editwindowend) : null;
@@ -84,6 +83,7 @@ $form = array(
             'rules'        => array( 'required' => true, 'maxlength' => 128 ),
             'defaultvalue' => $group_data->name,
         ),
+        'shortname' => group_get_shortname_element($group_data),
         'description' => array(
             'type'         => 'wysiwyg',
             'title'        => get_string('groupdescription', 'group'),
@@ -389,9 +389,9 @@ $elements['viewnotify'] = array(
 );
 $elements['feedbacknotify'] = array(
     'type' => 'select',
-    'title' => get_string('feedbacknotify', 'group'),
+    'title' => get_string('commentnotify', 'group'),
     'options' => $notifyroles,
-    'description' => get_string('feedbacknotifydescription1', 'group'),
+    'description' => get_string('commentnotifydescription1', 'group'),
     'defaultvalue' => $group_data->feedbacknotify
 );
 if ($cancreatecontrolled) {
@@ -418,6 +418,21 @@ function editgroup_validate(Pieform $form, $values) {
         if ($ids = get_records_sql_array('SELECT id FROM {group} WHERE LOWER(TRIM(name)) = ?', array(strtolower(trim($values['name']))))) {
             if (count($ids) > 1 || $ids[0]->id != $group_data->id) {
                 $form->set_error('name', get_string('groupalreadyexists', 'group'));
+            }
+        }
+    }
+
+    if (isset($values['shortname']) && $group_data->id) {
+        if (!preg_match('/^[a-zA-Z0-9_.-]{2,255}$/', $values['shortname'])) {
+            $form->set_error('shortname', get_string('shortnameformat', 'group'));
+        }
+
+        if ($group_data->shortname != $values['shortname']) {
+            // This check has not always been case-insensitive; don't use get_record in case we get >1 row back.
+            if ($ids = get_records_sql_array('SELECT id FROM {group} WHERE LOWER(TRIM(shortname)) = ?', array(strtolower(trim($values['shortname']))))) {
+                if (count($ids) > 1 || $ids[0]->id != $group_data->id) {
+                    $form->set_error('shortname', get_string('groupshortnamealreadyexists', 'group'));
+                }
             }
         }
     }
@@ -494,6 +509,11 @@ function editgroup_submit(Pieform $form, $values) {
         'sendnow'        => intval($values['sendnow']),
         'feedbacknotify'     => intval($values['feedbacknotify']),
     );
+
+    // Only admins can only update shortname.
+    if (isset($values['shortname']) && $USER->can_edit_group_shortname($group_data)) {
+        $newvalues['shortname'] = $values['shortname'];
+    }
 
     if (
             get_config('cleanurls')
@@ -602,7 +622,6 @@ jQuery(function($) {
 
 $smarty = smarty();
 $smarty->assign('form', $editgroup);
-$smarty->assign('PAGEHEADING', TITLE);
-$smarty->assign('subsectionheading', $group_data->name);
+$smarty->assign('PAGEHEADING', !empty($group_data->name) ? $group_data->name : TITLE);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->display('form.tpl');
