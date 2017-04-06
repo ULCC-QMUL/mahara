@@ -220,56 +220,26 @@ class PluginArtefactFile extends PluginArtefact {
      * This can be called on install (and is, in the postinst method above),
      * and every time an upgrade is made that changes the file.
      */
-    function resync_filetype_list() {
+    public static function resync_filetype_list() {
         require_once('xmlize.php');
         db_begin();
 
-        $currentlist = get_records_assoc('artefact_file_mime_types');
+        delete_records('artefact_file_mime_types');
+
         $newlist     = xmlize(file_get_contents(get_config('docroot') . 'artefact/file/filetypes.xml'));
         $filetypes   = $newlist['filetypes']['#']['filetype'];
-        $newtypes    = array();
 
-        $count = array('added' => 0, 'updated' => 0, 'removed' => 0);
-
-        // Step one: if a mimetype is in the new list that is not in the current
-        // list, add it to the current list.
         foreach ($filetypes as $filetype) {
             $description = $filetype['#']['description'][0]['#'];
             foreach ($filetype['#']['mimetypes'][0]['#']['mimetype'] as $type) {
                 $mimetype = $type['#'];
-                if (!isset($currentlist[$mimetype])) {
-                    execute_sql("INSERT INTO {artefact_file_mime_types} (mimetype, description) VALUES (?,?)", array($mimetype, $description));
-                    $count['added']++;
-                }
-                else if ($currentlist[$mimetype]->description != $description) {
-                    execute_sql("UPDATE {artefact_file_mime_types} SET description = ? WHERE mimetype = ?", array($description, $mimetype));
-                    $count['updated']++;
-                }
-                $newtypes[$mimetype] = true;
-                $currentlist[$mimetype] = (object) array(
-                    'mimetype'    => $mimetype,
-                    'description' => $description,
-                );
-            }
-        }
-
-        // Step two: If a mimetype is in the current list that is not in the
-        // new list, remove it from the current list.
-        foreach ($currentlist as $mimetype => $type) {
-            if (!isset($newtypes[$mimetype])) {
-                delete_records('artefact_file_mime_types', 'mimetype', $mimetype);
-                $count['removed']++;
+                execute_sql("INSERT INTO {artefact_file_mime_types} (mimetype, description) VALUES (?,?)", array($mimetype, $description));
             }
         }
 
         db_commit();
-        $changes = array();
-        foreach (array_filter($count) as $k => $v) {
-            $changes[] = "$v $k";
-        }
-        if ($changes) {
-            log_info('Updated filetype list: ' . join(', ', $changes) . '.');
-        }
+
+        log_info('Synced filetype list with filetypes.xml');
     }
 
     public static function get_mimetypes_from_description($description=null, $getrecords=false) {
@@ -2428,6 +2398,8 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
      * Render's the icon thumbnail for the specified user
      */
     public static function download_thumbnail_for_user($userid) {
+        global $THEME;
+
         $size = get_imagesize_parameters();
         $earlyexpiry = param_boolean('earlyexpiry', false);
 
@@ -2440,7 +2412,7 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
         );
 
         // User has a profile icon file selected. Use it.
-        if (!empty($data->profileicon)) {
+        if (!empty($data) && !empty($data->profileicon)) {
             $id = $data->profileicon;
             $mimetype = $data->filetype;
 
@@ -2450,9 +2422,8 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
         }
 
         // No profile icon file selected. Go through fallback icons.
-
         // Look for an appropriate image on gravatar.com
-        $useremail = $data->email;
+        $useremail = !empty($data) ? $data->email : false;
         if ($useremail and $gravatarurl = remote_avatar_url($useremail, $size)) {
             redirect($gravatarurl);
         }
@@ -2505,7 +2476,7 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
     /**
      * Render's the icon's thumbnail and exits
      */
-    public static function download_thumbnail($artefactid) {
+    public static function download_thumbnail($artefactid, $type=null) {
         global $USER;
         $id = $artefactid;
         $size = get_imagesize_parameters();
@@ -2557,6 +2528,11 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
                     perf_to_log();
                     exit;
                 }
+            }
+            else {
+                // If we can't find the profile icon by id (deleted off server) then show the one
+                // for nonexistant user, defaults to no_userphoto
+                self::download_thumbnail_for_user(-1);
             }
         }
     }

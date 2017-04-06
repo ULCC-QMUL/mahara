@@ -101,8 +101,9 @@ if (!empty($direction)) {
             }
             // Check if the collection has a secret url token for any of the existing views
             $hassecreturl = false;
-            if (!empty(array_merge($differentarray, $viewids))) {
-                if (count_records_sql("SELECT token FROM {view_access} WHERE view IN (" . join(',', array_merge($differentarray, $viewids)) . ") AND (token IS NOT NULL AND token !='')")) {
+            $views_all = array_merge($differentarray, $viewids);
+            if (!empty($views_all)) {
+                if (record_exists_select("view_access", "view IN (" . join(',', array_merge($differentarray, $viewids)) . ") AND (token IS NOT NULL AND token !='')")) {
                     $hassecreturl = true;
                 }
             }
