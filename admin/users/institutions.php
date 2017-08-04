@@ -598,6 +598,13 @@ if ($institution || $add) {
         'description'  => get_string('reviewsselfdeletiondescription','admin'),
         'disabled'     => get_config('defaultreviewselfdeletion') == true,
         'defaultvalue' => get_config('defaultreviewselfdeletion') ? get_config('defaultreviewselfdeletion') : (isset($data->reviewselfdeletion) && $data->reviewselfdeletion),
+    $elements['allowinstitutiontags'] = array(
+        'type'         => 'switchbox',
+        'title'        => get_string('allowinstitutiontags', 'tags'),
+        'description'  => get_string('allowinstitutiontagsdescription', 'tags'),
+        'defaultvalue' => is_plugin_active('framework', 'module') && $data->tags,
+        'disabled'     => is_plugin_active('framework', 'module') == false,
+        'help'         => true,
     );
     $elements['lockedfields'] = array(
         'type' => 'fieldset',
@@ -945,6 +952,7 @@ function institution_submit(Pieform $form, $values) {
 
     $newinstitution->allowinstitutionpublicviews  = (isset($values['allowinstitutionpublicviews']) && $values['allowinstitutionpublicviews']) ? 1 : 0;
     $newinstitution->allowinstitutionsmartevidence  = (isset($values['allowinstitutionsmartevidence']) && $values['allowinstitutionsmartevidence']) ? 1 : 0;
+    $newinstitution->tags  = (isset($values['allowinstitutiontags']) && $values['allowinstitutiontags']) ? 1 : 0;
 
     // do not set 'reviewselfdeletion' if it has never been changed at institution level
     // and the value is the same as site setting 'defaultreviewselfdeletion'
