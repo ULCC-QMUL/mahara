@@ -4796,5 +4796,66 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
+    if ($oldversion < 2017092503) {
+        log_debug('Add tag table');
+        $table = new XMLDBTable('tag');
+        $table->addFieldInfo('id', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        $table->addFieldInfo('text', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('owner', XMLDB_TYPE_INTEGER, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('editedby', XMLDB_TYPE_INTEGER, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('ctime', XMLDB_TYPE_DATETIME, null, XMLDB_NOTNULL);
+        $table->addFieldInfo('mtime', XMLDB_TYPE_DATETIME, null, XMLDB_NOTNULL);
+
+        $table->addKeyInfo('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->addKeyInfo('editedby', XMLDB_KEY_FOREIGN, array('editedby'), 'usr', array('id'));
+        $table->addKeyInfo('owner', XMLDB_KEY_FOREIGN, array('owner'), 'institution', array('id'));
+        create_table($table);
+        clear_menu_cache();
+
+        log_debug('Add a "tagid" field to the artefact_tag table');
+        $table = new XMLDBTable('artefact_tag');
+        $institutionfield = new XMLDBField('institution');
+        if (field_exists($table, $institutionfield)) {
+            drop_field($table, $institutionfield);
+        }
+        $field = new XMLDBField('tagid');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null, null, 0);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+
+        log_debug('Add a "tagid" field to the collection_tag table');
+        $table = new XMLDBTable('collection_tag');
+        if (field_exists($table, $institutionfield)) {
+            drop_field($table, $institutionfield);
+        }
+        $field = new XMLDBField('tagid');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null, null, 0);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+
+        log_debug('Add a "tagid" field to the view_tag table');
+        $table = new XMLDBTable('view_tag');
+        if (field_exists($table, $institutionfield)) {
+            drop_field($table, $institutionfield);
+        }
+        $field = new XMLDBField('tagid');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null, null, 0);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+
+        log_debug('Add a "tagid" field to the usr_tag table');
+        $table = new XMLDBTable('usr_tag');
+        if (field_exists($table, $institutionfield)) {
+            drop_field($table, $institutionfield);
+        }
+        $field = new XMLDBField('tagid');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null, null, 0);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+    }
     return $status;
 }

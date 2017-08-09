@@ -10,9 +10,11 @@
                 <FIELD NAME="block_instance" TYPE="int" LENGTH="10" NOTNULL="true" />
                 <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
                 <FIELD NAME="tagtype" TYPE="int" LENGTH="10" NOTNULL="true" />
+                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
             </FIELDS>
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="id" />
+                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
             <INDEXES>
                 <INDEX NAME="tagtagtypeix" UNIQUE="false" FIELDS="tag,tagtype"/>
