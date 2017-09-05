@@ -36,10 +36,10 @@
 
                 <span class="complete-task">
                     {if $task->completed == 1}
-                        <span class="icon icon-check-square-o icon-lg text-success left" role="presentation" aria-hidden="true"></span>
+                        <span class="icon icon-check-square-o icon-lg text-success left" role="presentation" aria-hidden="true" {if $editing}onclick="changeCheckBox(this, '{$task->id}')"{/if}></span>
                         <span class="sr-only">{str tag=completed section=artefact.plans}</span>
                     {else}
-                        <span class="icon-square-o icon icon-lg text-midtone left" role="presentation" aria-hidden="true"></span>
+                        <span class="icon-square-o icon icon-lg text-midtone left" role="presentation" aria-hidden="true" {if $editing}onclick="changeCheckBox(this, '{$task->id}')"{/if}></span>
                         <span class="sr-only">{str tag=incomplete section=artefact.plans}</span>
                     {/if}
 
