@@ -28,7 +28,10 @@ $task = new ArtefactTypeTask($id);
 if (!$USER->can_edit_artefact($task)) {
     throw new AccessDeniedException(get_string('accessdenied', 'error'));
 }
-
+// This SESSION variable is necessary for the return to the previous page after task edit.
+if (!$SESSION->get('artefact-plan_returnurl')) {
+    $SESSION->set('artefact-plan_returnurl', $_SERVER['HTTP_REFERER']);
+}
 $form = ArtefactTypeTask::get_form($task->get('parent'), $task);
 
 $smarty = smarty();

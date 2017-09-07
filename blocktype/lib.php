@@ -991,6 +991,10 @@ class BlockInstance {
 
         // CUSTOM Catalyst - for the QM Framework Dashboard use a different block editing template.
         if (strpos($_SERVER['REQUEST_URI'], 'module/qmframework')) {
+            // If there is no artefact added in the blocktype, $configdata['artefactid'] is not deffined.
+            if (isset($configdata['artefactid'])) {
+                $smarty->assign('planid', $configdata['artefactid']);
+            }
             return array('html' => $smarty->fetch('module:qmframework:blockedit.tpl'), 'javascript' => $js, 'pieformcss' => $css);
         } else {
             return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);

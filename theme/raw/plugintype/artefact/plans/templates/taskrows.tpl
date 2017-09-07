@@ -51,6 +51,11 @@
                     {if $task->description}
                     <span class="icon icon-chevron-down right collapse-indicator pull-right" role="presentation" aria-hidden="true"></span>
                     {/if}
+
+                    {if $editing}
+                    <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span class="pull-right" role="presentation" aria-hidden="true">Edit </span></a>
+                    {/$if}
+
                 </span>
 
             {if $task->description}</a>{/if}
