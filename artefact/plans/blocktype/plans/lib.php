@@ -76,7 +76,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     'jsonscript' => 'artefact/plans/viewtasks.json.php',
                 );
             }
-            ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination);
+            ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination, $editing);
 
             if ($exporter && $tasks['count'] > $tasks['limit']) {
                 $artefacturl = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $configdata['artefactid']
