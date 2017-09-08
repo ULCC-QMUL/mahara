@@ -33,7 +33,13 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $configdata = $bi->get('configdata');
 
         if (!empty($configdata['artefactid'])) {
-            return $bi->get_artefact_instance($configdata['artefactid'])->get('title');
+            if (is_array($configdata['artefactid']) && count($configdata['artefactid']) > 1) {
+                return get_string('title', 'blocktype.plans/plans');
+            } else if (count($configdata['artefactid']) == 1) {
+                return $bi->get_artefact_instance($configdata['artefactid'][0])->get('title');
+            } else {
+                return $bi->get_artefact_instance($configdata['artefactid'])->get('title');
+            }
         }
         return '';
     }
@@ -58,35 +64,45 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
 
         $smarty = smarty_core();
-        if (isset($configdata['artefactid'])) {
-            $plan = artefact_instance_from_id($configdata['artefactid']);
-            $tasks = ArtefactTypeTask::get_tasks($configdata['artefactid'], 0, $limit);
-            $template = 'artefact:plans:taskrows.tpl';
-            $blockid = $instance->get('id');
-            if ($exporter) {
-                $pagination = false;
-            }
-            else {
-                $baseurl = $instance->get_view()->get_url();
-                $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
-                $pagination = array(
-                    'baseurl'   => $baseurl,
-                    'id'        => 'block' . $blockid . '_pagination',
-                    'datatable' => 'tasklist_' . $blockid,
-                    'jsonscript' => 'artefact/plans/viewtasks.json.php',
-                );
-            }
-            ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination, $editing);
+        if (isset($configdata['artefactid']) && count($configdata['artefactid']) > 0) {
+            $plans = array();
+            $alltasks = array();
+            foreach ($configdata['artefactid'] as $planid) {
+                $plan = artefact_instance_from_id($planid);
+                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
-            if ($exporter && $tasks['count'] > $tasks['limit']) {
-                $artefacturl = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $configdata['artefactid']
-                    . '&view=' . $instance->get('view');
-                $tasks['pagination'] = '<a href="' . $artefacturl . '">' . get_string('alltasks', 'artefact.plans') . '</a>';
+                $template = 'artefact:plans:taskrows.tpl';
+                $blockid = $instance->get('id');
+                if ($exporter) {
+                    $pagination = false;
+                } else {
+                    $baseurl = $instance->get_view()->get_url();
+                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
+                    $pagination = array(
+                        'baseurl'   => $baseurl,
+                        'id'        => 'block' . $blockid . '_pagination',
+                        'datatable' => 'tasklist_' . $blockid,
+                        'jsonscript' => 'artefact/plans/viewtasks.json.php',
+                    );
+                }
+                ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination, $editing);
+
+                if ($exporter && $tasks['count'] > $tasks['limit']) {
+                    $artefacturl = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $planid
+                        . '&view=' . $instance->get('view');
+                    $tasks['pagination'] = '<a href="' . $artefacturl . '">' . get_string('alltasks', 'artefact.plans') . '</a>';
+                }
+                $plans[$planid]['id'] = $planid;
+                $plans[$planid]['description'] = $plan->get('description');
+                $plans[$planid]['owner'] = $plan->get('owner');
+                $plans[$planid]['tags'] = $plan->get('tags');
+                $plans[$planid]['numtasks'] = $tasks['count'];
+
+                $tasks['planid'] = $planid;
+                array_push($alltasks, $tasks);
             }
-            $smarty->assign('description', $plan->get('description'));
-            $smarty->assign('owner', $plan->get('owner'));
-            $smarty->assign('tags', $plan->get('tags'));
-            $smarty->assign('tasks', $tasks);
+            $smarty->assign('plans', $plans);
+            $smarty->assign('alltasks', $alltasks);
         }
         else {
             $smarty->assign('noplans','blocktype.plans/plans');
@@ -126,7 +142,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             'title' => get_string('planstoshow', 'blocktype.plans/plans'),
             'defaultvalue' => $default,
             'blocktype' => 'plans',
-            'selectone' => true,
+            'selectone' => false,
             'search'    => false,
             'artefacttypes' => array('plan'),
             'template'  => 'artefact:plans:artefactchooser-element.tpl',
