@@ -1,5 +1,11 @@
 {foreach from=$plans item=plan}
 <div class="panel-body flush">
+    {if $editing}
+        <div style="float:right">
+            <a href="{$WWWROOT}artefact/plans/edit/index.php?id={$plan.id}">Edit plan</a> |
+            <a href="{$WWWROOT}artefact/plans/new.php?id={$plan.id}">Add task</a>
+        </div>
+    {/if}
     <p>{$plan.description}</p>
 
     {if $plan.tags}

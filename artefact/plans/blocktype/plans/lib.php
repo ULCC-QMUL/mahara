@@ -101,6 +101,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $tasks['planid'] = $planid;
                 array_push($alltasks, $tasks);
             }
+            $smarty->assign('editing', $editing);
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);
         }
