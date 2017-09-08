@@ -1061,8 +1061,17 @@ class BlockInstance {
         $configdata = $this->get('configdata');
         if (!empty($configdata['artefactid'])) {
             if (call_static_method($classname, 'has_title_link')) {
-                $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
-                    . $configdata['artefactid'] . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
+                if (is_array($configdata['artefactid'])) {
+                    foreach ($configdata['artefactid'] as $plan) {
+                        $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
+                            . $plan . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
+                        // On each $smarty->assign a new object(Dwoo_Mahara) gets created that will be assigning to each
+                        // block instance in the build_column function defined in the htdocs/lib/view.php file.
+                    }
+                } else {
+                    $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
+                        . $configdata['artefactid'] . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
+                }
             }
         }
 
