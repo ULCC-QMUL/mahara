@@ -1,0 +1,21 @@
+[submodule "theme/qmulpurple"]
+	path = theme/qmulpurple
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpurple.git
+[submodule "theme/qmulpink"]
+	path = theme/qmulpink
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpink.git
+[submodule "theme/qmulblue"]
+	path = theme/qmulblue
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmulblue.git
+[submodule "theme/qmul"]
+	path = theme/qmul
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmul.git
+[submodule "artefact/cloud"]
+	path = artefact/cloud
+	url = git@github.com:povsod/mahara-artefact-cloud.git
+[submodule "artefact/cpds"]
+	path = artefact/cpds
+	url = git@github.com:ULCC-QMUL/mahara-artefact_cpds.git
+[submodule "module/qmframework"]
+	path = module/qmframework
+	url = git@github.com:ULCC-QMUL/mahara-module_qmframework.git
