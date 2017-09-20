@@ -89,4 +89,17 @@ abstract class PluginModule extends Plugin {
     public static function institution_staff_menu_items() {
         return array();
     }
+
+    /**
+     * This function returns an array of group menu items
+     * to be displayed
+     *
+     * See the function find_menu_children() in lib/web.php
+     * for a description of the expected array structure.
+     *
+     * @return array
+     */
+    public static function group_menu_items($group) {
+        return array();
+    }
 }
