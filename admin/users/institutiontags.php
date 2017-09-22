@@ -20,7 +20,7 @@ require(dirname(dirname(dirname(__FILE__))) . '/init.php');
 require_once(get_config('libroot') . 'institution.php');
 
 $institution = param_alphanum('institution', false);
-$offset = param_integer('offset', 0);
+$new = param_boolean('new', 0);
 
 // Get all the institutions that the current user has access to.
 $institutionelement = get_institution_selector(true, false, false, false, true);
@@ -48,16 +48,117 @@ $institutionselector = pieform(array(
 $wwwroot = get_config('wwwroot');
 $js = <<< EOF
 function reloadTags() {
-    window.location.href = '{$wwwroot}admin/users/institutiontags.php?institution='+$('usertypeselect_institution').value;
+    window.location.href = '{$wwwroot}admin/users/institutiontags.php?new={$new}&institution='+$('usertypeselect_institution').value;
 }
 addLoadEvent(function() {
     connect($('usertypeselect_institution'), 'onchange', reloadTags);
 });
 EOF;
 
+// Check if user is a institution admin
+$canedit = $USER->get('admin') || $USER->is_institutional_admin();
+if (!$canedit) {
+    throw new AccessDeniedException(get_string('cantlistinstitutiontags', 'tags'));
+}
+
+// Building the new tag form.
+$elements = array(
+    'tag' => array(
+        'type' => 'text',
+        'defaultvalue' => null,
+        'title' => get_string('institutiontags', 'tags'),
+        'size' => 30,
+        'rules' => array(
+            'required' => true,
+        ),
+    ),
+    'submit' => array(
+        'type'    => 'submitcancel',
+        'class'   => 'btn-primary',
+        'value'   => array(get_string('save'), get_string('cancel')),
+        'confirm' => null,
+    )
+);
+$form = pieform(array(
+    'name'       => 'institutiontag',
+    'plugintype' => 'core',
+    'pluginname' => 'tags',
+    'elements'   => $elements,
+));
+
+
+/**
+ * Submit the new institution tag form
+ *
+ * @param Pieform  $form   The form to submit
+ * @param array    $values The values submitted
+ */
+function institutiontag_submit(Pieform $form, $values) {
+    global $SESSION, $institution, $USER;
+
+    $institutiontag = new stdClass;
+    $institutiontag->text     = $values['tag'];
+    $institutiontag->owner    = get_field('institution', 'id', 'name', $institution);
+    $institutiontag->editedby = $USER->id;
+    $institutiontag->ctime    = date("Y-m-d", time());
+    $institutiontag->mtime    = date("Y-m-d", time());
+
+    $id = insert_record('tag', $institutiontag, 'id', true);
+    if ($id) {
+        $SESSION->add_ok_msg(get_string('institutiontagsaved', 'tags'));
+    } else {
+        $SESSION->add_error_msg(get_string('institutiontagcantbesaved', 'tags'));
+    }
+    redirect("/admin/users/institutiontags.php?institution={$institution}");
+}
+
+/**
+ * Cancel the submission of the new institution tag form.
+ */
+function institutiontag_cancel_submit() {
+    global $institution;
+    redirect("/admin/users/institutiontags.php?institution={$institution}");
+}
+
+/**
+ * Validate the submitted data from the new institution tag form. New tags must not:
+ *  - be empty strings
+ *  - match an existing tag within the institution
+ *
+ * @param Pieform  $form   The form to validate
+ * @param array    $values The values submitted
+ */
+function institutiontag_validate(Pieform $form, $values) {
+    global $institution;
+
+    // Don't even start attempting to parse if there are previous errors
+    if ($form->has_errors()) {
+        return;
+    }
+    if (empty(trim($values['tag'])) || trim($values['tag']) === '') {
+        $form->set_error('tag', get_string('error:emptytag', 'tags'));
+        return;
+    }
+    $id = get_field('institution', 'id', 'name', $institution);
+    if (record_exists('tag', 'owner', $id, 'text', $values['tag'])) {
+        $form->set_error('tag', get_string('error:duplicatetag', 'tags'));
+        return;
+    }
+}
+
+// Get the exiting institution tags.
+$id   = get_field('institution', 'id', 'name', $institution);
+$tags = get_records_sql_array('SELECT * FROM {tag} t WHERE owner = ?', array((int)$id));
+
 $smarty = smarty(array('paginator'));
 setpageicon($smarty, 'icon-university');
-
 $smarty->assign('institutionselector', $institutionselector);
 $smarty->assign('INLINEJAVASCRIPT', $js);
+$smarty->assign('canedit', $canedit);
+$smarty->assign('institution', $institution);
+$smarty->assign('new', $new);
+$smarty->assign('form', $form);
+$smarty->assign('tags', $tags);
+$smarty->assign('SUBPAGETOP', 'admin/users/institutiontagsactions.tpl');
+$smarty->assign('addonelink', get_config('wwwroot') . "admin/users/institutiontags.php?new=1&institution={$institution}");
 $smarty->display('admin/users/institutiontags.tpl');
