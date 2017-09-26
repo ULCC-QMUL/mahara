@@ -120,6 +120,7 @@ function institutiontag_cancel_submit() {
     redirect("/admin/users/institutiontags.php?institution={$institution}");
 }
 
+$institutionid = get_field('institution', 'id', 'name', $institution);
 /**
  * Validate the submitted data from the new institution tag form. New tags must not:
  *  - be empty strings
@@ -139,8 +140,7 @@ function institutiontag_validate(Pieform $form, $values) {
         $form->set_error('tag', get_string('error:emptytag', 'tags'));
         return;
     }
-    $id = get_field('institution', 'id', 'name', $institution);
-    if (record_exists('tag', 'owner', $id, 'text', $values['tag'])) {
+    if (record_exists('tag', 'owner', $institutionid, 'text', $values['tag'])) {
         $form->set_error('tag', get_string('error:duplicatetag', 'tags'));
         return;
     }

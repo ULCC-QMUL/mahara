@@ -1051,21 +1051,33 @@ class PluginSearchInternal extends PluginSearch {
                     if (!empty($ids['view'])) {
                         if ($viewtags = get_records_select_array('view_tag', 'view IN (' . join(',', array_keys($ids['view'])) . ')')) {
                             foreach ($viewtags as &$vt) {
-                                $data['view:' . $vt->view]->tags[] = $vt->tag;
+                                if ($institutiontag = get_field('tag', 'owner', 'text', $vt->tag)) {
+                                    $data['view:' . $vt->view]->tags[] = $vt->tag . '(' . get_field('institution', 'displayname', 'id', $institutiontag) . ')';
+                                } else {
+                                    $data['view:' . $vt->view]->tags[] = $vt->tag;
+                                }
                             }
                         }
                     }
                     if (!empty($ids['collection'])) {
                         if ($collectiontags = get_records_select_array('collection_tag', 'collection IN (' . join(',', array_keys($ids['collection'])) . ')')) {
                             foreach ($collectiontags as &$ct) {
-                                $data['collection:' . $ct->collection]->tags[] = $ct->tag;
+                                if ($institutiontag = get_field('tag', 'owner', 'text', $at->tag)) {
+                                    $data['collection:' . $ct->collection]->tags[] = $ct->tag . '(' . get_field('institution', 'displayname', 'id', $institutiontag) . ')';
+                                } else {
+                                    $data['collection:' . $ct->collection]->tags[] = $ct->tag;
+                                }
                             }
                         }
                     }
                     if (!empty($ids['artefact'])) {
                         if ($artefacttags = get_records_select_array('artefact_tag', 'artefact IN (' . join(',', array_keys($ids['artefact'])) . ')', NULL, 'tag')) {
                             foreach ($artefacttags as &$at) {
-                                $data['artefact:' . $at->artefact]->tags[] = $at->tag;
+                                if ($institutiontag = get_field('tag', 'owner', 'text', $at->tag)) {
+                                    $data['artefact:' . $at->artefact]->tags[] = $at->tag . '(' . get_field('institution', 'displayname', 'id', $institutiontag) . ')';
+                                } else {
+                                    $data['artefact:' . $at->artefact]->tags[] = $at->tag;
+                                }
                             }
                         }
                     }
