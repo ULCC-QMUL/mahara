@@ -128,7 +128,7 @@ jQuery(function($) {
                   }
                   var edit_tag_link = $('#results_container a.edit-tag').first();
                   if (edit_tag_link.length) {
-                      if (data.data.tag) {
+                      if (data.data.tagg && !data.data.is_institution_tag) {
                           edit_tag_link.prop('href', config.wwwroot + 'edittags.php?tag=' + data.data.tagurl);
                           edit_tag_link.removeClass('hidden');
                       }
@@ -202,11 +202,16 @@ if (strpos($data->baseurl, 'tags.php?') !== 0) {
 else {
     $data->queryprefix = '&';
 }
+$notinstitutiontag = true;
+if ($tag && get_field('tag', 'id', 'text', $tag)) {
+    $notinstitutiontag = false;
+}
 
 $smarty = smarty(array('paginator'));
 $smarty->assign('tags', $tags);
 $smarty->assign('tagsortoptions', $tagsortoptions);
 $smarty->assign('tag', $tag);
+$smarty->assign('not_institution_tag', $notinstitutiontag);
 $smarty->assign('results', $data);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->display('tags.tpl');
