@@ -14,6 +14,16 @@
                             {$tag->text}
                         </h3>
                     </div>
+                    <div class="col-md-3">
+                      <div class="inner-link btn-action-list">
+                        <div class="btn-top-right btn-group btn-group-top">
+                            <a href="{$WWWROOT}/admin/users/institutiontags.php?tag={$tag->text}&institution={$institution}" title="{str tag=deleteinstitutiontag section=tags}" class="btn btn-default btn-xs">
+                          <span class="icon icon-trash icon-lg text-danger" role="presentation" aria-hidden="true"></span>
+                          <span class="sr-only">{str tag=deleteinstitutiontag section=tags}</span>
+                            </a>
+                        </div>
+                      </div>
+                    </div>
                 </div>
             </div>
         </div>

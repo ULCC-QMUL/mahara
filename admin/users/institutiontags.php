@@ -21,6 +21,7 @@ require_once(get_config('libroot') . 'institution.php');
 
 $institution = param_alphanum('institution', false);
 $new = param_boolean('new', 0);
+$tag = param_variable('tag', null);
 
 // Get all the institutions that the current user has access to.
 $institutionelement = get_institution_selector(true, false, false, false, true);
@@ -120,7 +121,6 @@ function institutiontag_cancel_submit() {
     redirect("/admin/users/institutiontags.php?institution={$institution}");
 }
 
-$institutionid = get_field('institution', 'id', 'name', $institution);
 /**
  * Validate the submitted data from the new institution tag form. New tags must not:
  *  - be empty strings
@@ -131,6 +131,7 @@ $institutionid = get_field('institution', 'id', 'name', $institution);
  */
 function institutiontag_validate(Pieform $form, $values) {
     global $institution;
+    $institutionid = get_field('institution', 'id', 'name', $institution);
 
     // Don't even start attempting to parse if there are previous errors
     if ($form->has_errors()) {
@@ -144,6 +145,33 @@ function institutiontag_validate(Pieform $form, $values) {
         $form->set_error('tag', get_string('error:duplicatetag', 'tags'));
         return;
     }
+}
+
+$institutionid = get_field('institution', 'id', 'name', $institution);
+// Delete tag.
+if ($tag) {
+    $tagid = (int) get_field('tag', 'id', 'text', $tag, 'owner', $institutionid);
+    $tagrecords = get_records_sql_array("
+        SELECT
+            t.tag
+        FROM (
+           (SELECT at.tag FROM {artefact_tag} at WHERE at.tagid = ?)
+           UNION
+           (SELECT vt.tag FROM {view_tag} vt WHERE vt.tagid = ?)
+           UNION
+           (SELECT ct.tag FROM {collection_tag} ct WHERE ct.tagid = ?)
+    ) t",
+        array($tagid, $tagid, $tagid)
+    );
+    if (!$tagrecords) {
+        db_begin();
+        delete_records_select('tag', "owner = $institutionid AND text = '$tag'");
+        db_commit();
+        $SESSION->add_ok_msg(get_string('institutiontagdeleted', 'tags'));
+    } else {
+        $SESSION->add_error_msg(get_string('cantdeleteinstitutiontag', 'tags'));
+    }
+    redirect("/admin/users/institutiontags.php?new=0&institution={$institution}");
 }
 
 // Get the exiting institution tags.
