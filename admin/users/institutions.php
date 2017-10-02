@@ -547,8 +547,7 @@ if ($institution || $add) {
         'type'         => 'switchbox',
         'title'        => get_string('allowinstitutiontags', 'tags'),
         'description'  => get_string('allowinstitutiontagsdescription', 'tags'),
-        'defaultvalue' => is_plugin_active('framework', 'module') && $data->tags,
-        'disabled'     => is_plugin_active('framework', 'module') == false,
+        'defaultvalue' => isset($data->tags) ? $data->tags : false,
         'help'         => true,
     );
     $elements['lockedfields'] = array(
