@@ -988,7 +988,14 @@ class BlockInstance {
         if (is_array($css)) {
             $css = array_unique($css);
         }
-        return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+
+        // CUSTOM Catalyst - for the QM Framework Dashboard use a different block editing template.
+        if (strpos($_SERVER['REQUEST_URI'], 'module/qmframework')) {
+            return array('html' => $smarty->fetch('module:qmframework:blockedit.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+        } else {
+            return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+        }
+        // END CUSTOM Catalyst.
     }
 
     /**

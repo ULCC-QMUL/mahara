@@ -1,0 +1,9 @@
+.sidebar {
+    .panel {
+        border-color: $accent-color;
+
+        .list-group-item-link a:hover {
+            //background-colour: $accent-color;
+        }
+    }
+}

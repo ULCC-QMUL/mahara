@@ -203,6 +203,10 @@ class mahara_group_external extends external_api {
             foreach (array('category', 'open', 'controlled', 'request', 'submitpages', 'editroles',
                            'hidemembers', 'invitefriends', 'suggestfriends', 'hidden', 'quota',
                            'hidemembersfrommembers', 'public', 'usersautoadded', 'viewnotify',) as $attr) {
+                if ($attr == 'submitpages') {
+                    $create['submittableto'] = $group['submitpages'];
+                    continue;
+                }
                 if (isset($group[$attr]) && $group[$attr] !== false && $group[$attr] !== null && strlen("" . $group[$attr])) {
                     $create[$attr] = $group[$attr];
                 }
@@ -490,6 +494,10 @@ class mahara_group_external extends external_api {
                            'hidemembers', 'invitefriends', 'suggestfriends',
                            'hidden', 'hidemembersfrommembers',
                            'usersautoadded', 'public', 'viewnotify') as $attr) {
+                if ($attr == 'submitpages') {
+                    $newvalues->submittableto = $group[$attr];
+                    continue;
+                }
                 if (isset($group[$attr]) && $group[$attr] !== false && $group[$attr] !== null && strlen("" . $group[$attr])) {
                     $newvalues->{$attr} = $group[$attr];
                 }

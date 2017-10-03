@@ -1,0 +1,31 @@
+.arrow-bar {
+    .arrow {
+        .text {
+            color: #FFF;
+        }
+    }
+    .nav-inpage.nav {
+        li {
+            a {
+                color: #FFF;
+                &:hover {
+                    color: #FFF;
+                    background-color: $accent-color;
+                }
+            }
+            button {
+                color: #FFF;
+                &:hover {
+                    color: #FFF;
+                    background-color: $accent-color;
+                    text-decoration: none;
+                }
+            }
+            &.active a,
+            &.active button {
+                background-color: #FFF;
+                color: #333;
+            }
+        }
+    }
+}
