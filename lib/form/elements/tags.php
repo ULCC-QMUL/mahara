@@ -38,21 +38,27 @@ function pieform_element_tags(Pieform $form, $element) {
     return pieform_element_autocomplete($form, $newelement);
 }
 
-function translate_tags_to_names(array $ids) {
+function translate_tags_to_names(array $tags) {
     global $USER;
-    // for an empty list, the element '' is transmitted
-    $ids = array_diff($ids, array(''));
+
+    if (empty($tags)) {
+        $tags = array();
+    } else if (count($tags) == 1 && !is_object($tags[0])) { // Legacy fix.
+        $tags = array();
+    }
+
     $results = array();
     $alltags = get_all_tags_for_user();
-
-    foreach ($ids as $id) {
-        if (isset($alltags['tags'][$id])) {
-            $results[] = (object) array('id' => $id, 'text' => display_tag($id, $alltags['tags']));
+    foreach ($tags as $tag) {
+        $id = $tag->tagid != 0 ? $tag->tagid : $tag->tag;
+        if (isset($alltags['tags'][$tag->tag])) {
+            $results[] = (object) array('id' => $id, 'text' => display_tag($tag->tag, $alltags['tags']));
         }
         else {
-            $results[] = (object) array('id' => $id, 'text' => hsc($id));
+            $results[] = (object) array('id' => $id, 'text' => hsc($tag->tag));
         }
     }
+
     return $results;
 }
 
@@ -65,11 +71,16 @@ function translate_tags_to_names(array $ids) {
  * @return $tag Formatted tag
  */
 function display_tag($name, $alltags) {
+    if ($alltags[$name]->prefix && !empty($alltags[$name]->prefix)) {
+        $prefix = $alltags[$name]->prefix;
+        return $prefix . ': '. $name . ' (' . $alltags[$name]->count . ')';
+    }
+
     return $name . ' (' . $alltags[$name]->count . ')';
 }
 
 /**
- * Get all tags created by this user
+ * Get all tags available for this user
  *
  * @param string $query Search option
  * @param int $limit
@@ -84,14 +95,41 @@ function get_all_tags_for_user($query = null, $limit = null, $offset = null) {
         if ($USER->get('admin')) {
             $usertags = "
                 UNION ALL
-                SELECT tag,COUNT(*) AS count FROM {usr_tag} t INNER JOIN {usr} u ON t.usr=u.id GROUP BY 1";
+                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                  FROM {usr_tag} t
+            INNER JOIN {usr} u ON t.usr=u.id
+                 WHERE t.tagid = 0
+              GROUP BY 1";
         }
         else if ($admininstitutions = $USER->get('admininstitutions')) {
             $insql = "'" . join("','", $admininstitutions) . "'";
             $usertags = "
                 UNION ALL
-                SELECT tag,COUNT(*) AS count FROM {usr_tag} t INNER JOIN {usr} u ON t.usr=u.id INNER JOIN {usr_institution} ui ON ui.usr=u.id WHERE ui.institution IN ($insql) GROUP BY 1";
+                SELECT tag, COUNT(*) AS count FROM {usr_tag} t, NULL AS prefix, 0 AS tagid
+            INNER JOIN {usr} u ON t.usr=u.id
+            INNER JOIN {usr_institution} ui ON ui.usr=u.id
+                 WHERE ui.institution IN ($insql) AND t.tagid = 0
+              GROUP BY 1";
         }
+
+        // User institution defined tags.
+        $institutiontags = '';
+        if ($institutions = $USER->get('institutions')) {
+            foreach ($institutions as $shortname => $inst) {
+                if ($inst->tags != 1) {
+                    unset($institutions[$shortname]);
+                }
+            }
+            $insql = join(',', array_map(create_function('$a', 'return db_quote($a);'), array_keys($institutions)));
+            $usertags = "
+                UNION ALL
+                SELECT t.text AS tag, COUNT(*) AS count, i.displayname AS prefix, t.id AS tagid
+                  FROM {tag} t
+            INNER JOIN {institution} i ON i.id= t.owner
+                 WHERE i.name IN ({$insql})
+              GROUP BY 1";
+        }
+
         $values = array($userid, $userid, $userid);
         $querystr = '';
         if ($query) {
@@ -99,24 +137,38 @@ function get_all_tags_for_user($query = null, $limit = null, $offset = null) {
             $values[] = $query;
         }
         $sql = "
-            SELECT tag, SUM(count) AS count
+            SELECT tag, SUM(count) AS count, prefix, tagid
             FROM (
-                SELECT tag,COUNT(*) AS count FROM {artefact_tag} t INNER JOIN {artefact} a ON t.artefact=a.id WHERE a.owner=? GROUP BY 1
-                UNION ALL
-                SELECT tag,COUNT(*) AS count FROM {view_tag} t INNER JOIN {view} v ON t.view=v.id WHERE v.owner=? GROUP BY 1
-                UNION ALL
-                SELECT tag,COUNT(*) AS count FROM {collection_tag} t INNER JOIN {collection} c ON t.collection=c.id WHERE c.owner=? GROUP BY 1
-                " . $usertags . "
-            ) tags
-            " . $querystr . "
-            GROUP BY tag
-            ORDER BY LOWER(tag)
-            ";
+                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                  FROM {artefact_tag} t
+            INNER JOIN {artefact} a ON t.artefact=a.id
+                WHERE a.owner = ? AND t.tagid = 0
+             GROUP BY 1
+             UNION ALL
+                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                  FROM {view_tag} t
+            INNER JOIN {view} v ON t.view = v.id
+                 WHERE v.owner = ? AND t.tagid = 0
+              GROUP BY 1
+             UNION ALL
+                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                  FROM {collection_tag} t
+            INNER JOIN {collection} c ON t.collection = c.id
+                 WHERE c.owner = ? AND t.tagid = 0
+              GROUP BY 1"
+                . $usertags
+                . $institutiontags
+                . ") tags"
+                . $querystr
+                . " GROUP BY tag
+                   ORDER BY LOWER(tag)";
+
         $result = get_records_sql_assoc($sql, $values, $offset, $limit);
     }
     $results = !empty($result) ? $result : array();
-    $return = array('tags' => $results,
-                    'count' => count($results),
+    $return = array(
+        'tags'  => $results,
+        'count' => count($results),
     );
 
     return $return;

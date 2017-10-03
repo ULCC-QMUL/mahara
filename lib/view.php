@@ -703,8 +703,20 @@ class View {
 
     public function get_tags() {
         if (!isset($this->tags)) {
-            $this->tags = get_column('view_tag', 'tag', 'view', $this->get('id'));
+            $this->tags = get_records_sql_array('SELECT t.tag, t.prefix, t.tagid, t.ownerid
+                FROM (
+                    SELECT vt.tag, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                      FROM {view_tag} vt
+                     WHERE vt.view = ? AND tagid = 0
+              UNION SELECT vt.tag, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                      FROM {view_tag} vt
+                      JOIN {tag} t ON t.id = vt.tagid
+                      JOIN {institution} i ON i.id = t.owner
+                     WHERE vt.view = ?
+                     ) t
+            GROUP BY t.tag, t.prefix, t.tagid, t.ownerid', array($this->get('id'), $this->get('id')));
         }
+
         return $this->tags;
     }
 
@@ -774,13 +786,28 @@ class View {
             update_record('view', $fordb, 'id');
         }
 
-        if (isset($this->tags)) {
+        // Delete and update tags.
+        delete_records('view_tag', 'view', $this->get('id'));
+        if (isset($this->tags) && is_array($this->tags)) {
             $this->tags = check_case_sensitive($this->tags, 'view_tag');
-            delete_records('view_tag', 'view', $this->get('id'));
-            foreach ($this->get_tags() as $tag) {
-                //truncate the tag before insert it into the database
+            foreach ($this->tags as $tag) {
+                if (is_numeric($tag) && $tag != 0) {
+                    $tagid = $tag;
+                    $tag   = get_field('tag', 'text', 'id', $tagid);
+                } else {
+                    $tagid = 0;
+                }
+
+                // Truncate the tag before insert it into the database.
                 $tag = substr($tag, 0, 128);
-                insert_record('view_tag', (object)array( 'view' => $this->get('id'), 'tag' => $tag));
+                insert_record(
+                    'view_tag',
+                    (object) array(
+                        'view'  => $this->get('id'),
+                        'tag'   => $tag,
+                        'tagid' => $tagid
+                    )
+                );
             }
         }
 
