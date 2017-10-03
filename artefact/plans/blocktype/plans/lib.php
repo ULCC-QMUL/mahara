@@ -57,6 +57,15 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function render_instance(BlockInstance $instance, $editing=false) {
         global $exporter;
 
+        // CUSTOM CATALYST - filter tags for the QM Dashboard.
+        global $view;
+        if ($view->get('type') == 'qmdashboard') {
+            $filtertag = param_variable('tag', null);
+            $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
+            $institutionid = get_field('institution', 'id', 'name', $institution);
+        }
+        // END CUSTOM CATALYST.
+
         require_once(get_config('docroot') . 'artefact/lib.php');
         safe_require('artefact','plans');
 
@@ -69,6 +78,19 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $alltasks = array();
             foreach ($configdata['artefactid'] as $planid) {
                 $plan = artefact_instance_from_id($planid);
+
+                // CUSTOM CATALYST - filter tags for the QM Dashboard.
+                if ($view->get('type') == 'qmdashboard') {
+                    $alltags = $plan->get('tags');
+                    $tagkeys = array_map(function($k) {
+                        return $k->tag;
+                    }, $alltags);
+                    if ($filtertag && !in_array($filtertag, $tagkeys)) {
+                        continue;
+                    }
+                }
+                // END CUSTOM CATALYST.
+
                 $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 $template = 'artefact:plans:taskrows.tpl';
@@ -96,6 +118,18 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $plans[$planid]['description'] = $plan->get('description');
                 $plans[$planid]['owner'] = $plan->get('owner');
                 $plans[$planid]['tags'] = $plan->get('tags');
+
+                // CUSTOM CATALYST - filter tags for the QM dashboard.
+                if ($view->get('type') == 'qmdashboard') {
+                    $plans[$planid]['tags'] = array();
+                    foreach ($plan->get('tags') as $tag) {
+                        if ($tag->ownerid && $tag->ownerid == $institutionid) {
+                            array_push($plans[$planid]['tags'], $tag);
+                        }
+                    }
+                }
+                // END CUSTOM CATALYST.
+
                 $plans[$planid]['numtasks'] = $tasks['count'];
 
                 $tasks['planid'] = $planid;
