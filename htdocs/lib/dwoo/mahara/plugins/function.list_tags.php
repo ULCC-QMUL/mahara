@@ -26,15 +26,26 @@ function Dwoo_Plugin_list_tags(Dwoo $dwoo, $tags, $owner) {
         return '';
     }
 
-    if ($owner != $USER->get('id')) {
-        return join(', ', array_map('hsc', $tags));
+    // Format the tags to display any defined
+    // owner prefix if required.
+    $formatted = array();
+    foreach ($tags as $tag) {
+        if (isset($tag->prefix) && !empty($tag->prefix)) {
+            $formatted[] = $tag->prefix . ': '. $tag->tag;
+        } else {
+            $formatted[] = $tag->tag;
+        }
     }
 
-    foreach ($tags as &$t) {
+    if ($owner != $USER->get('id')) {
+        return join(', ', array_map('hsc', $formatted));
+    }
+
+    foreach ($formatted as &$t) {
         $t = '<a class="tag" href="' . get_config('wwwroot') . 'tags.php?tag=' . urlencode($t) . '">' . hsc(str_shorten_text($t, 50)) . '</a>';
     }
-    
-    return join(', ', $tags);
+
+    return join(', ', $formatted);
 }
 
 ?>
