@@ -3595,7 +3595,7 @@ function tag_weight($freq) {
     // return log10($freq);
 }
 
-function get_my_tags($limit=null, $cloud=true, $sort='freq') {
+function get_my_tags($limit=null, $cloud=true, $sort='freq', $excludeinstitutiontags=false) {
     global $USER;
     $id = $USER->get('id');
     if ($limit || $sort != 'alpha') {
@@ -3604,22 +3604,26 @@ function get_my_tags($limit=null, $cloud=true, $sort='freq') {
     else {
         $sort = 't.tag ASC';
     }
+    $excludeinstitutiontagssql = $excludeinstitutiontags ? 'WHERE t.tagid = 0' : '';
     $tagrecords = get_records_sql_array("
         SELECT
-            t.tag, COUNT(t.tag) AS count
+            t.tag, COUNT(t.tag) AS count, t.tagid, i.displayname AS owner
         FROM (
-           (SELECT at.tag, a.id, 'artefact' AS type
+           (SELECT at.tag, a.id, at.tagid, 'artefact' AS type
             FROM {artefact_tag} at JOIN {artefact} a ON a.id = at.artefact
             WHERE a.owner = ?)
            UNION
-           (SELECT vt.tag, v.id, 'view' AS type
+           (SELECT vt.tag, v.id, vt.tagid, 'view' AS type
             FROM {view_tag} vt JOIN {view} v ON v.id = vt.view
             WHERE v.owner = ?)
            UNION
-           (SELECT ct.tag, c.id, 'collection' AS type
+           (SELECT ct.tag, c.id, ct.tagid, 'collection' AS type
             FROM {collection_tag} ct JOIN {collection} c ON c.id = ct.collection
             WHERE c.owner = ?)
     ) t
+        LEFT JOIN {tag} tag ON t.tagid = tag.id
+        LEFT JOIN {institution} i ON tag.owner = i.id
+        {$excludeinstitutiontagssql}
         GROUP BY t.tag
         ORDER BY " . $sort . (is_null($limit) ? '' : " LIMIT $limit"),
         array($id, $id, $id)

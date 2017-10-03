@@ -44,5 +44,19 @@ function xmldb_blocktype_taggedposts_upgrade($oldversion=0) {
         }
     }
 
+    if ($oldversion < 2017092503) {
+        log_debug('Add a "tagid" field to the blocktype_taggedposts_tags table');
+        $table = new XMLDBTable('blocktype_taggedposts_tags');
+        $institutionfield = new XMLDBField('institution');
+        if (field_exists($table, $institutionfield)) {
+            drop_field($table, $institutionfield);
+        }
+        $field = new XMLDBField('tagid');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null, null, 0);
+        if (!field_exists($table, $field)) {
+            add_field($table, $field);
+        }
+    }
+
     return true;
 }
