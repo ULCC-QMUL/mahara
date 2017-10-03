@@ -177,13 +177,27 @@ class Collection {
             }
         }
 
-        if (isset($this->tags)) {
-            delete_records('collection_tag', 'collection', $this->get('id'));
-            $tags = check_case_sensitive($this->get_tags(), 'collection_tag');
-            foreach ($tags as $tag) {
-                //truncate the tag before insert it into the database
+        delete_records('collection_tag', 'collection', $this->get('id'));
+        if (isset($this->tags) && is_array($this->tags)) {
+            $this->tags = check_case_sensitive($this->tags, 'collection_tag');
+            foreach ($this->tags as $tag) {
+                if (is_numeric($tag) && $tag != 0) {
+                    $tagid = $tag;
+                    $tag   = get_field('tag', 'text', 'id', $tagid);
+                } else {
+                    $tagid = 0;
+                }
+
+                // Truncate the tag before insert it into the database.
                 $tag = substr($tag, 0, 128);
-                insert_record('collection_tag', (object)array( 'collection' => $this->get('id'), 'tag' => $tag));
+                insert_record(
+                    'collection_tag',
+                    (object) array(
+                        'collection' => $this->get('id'),
+                        'tag'        => $tag,
+                        'tagid'      => $tagid
+                    )
+                );
             }
         }
 
@@ -1242,8 +1256,20 @@ class Collection {
      */
     public function get_tags() {
         if (!isset($this->tags)) {
-            $this->tags = get_column('collection_tag', 'tag', 'collection', $this->get('id'));
+            $this->tags = get_records_sql_array('SELECT t.tag, t.prefix, t.tagid, t.ownerid
+                FROM (
+                    SELECT ct.tag, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                      FROM {collection_tag} ct
+                     WHERE ct.collection = ? AND tagid = 0
+              UNION SELECT ct.tag, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                      FROM {collection_tag} ct
+                      JOIN {tag} t ON t.id = ct.tagid
+                      JOIN {institution} i ON i.id = t.owner
+                     WHERE ct.collection = ?
+                     ) t
+            GROUP BY t.tag, t.prefix, t.tagid, t.ownerid', array($this->get('id'), $this->get('id')));
         }
+
         return $this->tags;
     }
 

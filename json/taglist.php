@@ -39,8 +39,8 @@ while ($more && count($tmptag) < $tagsperpage) {
             $more = true;
             continue;
         }
-
-        $tmptag[] = (object) array('id' => $tag->tag,
+        $id = $tag->tagid != 0 ? $tag->tagid : $tag->tag;
+        $tmptag[] = (object) array('id' => $id,
             'text' => display_tag($tag->tag, $tags['tags'])
         );
     }

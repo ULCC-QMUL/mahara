@@ -637,17 +637,24 @@ abstract class ArtefactType implements IArtefactType {
           $deleted = delete_records('artefact_tag', 'artefact', $this->id);
         }
 
-        if (is_array($this->tags)) {
+        if (isset($this->tags) && is_array($this->tags)) {
             $this->tags = check_case_sensitive($this->tags, 'artefact_tag');
             foreach (array_unique($this->tags) as $tag) {
                 if (empty($tag)) {
                     continue;
+                }
+                if (is_numeric($tag) && $tag != 0) {
+                    $tagid = $tag;
+                    $tag   = get_field('tag', 'text', 'id', $tagid);
+                } else {
+                    $tagid = 0;
                 }
                 insert_record(
                     'artefact_tag',
                     (object) array(
                         'artefact' => $this->id,
                         'tag'      => $tag,
+                        'tagid'    => $tagid
                     )
                 );
             }
@@ -1332,7 +1339,19 @@ abstract class ArtefactType implements IArtefactType {
         if (empty($id)) {
             return array();
         }
-        $tags = get_column_sql('SELECT tag FROM {artefact_tag} WHERE artefact = ? ORDER BY tag', array($id));
+        $tags = get_records_sql_array('SELECT t.tag, t.prefix, t.tagid, t.ownerid
+            FROM (
+                SELECT at.tag, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                  FROM {artefact_tag} at
+                 WHERE at.artefact = ? AND tagid = 0
+          UNION SELECT at.tag, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                  FROM {artefact_tag} at
+                  JOIN {tag} t ON t.id = at.tagid
+                  JOIN {institution} i ON i.id = t.owner
+                 WHERE at.artefact = ?
+                 ) t
+        GROUP BY t.tag, t.prefix, t.tagid, t.ownerid', array($id, $id));
+
         if (!$tags) {
             return array();
         }
