@@ -333,7 +333,13 @@ var FileBrowser = (function($) {
         if (self.filedata[id].tags) {
             for (var x in self.filedata[id].tags) {
                 var option = document.createElement("option");
-                option.text = option.value = self.filedata[id].tags[x];
+                option.value = self.filedata[id].tags[x].tagid != 0 ? self.filedata[id].tags[x].tagid : self.filedata[id].tags[x].tag;
+                if (self.filedata[id].tags[x].prefix && self.filedata[id].tags[x].prefix != '') {
+                    option.text = self.filedata[id].tags[x].prefix + ': ' +  self.filedata[id].tags[x].tag;
+                } else {
+                    option.text = self.filedata[id].tags[x].tag;
+                }
+
                 option.selected = "selected";
                 $('#' + self.id + '_edit_tags').append(option);
             }
