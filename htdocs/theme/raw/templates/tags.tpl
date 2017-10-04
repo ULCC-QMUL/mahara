@@ -11,7 +11,7 @@
     <div class="mytags">
         <ul class="list-unstyled">
         {foreach from=$tags item=t}
-            <li class="text-inline"><a id="tag:{$t->tag|urlencode|safe}" class="tag {if $t->tag == $tag}selected{/if}" href="{$WWWROOT}tags.php?tag={$t->tag|urlencode|safe}">{$t->tag|str_shorten_text:30}&nbsp;{if $t->owner}({$t->owner}){/if}<span class="tagfreq badge">{$t->count}</span></a></li>
+            <li class="text-inline"><a id="tag:{$t->tag|urlencode|safe}" class="tag {if $t->tag == $tag}selected{/if}" href="{$WWWROOT}tags.php?tag={$t->tag|urlencode|safe}">{$t->tag|str_shorten_text:30}&nbsp;<span class="tagfreq badge">{$t->count}</span></a></li>
         {/foreach}
         </ul>
     </div>
