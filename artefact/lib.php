@@ -1217,7 +1217,18 @@ abstract class ArtefactType implements IArtefactType {
             return array();
         }
         $artefactids = join(',', array_map('intval', $artefactids));
-        $tags = get_records_select_array('artefact_tag', 'artefact IN (' . $artefactids . ')');
+        $tags = get_records_sql_array('SELECT t.tag, t.artefact, t.prefix, t.tagid, t.ownerid
+            FROM (
+                SELECT at.tag, at.artefact, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                  FROM {artefact_tag} at
+                 WHERE at.artefact IN (' . $artefactids . ') AND tagid = 0
+          UNION SELECT at.tag, at.artefact, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                  FROM {artefact_tag} at
+                  JOIN {tag} t ON t.id = at.tagid
+                  JOIN {institution} i ON i.id = t.owner
+                 WHERE at.artefact IN (' . $artefactids . ')
+                 ) t
+        GROUP BY t.tag, t.artefact, t.prefix, t.tagid, t.ownerid');
         if (!$tags) {
             return array();
         }
@@ -1233,10 +1244,22 @@ abstract class ArtefactType implements IArtefactType {
 
         // load tags
         if ($list) {
-            $tags = get_records_select_array('artefact_tag', 'artefact IN (' . join(',', array_keys($list)) . ')');
+            $artefactids = join(',', array_keys($list));
+            $tags = get_records_sql_array('SELECT t.tag, t.artefact, t.prefix, t.tagid, t.ownerid
+                FROM (
+                    SELECT at.tag, at.artefact, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                      FROM {artefact_tag} at
+                     WHERE at.artefact IN (' . $artefactids . ') AND tagid = 0
+              UNION SELECT at.tag, at.artefact, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                      FROM {artefact_tag} at
+                      JOIN {tag} t ON t.id = at.tagid
+                      JOIN {institution} i ON i.id = t.owner
+                     WHERE at.artefact IN (' . $artefactids . ')
+                     ) t
+            GROUP BY t.tag, t.artefact, t.prefix, t.tagid, t.ownerid');
             if ($tags) {
                 foreach ($tags as $t) {
-                    $list[$t->artefact]->tags[] = $t->tag;
+                    $list[$t->artefact]->tags[] = $t;
                 }
                 foreach ($list as &$attachment) {
                     if (!empty($attachment->tags)) {

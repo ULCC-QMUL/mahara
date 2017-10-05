@@ -3607,7 +3607,7 @@ function get_my_tags($limit=null, $cloud=true, $sort='freq', $excludeinstitution
     $excludeinstitutiontagssql = $excludeinstitutiontags ? 'WHERE t.tagid = 0' : '';
     $tagrecords = get_records_sql_array("
         SELECT
-            t.tag, COUNT(t.tag) AS count, t.tagid, i.displayname AS owner
+            t.tag, COUNT(t.tag) AS count, t.tagid, i.displayname AS prefix
         FROM (
            (SELECT at.tag, a.id, at.tagid, 'artefact' AS type
             FROM {artefact_tag} at JOIN {artefact} a ON a.id = at.artefact
@@ -3642,14 +3642,19 @@ function get_my_tags($limit=null, $cloud=true, $sort='freq', $excludeinstitution
             $maxsize = 2.5;
 
             foreach ($tagrecords as &$t) {
-                $weight = (tag_weight($t->count) - $minweight) / ($maxweight - $minweight);
+                $prefix  = ($t->prefix && $t->prefix != '') ? "{$t->prefix}: " : '';
+                $t->tag  = $prefix . $t->tag;
+                $weight  = (tag_weight($t->count) - $minweight) / ($maxweight - $minweight);
                 $t->size = sprintf("%0.1f", $minsize + ($maxsize - $minsize) * $weight);
+                $t->tagurl = urlencode($t->tag);
             }
         }
         usort($tagrecords, create_function('$a,$b', 'return strnatcasecmp($a->tag, $b->tag);'));
     }
     else {
         foreach ($tagrecords as &$t) {
+            $prefix = ($t->prefix && $t->prefix != '') ? "{$t->prefix}: " : '';
+            $t->tag = $prefix . $t->tag;
             $t->tagurl = urlencode($t->tag);
         }
     }
