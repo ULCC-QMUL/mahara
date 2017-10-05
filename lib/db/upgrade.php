@@ -4857,5 +4857,23 @@ function xmldb_core_upgrade($oldversion=0) {
             add_field($table, $field);
         }
     }
+
+    if ($oldversion < 2017100400) {
+        require_once(get_config('docroot') . 'blocktype/lib.php');
+        $instances = get_records_array('block_instance', 'blocktype', 'plans');
+        if ($instances) {
+            foreach ($instances as $instance) {
+                $blockinstance = new BlockInstance($instance->id);
+                $configdata = $blockinstance->get('configdata');
+
+                if (isset($configdata['artefactid'])) {
+                    $configdata['artefactids'] = array($configdata['artefactid']);
+                    unset($configdata['artefactid']);
+                    $blockinstance->set('configdata', $configdata);
+                    $blockinstance->commit();
+                }
+            }
+        }
+    }
     return $status;
 }

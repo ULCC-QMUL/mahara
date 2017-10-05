@@ -28,7 +28,7 @@ if ($blockid = param_integer('block', null)) {
     $options = $configdata = $bi->get('configdata');
     // If block sets limit use that instead
     $limit = !empty($configdata['count']) ? $configdata['count'] : $limit;
-    $tasks = ArtefactTypeTask::get_tasks($configdata['artefactid'], $offset, $limit);
+    $tasks = ArtefactTypeTask::get_tasks($configdata['artefactids'], $offset, $limit);
 
     $template = 'artefact:plans:taskrows.tpl';
     $baseurl = $bi->get_view()->get_url();

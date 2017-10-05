@@ -32,13 +32,13 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function get_instance_title(BlockInstance $bi) {
         $configdata = $bi->get('configdata');
 
-        if (!empty($configdata['artefactid'])) {
-            if (is_array($configdata['artefactid']) && count($configdata['artefactid']) > 1) {
+        if (!empty($configdata['artefactids'])) {
+            if (is_array($configdata['artefactids']) && count($configdata['artefactids']) > 1) {
                 return get_string('title', 'blocktype.plans/plans');
-            } else if (count($configdata['artefactid']) == 1) {
-                return $bi->get_artefact_instance($configdata['artefactid'][0])->get('title');
+            } else if (count($configdata['artefactids']) == 1) {
+                return $bi->get_artefact_instance($configdata['artefactids'][0])->get('title');
             } else {
-                return $bi->get_artefact_instance($configdata['artefactid'])->get('title');
+                return $bi->get_artefact_instance($configdata['artefactids'])->get('title');
             }
         }
         return '';
@@ -73,10 +73,10 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
 
         $smarty = smarty_core();
-        if (isset($configdata['artefactid']) && count($configdata['artefactid']) > 0) {
+        if (isset($configdata['artefactids']) && count($configdata['artefactids']) > 0) {
             $plans = array();
             $alltasks = array();
-            foreach ($configdata['artefactid'] as $planid) {
+            foreach ($configdata['artefactids'] as $planid) {
                 $plan = artefact_instance_from_id($planid);
 
                 // CUSTOM CATALYST - filter tags for the QM Dashboard.
@@ -158,7 +158,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $form = array();
 
         // Which resume field does the user want
-        $form[] = self::artefactchooser_element((isset($configdata['artefactid'])) ? $configdata['artefactid'] : null);
+        $form[] = self::artefactchooser_element((isset($configdata['artefactids'])) ? $configdata['artefactids'] : null);
         $form['count'] = array(
             'type' => 'text',
             'title' => get_string('taskstodisplay', 'blocktype.plans/plans'),
@@ -172,7 +172,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function artefactchooser_element($default=null) {
         safe_require('artefact', 'plans');
         return array(
-            'name'  => 'artefactid',
+            'name'  => 'artefactids',
             'type'  => 'artefactchooser',
             'title' => get_string('planstoshow', 'blocktype.plans/plans'),
             'defaultvalue' => $default,

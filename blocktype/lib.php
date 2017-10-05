@@ -992,8 +992,8 @@ class BlockInstance {
         // CUSTOM Catalyst - for the QM Framework Dashboard use a different block editing template.
         if (strpos($_SERVER['REQUEST_URI'], 'module/qmframework')) {
             // If there is no artefact added in the blocktype, $configdata['artefactid'] is not deffined.
-            if (isset($configdata['artefactid'])) {
-                $smarty->assign('planid', $configdata['artefactid']);
+            if (isset($configdata['artefactids'])) {
+                $smarty->assign('planid', $configdata['artefactids']);
             }
             return array('html' => $smarty->fetch('module:qmframework:blockedit.tpl'), 'javascript' => $js, 'pieformcss' => $css);
         } else {
@@ -1061,17 +1061,8 @@ class BlockInstance {
         $configdata = $this->get('configdata');
         if (!empty($configdata['artefactid'])) {
             if (call_static_method($classname, 'has_title_link')) {
-                if (is_array($configdata['artefactid'])) {
-                    foreach ($configdata['artefactid'] as $plan) {
-                        $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
-                            . $plan . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
-                        // On each $smarty->assign a new object(Dwoo_Mahara) gets created that will be assigning to each
-                        // block instance in the build_column function defined in the htdocs/lib/view.php file.
-                    }
-                } else {
-                    $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
-                        . $configdata['artefactid'] . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
-                }
+                $smarty->assign('viewartefacturl', get_config('wwwroot') . 'artefact/artefact.php?artefact='
+                    . $configdata['artefactid'] . '&view=' . $this->get('view') . '&block=' . $this->get('id'));
             }
         }
 
