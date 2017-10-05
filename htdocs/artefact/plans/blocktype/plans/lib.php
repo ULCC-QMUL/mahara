@@ -93,6 +93,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $tasks['pagination'] = '<a href="' . $artefacturl . '">' . get_string('alltasks', 'artefact.plans') . '</a>';
                 }
                 $plans[$planid]['id'] = $planid;
+                $plans[$planid]['title'] = $plan->get('title');
                 $plans[$planid]['description'] = $plan->get('description');
                 $plans[$planid]['owner'] = $plan->get('owner');
                 $plans[$planid]['tags'] = $plan->get('tags');

@@ -74,6 +74,12 @@
 
                 </div>
             </div>
+            {else}
+                {if $task->tags}
+                    <div class="tags">
+                        <strong>{str tag=tags}:</strong> {list_tags tags=$task->tags owner=$task->owner}
+                    </div>
+                {/if}
             {/if}
         </div>
     {/if}
