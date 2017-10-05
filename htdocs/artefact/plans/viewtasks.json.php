@@ -38,7 +38,7 @@ if ($blockid = param_integer('block', null)) {
     // CUSTOM Catalyst - use the QM Dashboard URL.
     $view = new View($bi->get('view'));
     $baseurl = ($view->get('type') == 'qmdashboard')
-        ? get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id')
+        ? get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id') . '&tag=' . param_variable('tag', '')
         : $baseurl;
     // END CUSTOM Catalyst.
     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;

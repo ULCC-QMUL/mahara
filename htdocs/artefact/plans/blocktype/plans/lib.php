@@ -69,7 +69,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
-            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id');
+            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id') . '&tag=' . $filtertag;
 
             // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
             if (!$filtertag) {
@@ -106,20 +106,37 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $alltasks = array();
             foreach ($configdata['artefactids'] as $planid) {
                 $plan = artefact_instance_from_id($planid);
+                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 // CUSTOM CATALYST - filter tags for the QM Dashboard.
-                if ($view->get('type') == 'qmdashboard') {
-                    $alltags = $plan->get('tags');
-                    $tagkeys = array_map(function($k) {
+                if ($view->get('type') == 'qmdashboard' && $filtertag) {
+                    $split = explode(':', $filtertag);
+                    if (count($split) == 2) {
+                        $filtertag = trim($split[1]);
+                    }
+                    $matches = true;
+
+                    // Check if a plan tag matches first; and we will
+                    // display all tasks within this.
+                    $matched = array_map(function($k) {
                         return $k->tag;
-                    }, $alltags);
-                    if ($filtertag && !in_array($filtertag, $tagkeys)) {
+                    }, $plan->get('tags'));
+                    if (!in_array($filtertag, $matched)) {
+                        $matches = false;
+                    }
+
+                    // If the plan hasn't matched but one of the
+                    // tasks has then the list won't be empty.
+                    if (!$matches && !empty($tasks)) {
+                        $matches = true;
+                    }
+
+                    // Nothing matched; skip this plan.
+                    if (!$matches) {
                         continue;
                     }
                 }
                 // END CUSTOM CATALYST.
-
-                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 $template = 'artefact:plans:taskrows.tpl';
                 $blockid = $instance->get('id');
@@ -127,7 +144,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $pagination = false;
                 } else {
                     $baseurl = $instance->get_view()->get_url();
-                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM Catalyst - use the QM Dashboard URL.
+                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM CATALYST - use the QM Dashboard URL.
                     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
                     $pagination = array(
                         'baseurl'   => $baseurl,
@@ -155,7 +172,11 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 if ($view->get('type') == 'qmdashboard') {
                     $plans[$planid]['tags'] = array();
                     foreach ($plan->get('tags') as $tag) {
-                        if ($tag->ownerid && $tag->ownerid == $institutionid) {
+                        if ($filtertag) {
+                            if ($tag->tag === $filtertag) {
+                                array_push($plans[$planid]['tags'], $tag);
+                            }
+                        } else if ($tag->ownerid && $tag->ownerid == $institutionid) {
                             array_push($plans[$planid]['tags'], $tag);
                         }
                     }
