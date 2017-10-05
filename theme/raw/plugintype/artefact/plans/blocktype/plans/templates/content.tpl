@@ -6,6 +6,7 @@
             <a href="{$WWWROOT}artefact/plans/new.php?id={$plan.id}">Add task</a>
         </div>
     {/if}
+    <strong>{$plan.title}</strong>
     <p>{$plan.description}</p>
 
     {if $plan.tags}
