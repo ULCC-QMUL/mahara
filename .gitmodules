@@ -25,3 +25,6 @@
 [submodule "blocktype/contentcounts"]
 	path = blocktype/contentcounts
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_contentcounts
+[submodule "blocktype/contenttags"]
+	path = blocktype/contenttags
+	url = git@github.com:/ULCC-QMUL/mahara-blocktype_contenttags
