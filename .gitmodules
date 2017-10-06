@@ -22,3 +22,6 @@
 [submodule "blocktype/expandedcontent"]
 	path = blocktype/expandedcontent
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_expandedcontent
+[submodule "blocktype/contentcounts"]
+	path = blocktype/contentcounts
+	url = git@github.com:/ULCC-QMUL/mahara-blocktype_contentcounts
