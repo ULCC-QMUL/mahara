@@ -5,7 +5,7 @@
             {if $task->description}<a class="link-block collapsed" href="#expand-task-{$task->id}" data-toggle="collapse" aria-expanded="false" aria-controls="expand-task-{$task->id}">{/if}
 
                 <span class="overdue-task">
-                    <span class="icon icon-times text-danger icon-lg left" role="presentation" aria-hidden="true"></span>
+                    <span class="icon icon-times text-danger icon-lg left" role="presentation" aria-hidden="true" {if $editing}onclick="changeCheckBox(this, '{$task->id}')"{/if}></span>
                     <span class="text-danger">{$task->title}</span> -
                     <span class="text-small text-midtone">
                         {str tag='completiondate' section='artefact.plans'}: {$task->completiondate}
@@ -13,6 +13,10 @@
                     {if $task->description}
                     <span class="icon icon-chevron-down right collapse-indicator pull-right" role="presentation" aria-hidden="true"></span>
                     {/if}
+
+                    {if $editing}
+                    <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span class="pull-right" role="presentation" aria-hidden="true">Edit </span></a>
+                    {/$if}
                 </span>
             {if $task->description}</a>{/if}
 
