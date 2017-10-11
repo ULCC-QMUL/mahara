@@ -4875,5 +4875,13 @@ function xmldb_core_upgrade($oldversion=0) {
             }
         }
     }
+
+    if ($oldversion < 2017101100) {
+            $record = (object)array(
+                'name'  => 'userleavesgroup'
+            );
+            insert_record('event_type', $record);
+    }
+
     return $status;
 }
