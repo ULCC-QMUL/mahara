@@ -27,7 +27,9 @@ build_portfolio_search_html($data);
 $data->tagdisplay = is_null($tag) ? get_string('alltags') : hsc(str_shorten_text($tag, 50));
 
 $data->is_institution_tag = false;
-if ($institution = get_field('tag', 'owner', 'text', $tag)) {
+
+$tagname = strpos($tag, ':') ? explode(': ', $tag)[1] : $tag;
+if ($institution = get_field('tag', 'owner', 'text', $tagname)) {
     $data->is_institution_tag = get_field('institution', 'displayname', 'id', $institution);
 }
 $data->tagurl = urlencode($tag);

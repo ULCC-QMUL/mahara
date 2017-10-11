@@ -201,8 +201,11 @@ else {
     $data->queryprefix = '&';
 }
 $notinstitutiontag = true;
-if ($tag && get_field('tag', 'id', 'text', $tag)) {
-    $notinstitutiontag = false;
+if ($tag) {
+    $tagname = strpos($tag, ':') ? explode(': ', $tag)[1] : $tag;
+    if (get_field('tag', 'id', 'text', $tagname)) {
+        $notinstitutiontag = false;
+    }
 }
 
 $smarty = smarty(array('paginator'));
