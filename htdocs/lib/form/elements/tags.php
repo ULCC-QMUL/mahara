@@ -90,85 +90,81 @@ function display_tag($name, $alltags) {
 function get_all_tags_for_user($query = null, $limit = null, $offset = null) {
     global $USER;
     if ($USER->is_logged_in()) {
-        $usertags = "";
         $userid = $USER->get('id');
+
+        $usertagssql = "";
+        $usertags = array();
+        // If the user is a site admin show all the user tags as well.
         if ($USER->get('admin')) {
-            $usertags = "
-                UNION ALL
+          $usertagssql = "
+                SELECT tag, 1 AS count, NULL AS prefix, 0 AS tagid
+                  FROM {usr_tag} t
+                 WHERE t.tagid = 0";
+          $usertags = (is_array(get_records_sql_assoc($usertagssql))) ? get_records_sql_assoc($usertagssql) : array();
+        }
+        // If the user is an institution admin show the user tags of the users belonging to that institution.
+        else if ($admininstitutions = $USER->get('admininstitutions')) {
+            $insql = "'" . join("','", $admininstitutions) . "'";
+            $usertagssql = "
                 SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
                   FROM {usr_tag} t
             INNER JOIN {usr} u ON t.usr=u.id
-                 WHERE t.tagid = 0
-              GROUP BY 1";
-        }
-        else if ($admininstitutions = $USER->get('admininstitutions')) {
-            $insql = "'" . join("','", $admininstitutions) . "'";
-            $usertags = "
-                UNION ALL
-                SELECT tag, COUNT(*) AS count FROM {usr_tag} t, NULL AS prefix, 0 AS tagid
-            INNER JOIN {usr} u ON t.usr=u.id
             INNER JOIN {usr_institution} ui ON ui.usr=u.id
-                 WHERE ui.institution IN ($insql) AND t.tagid = 0
-              GROUP BY 1";
+                 WHERE ui.institution IN ($insql) AND t.tagid = 0";
+          $usertags = (is_array(get_records_sql_assoc($usertagssql))) ? get_records_sql_assoc($usertagssql) : array();
         }
-
-        // User institution defined tags.
-        $institutiontags = '';
-        if ($institutions = $USER->get('institutions')) {
-            foreach ($institutions as $shortname => $inst) {
-                if ($inst->tags != 1) {
-                    unset($institutions[$shortname]);
-                }
-            }
-            $insql = join(',', array_map(create_function('$a', 'return db_quote($a);'), array_keys($institutions)));
-            $usertags = "
-                UNION ALL
-                SELECT t.text AS tag, COUNT(*) AS count, i.displayname AS prefix, t.id AS tagid
-                  FROM {tag} t
-            INNER JOIN {institution} i ON i.id= t.owner
-                 WHERE i.name IN ({$insql})
-              GROUP BY 1";
-        }
-
+        // Get the user's tags and the institution tags used by the user.
         $values = array($userid, $userid, $userid);
-        $querystr = '';
-        if ($query) {
-            $querystr = " WHERE tag LIKE '%' || ? || '%'";
-            $values[] = $query;
-        }
         $sql = "
             SELECT tag, SUM(count) AS count, prefix, tagid
             FROM (
-                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                SELECT t.tag, COUNT(*) AS count, i.displayname AS prefix, t.tagid AS tagid
                   FROM {artefact_tag} t
-            INNER JOIN {artefact} a ON t.artefact=a.id
-                WHERE a.owner = ? AND t.tagid = 0
-             GROUP BY 1
-             UNION ALL
-                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
-                  FROM {view_tag} t
-            INNER JOIN {view} v ON t.view = v.id
-                 WHERE v.owner = ? AND t.tagid = 0
+            INNER JOIN {artefact} a ON t.artefact = a.id
+             LEFT JOIN {tag} tag ON t.tag = tag.text
+             LEFT JOIN {institution} i ON i.id = tag.owner AND i.tags = 1
+                 WHERE a.owner = ?
               GROUP BY 1
              UNION ALL
-                SELECT tag, COUNT(*) AS count, NULL AS prefix, 0 AS tagid
+                SELECT tag, COUNT(*) AS count, i.displayname AS prefix, t.tagid AS tagid
+                  FROM {view_tag} t
+            INNER JOIN {view} v ON t.view = v.id
+             LEFT JOIN {tag} tag ON t.tag = tag.text
+             LEFT JOIN {institution} i ON i.id = tag.owner AND i.tags = 1
+                 WHERE v.owner = ?
+              GROUP BY 1
+             UNION ALL
+                SELECT tag, COUNT(*) AS count, i.displayname AS prefix, t.tagid AS tagid
                   FROM {collection_tag} t
             INNER JOIN {collection} c ON t.collection = c.id
-                 WHERE c.owner = ? AND t.tagid = 0
-              GROUP BY 1"
-                . $usertags
-                . $institutiontags
-                . ") tags"
-                . $querystr
-                . " GROUP BY tag
-                   ORDER BY LOWER(tag)";
+             LEFT JOIN {tag} tag ON t.tag = tag.text
+             LEFT JOIN {institution} i ON i.id = tag.owner AND i.tags = 1
+                 WHERE c.owner = ?
+              GROUP BY 1) tags
+              GROUP BY tag
+              ORDER BY LOWER(tag)";
+        $usedtag = (is_array(get_records_sql_assoc($sql, $values, $offset, $limit))) ? get_records_sql_assoc($sql, $values, $offset, $limit) : array();
 
-        $result = get_records_sql_assoc($sql, $values, $offset, $limit);
+        // Get the institution tags not  yet used by the user.
+        $notinsql = "";
+        if (!empty($usedtag)) {
+          $tagids = array_map(function($tag) {
+              return $tag->tagid;
+          }, $usedtag);
+          $notinsql = "NOT IN (" . implode(", ", $tagids) . ")";
+        }
+        $unusedsql = "
+            SELECT t.text AS tag, 0 AS count, i.displayname AS prefix, t.id AS tagid
+              FROM {tag} t
+              JOIN {institution} i ON i.id = t.owner AND i.tags = 1
+              JOIN {usr_institution} ui ON ui.institution = i.name AND ui.usr = ?
+             WHERE t.id $notinsql";
+        $unusedtags = (is_array(get_records_sql_assoc($unusedsql, array($userid), $offset))) ? get_records_sql_assoc($unusedsql, array($userid), $offset, $limit) : array();
     }
+    $result = array_merge($usedtag, $unusedtags, $usertags);
     $results = !empty($result) ? $result : array();
-    $return = array(
-        'tags'  => $results,
-        'count' => count($results),
+    $return = array('tags' => $results,
+                    'count' => count($results),
     );
 
     return $return;
