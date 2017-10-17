@@ -25,7 +25,7 @@
                     {$tasks.tablerows|safe}
                 </div>
                 {if $tasks.pagination}
-                    <div id="plans_page_container_{$blockid}" class="hidden">
+                    <div id="plans_page_container_{$blockid}">
                         {$tasks.pagination|safe}
                     </div>
                     <script type="application/javascript">
