@@ -32,8 +32,14 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function get_instance_title(BlockInstance $bi) {
         $configdata = $bi->get('configdata');
 
-        if (!empty($configdata['artefactid'])) {
-            return $bi->get_artefact_instance($configdata['artefactid'])->get('title');
+        if (!empty($configdata['artefactids'])) {
+            if (is_array($configdata['artefactids']) && count($configdata['artefactids']) > 1) {
+                return get_string('title', 'blocktype.plans/plans');
+            } else if (count($configdata['artefactids']) == 1) {
+                return $bi->get_artefact_instance($configdata['artefactids'][0])->get('title');
+            } else {
+                return $bi->get_artefact_instance($configdata['artefactids'])->get('title');
+            }
         }
         return '';
     }
@@ -51,6 +57,15 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function render_instance(BlockInstance $instance, $editing=false) {
         global $exporter;
 
+        // CUSTOM CATALYST - filter tags for the QM Dashboard.
+        global $view;
+        if ($view->get('type') == 'qmdashboard') {
+            $filtertag = param_variable('tag', null);
+            $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
+            $institutionid = get_field('institution', 'id', 'name', $institution);
+        }
+        // END CUSTOM CATALYST.
+
         require_once(get_config('docroot') . 'artefact/lib.php');
         safe_require('artefact','plans');
 
@@ -58,35 +73,72 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
 
         $smarty = smarty_core();
-        if (isset($configdata['artefactid'])) {
-            $plan = artefact_instance_from_id($configdata['artefactid']);
-            $tasks = ArtefactTypeTask::get_tasks($configdata['artefactid'], 0, $limit);
-            $template = 'artefact:plans:taskrows.tpl';
-            $blockid = $instance->get('id');
-            if ($exporter) {
-                $pagination = false;
-            }
-            else {
-                $baseurl = $instance->get_view()->get_url();
-                $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
-                $pagination = array(
-                    'baseurl'   => $baseurl,
-                    'id'        => 'block' . $blockid . '_pagination',
-                    'datatable' => 'tasklist_' . $blockid,
-                    'jsonscript' => 'artefact/plans/viewtasks.json.php',
-                );
-            }
-            ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination);
+        if (isset($configdata['artefactids']) && count($configdata['artefactids']) > 0) {
+            $plans = array();
+            $alltasks = array();
+            foreach ($configdata['artefactids'] as $planid) {
+                $plan = artefact_instance_from_id($planid);
 
-            if ($exporter && $tasks['count'] > $tasks['limit']) {
-                $artefacturl = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $configdata['artefactid']
-                    . '&view=' . $instance->get('view');
-                $tasks['pagination'] = '<a href="' . $artefacturl . '">' . get_string('alltasks', 'artefact.plans') . '</a>';
+                // CUSTOM CATALYST - filter tags for the QM Dashboard.
+                if ($view->get('type') == 'qmdashboard') {
+                    $alltags = $plan->get('tags');
+                    $tagkeys = array_map(function($k) {
+                        return $k->tag;
+                    }, $alltags);
+                    if ($filtertag && !in_array($filtertag, $tagkeys)) {
+                        continue;
+                    }
+                }
+                // END CUSTOM CATALYST.
+
+                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
+
+                $template = 'artefact:plans:taskrows.tpl';
+                $blockid = $instance->get('id');
+                if ($exporter) {
+                    $pagination = false;
+                } else {
+                    $baseurl = $instance->get_view()->get_url();
+                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
+                    $pagination = array(
+                        'baseurl'   => $baseurl,
+                        'id'        => 'block' . $blockid . '_pagination',
+                        'datatable' => 'tasklist_' . $blockid,
+                        'jsonscript' => 'artefact/plans/viewtasks.json.php',
+                    );
+                }
+                ArtefactTypeTask::render_tasks($tasks, $template, $configdata, $pagination, $editing);
+
+                if ($exporter && $tasks['count'] > $tasks['limit']) {
+                    $artefacturl = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $planid
+                        . '&view=' . $instance->get('view');
+                    $tasks['pagination'] = '<a href="' . $artefacturl . '">' . get_string('alltasks', 'artefact.plans') . '</a>';
+                }
+                $plans[$planid]['id'] = $planid;
+                $plans[$planid]['title'] = $plan->get('title');
+                $plans[$planid]['description'] = $plan->get('description');
+                $plans[$planid]['owner'] = $plan->get('owner');
+                $plans[$planid]['tags'] = $plan->get('tags');
+
+                // CUSTOM CATALYST - filter tags for the QM dashboard.
+                if ($view->get('type') == 'qmdashboard') {
+                    $plans[$planid]['tags'] = array();
+                    foreach ($plan->get('tags') as $tag) {
+                        if ($tag->ownerid && $tag->ownerid == $institutionid) {
+                            array_push($plans[$planid]['tags'], $tag);
+                        }
+                    }
+                }
+                // END CUSTOM CATALYST.
+
+                $plans[$planid]['numtasks'] = $tasks['count'];
+
+                $tasks['planid'] = $planid;
+                array_push($alltasks, $tasks);
             }
-            $smarty->assign('description', $plan->get('description'));
-            $smarty->assign('owner', $plan->get('owner'));
-            $smarty->assign('tags', $plan->get('tags'));
-            $smarty->assign('tasks', $tasks);
+            $smarty->assign('editing', $editing);
+            $smarty->assign('plans', $plans);
+            $smarty->assign('alltasks', $alltasks);
         }
         else {
             $smarty->assign('noplans','blocktype.plans/plans');
@@ -107,7 +159,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $form = array();
 
         // Which resume field does the user want
-        $form[] = self::artefactchooser_element((isset($configdata['artefactid'])) ? $configdata['artefactid'] : null);
+        $form[] = self::artefactchooser_element((isset($configdata['artefactids'])) ? $configdata['artefactids'] : null);
         $form['count'] = array(
             'type' => 'text',
             'title' => get_string('taskstodisplay', 'blocktype.plans/plans'),
@@ -121,12 +173,12 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function artefactchooser_element($default=null) {
         safe_require('artefact', 'plans');
         return array(
-            'name'  => 'artefactid',
+            'name'  => 'artefactids',
             'type'  => 'artefactchooser',
             'title' => get_string('planstoshow', 'blocktype.plans/plans'),
             'defaultvalue' => $default,
             'blocktype' => 'plans',
-            'selectone' => true,
+            'selectone' => false,
             'search'    => false,
             'artefacttypes' => array('plan'),
             'template'  => 'artefact:plans:artefactchooser-element.tpl',

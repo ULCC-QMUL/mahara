@@ -36,10 +36,10 @@
 
                 <span class="complete-task">
                     {if $task->completed == 1}
-                        <span class="icon icon-check-square-o icon-lg text-success left" role="presentation" aria-hidden="true"></span>
+                        <span class="icon icon-check-square-o icon-lg text-success left" role="presentation" aria-hidden="true" {if $editing}onclick="changeCheckBox(this, '{$task->id}')"{/if}></span>
                         <span class="sr-only">{str tag=completed section=artefact.plans}</span>
                     {else}
-                        <span class="icon-square-o icon icon-lg text-midtone left" role="presentation" aria-hidden="true"></span>
+                        <span class="icon-square-o icon icon-lg text-midtone left" role="presentation" aria-hidden="true" {if $editing}onclick="changeCheckBox(this, '{$task->id}')"{/if}></span>
                         <span class="sr-only">{str tag=incomplete section=artefact.plans}</span>
                     {/if}
 
@@ -51,6 +51,11 @@
                     {if $task->description}
                     <span class="icon icon-chevron-down right collapse-indicator pull-right" role="presentation" aria-hidden="true"></span>
                     {/if}
+
+                    {if $editing}
+                    <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span class="pull-right" role="presentation" aria-hidden="true">Edit </span></a>
+                    {/$if}
+
                 </span>
 
             {if $task->description}</a>{/if}
@@ -69,6 +74,12 @@
 
                 </div>
             </div>
+            {else}
+                {if $task->tags}
+                    <div class="tags">
+                        <strong>{str tag=tags}:</strong> {list_tags tags=$task->tags owner=$task->owner}
+                    </div>
+                {/if}
             {/if}
         </div>
     {/if}

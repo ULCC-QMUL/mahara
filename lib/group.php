@@ -1912,6 +1912,13 @@ function group_get_menu_tabs() {
             }
         }
     }
+    if ($plugins = plugins_installed('module')) {
+        foreach ($plugins as &$plugin) {
+            safe_require('module', $plugin->name);
+            $plugin_menu = call_static_method(generate_class_name('module', $plugin->name), 'group_menu_items', $group);
+            $menu = array_merge($menu, $plugin_menu);
+        }
+    }
 
     if (group_role_can_access_report($group, $role)) {
         $menu['report'] = array(

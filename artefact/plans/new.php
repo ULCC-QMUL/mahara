@@ -33,7 +33,10 @@ else {
     define('TITLE', get_string('newplan','artefact.plans'));
     $form = ArtefactTypePlan::get_form();
 }
-
+// This SESSION variable is necessary for the return to the previous page after the adding of a task.
+if (!$SESSION->get('artefact-plan_returnurl')) {
+    $SESSION->set('artefact-plan_returnurl', $_SERVER['HTTP_REFERER']);
+}
 $smarty = smarty();
 $smarty->assign('form', $form);
 $smarty->assign('PAGEHEADING', hsc(TITLE));

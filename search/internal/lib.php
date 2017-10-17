@@ -1003,9 +1003,35 @@ class PluginSearchInternal extends PluginSearch {
 
         if (!is_null($tag)) {
             $artefacttypefilter .= ' AND at.tag = ?';
-            $viewfilter .= ' AND vt.tag = ?';
-            $collectionfilter .= ' AND ct.tag = ?';
-            $values = array($owner->id, $tag, $owner->id, $tag, $owner->id, $tag);
+            $viewfilter         .= ' AND vt.tag = ?';
+            $collectionfilter   .= ' AND ct.tag = ?';
+
+            // Test if this is an institutionally defined
+            // tag and strip the displayname prefix out.
+            $tagid = null;
+            $split = explode(':', $tag);
+            if (count($split) == 2) {
+                $prefix = trim($split[0]);
+                $tag    = trim($split[1]);
+                $tagid = get_column_sql('SELECT DISTINCT t.id
+                    FROM {tag} t
+               LEFT JOIN {institution} i ON i.id = t.owner
+                    WHERE i.displayname = ?
+                    AND t.text = ?', array($prefix, $tag));
+                if ($tagid && !empty($tagid)) {
+                    $tagid = current($tagid);
+                    $artefacttypefilter .= ' AND at.tagid = ?';
+                    $viewfilter         .= ' AND vt.tagid = ?';
+                    $collectionfilter   .= ' AND ct.tagid = ?';
+                }
+            }
+
+            // Values must be keyed to fit the order of the three separate UNION queries.
+            if (!is_null($tagid)) {
+                $values = array($owner->id, $tag, $tagid, $owner->id, $tag, $tagid, $owner->id, $tag, $tagid);
+            } else {
+                $values = array($owner->id, $tag, $owner->id, $tag, $owner->id, $tag);
+            }
         }
         else {
             $values = array($owner->id, $owner->id, $owner->id);
@@ -1049,30 +1075,77 @@ class PluginSearchInternal extends PluginSearch {
                         $ids[$d->type][$d->id] = 1;
                     }
                     if (!empty($ids['view'])) {
-                        if ($viewtags = get_records_select_array('view_tag', 'view IN (' . join(',', array_keys($ids['view'])) . ')')) {
+                        $where = 'vt.view IN (' . join(',', array_keys($ids['view'])) . ')';
+                        $viewtags = get_records_sql_array("SELECT t.tag, t.view, t.prefix, t.tagid, t.ownerid
+                            FROM (
+                                SELECT vt.tag, vt.view, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                                  FROM {view_tag} vt
+                                  JOIN {view} v ON v.id = vt.view
+                                 WHERE {$where} AND tagid = 0
+                          UNION SELECT vt.tag, vt.view, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                                  FROM {view_tag} vt
+                                  JOIN {view} v ON v.id = vt.view
+                                  JOIN {tag} t ON t.id = vt.tagid
+                                  JOIN {institution} i ON i.id = t.owner
+                                 WHERE {$where}
+                                 ) t
+                        GROUP BY t.tag, t.view, t.prefix, t.tagid, t.ownerid");
+                        if ($viewtags) {
                             foreach ($viewtags as &$vt) {
-                                $data['view:' . $vt->view]->tags[] = $vt->tag;
+                                $data['view:' . $vt->view]->tags[] = $vt;
                             }
                         }
                     }
                     if (!empty($ids['collection'])) {
-                        if ($collectiontags = get_records_select_array('collection_tag', 'collection IN (' . join(',', array_keys($ids['collection'])) . ')')) {
+                        $where = 'ct.collection IN (' . join(',', array_keys($ids['collection'])) . ')';
+                        $collectiontags = get_records_sql_array("SELECT t.tag, t.prefix, t.tagid, t.ownerid, t.collection
+                            FROM (
+                                SELECT ct.tag, ct.collection, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                                  FROM {collection_tag} ct
+                                  JOIN {collection} c ON c.id = ct.collection
+                                 WHERE {$where} AND tagid = 0
+                          UNION SELECT ct.tag, ct.collection, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                                  FROM {collection_tag} ct
+                                  JOIN {collection} c ON c.id = ct.collection
+                                  JOIN {tag} t ON t.id = ct.tagid
+                                  JOIN {institution} i ON i.id = t.owner
+                                 WHERE {$where}
+                                 ) t
+                        GROUP BY t.tag, t.collection, t.prefix, t.tagid, t.ownerid");
+                        if ($collectiontags) {
                             foreach ($collectiontags as &$ct) {
-                                $data['collection:' . $ct->collection]->tags[] = $ct->tag;
+                                $data['collection:' . $ct->collection]->tags[] = $ct;
                             }
                         }
                     }
                     if (!empty($ids['artefact'])) {
-                        if ($artefacttags = get_records_select_array('artefact_tag', 'artefact IN (' . join(',', array_keys($ids['artefact'])) . ')', NULL, 'tag')) {
+                        $where = 'at.artefact IN (' . join(',', array_keys($ids['artefact'])) . ')';
+                        $artefacttags = get_records_sql_array("SELECT t.tag, t.artefact, t.prefix, t.tagid, t.ownerid
+                            FROM (
+                                SELECT at.tag, at.artefact, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+                                  FROM {artefact_tag} at
+                                  JOIN {artefact} a ON a.id = at.artefact
+                                 WHERE {$where} AND tagid = 0
+                          UNION SELECT at.tag, at.artefact, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+                                  FROM {artefact_tag} at
+                                  JOIN {artefact} a ON a.id = at.artefact
+                                  JOIN {tag} t ON t.id = at.tagid
+                                  JOIN {institution} i ON i.id = t.owner
+                                 WHERE {$where}
+                                 ) t
+                        GROUP BY t.tag, t.artefact, t.prefix, t.tagid, t.ownerid");
+                        if ($artefacttags) {
                             foreach ($artefacttags as &$at) {
-                                $data['artefact:' . $at->artefact]->tags[] = $at->tag;
+                                $data['artefact:' . $at->artefact]->tags[] = $at;
                             }
                         }
                     }
                 }
+
                 $result->data = $data;
             }
         }
+
         return $result;
     }
 

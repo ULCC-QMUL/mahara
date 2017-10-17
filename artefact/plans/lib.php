@@ -184,12 +184,15 @@ class ArtefactTypePlan extends ArtefactType {
 
         $SESSION->add_ok_msg(get_string('plansavedsuccessfully', 'artefact.plans'));
 
-        if ($new) {
-            redirect('/artefact/plans/plan.php?id='.$artefact->get('id'));
+        if ($returnurl = $SESSION->get('artefact-plan_returnurl')) {
+            $SESSION->clear('artefact-plan_returnurl');
+        } else if ($new) {
+            $returnurl = '/artefact/plans/plan.php?id='.$artefact->get('id');
+        } else {
+            $returnurl = '/artefact/plans/index.php';
         }
-        else {
-            redirect('/artefact/plans/index.php');
-        }
+
+        redirect($returnurl);
     }
 
     /**
@@ -569,7 +572,13 @@ class ArtefactTypeTask extends ArtefactType {
 
         $SESSION->add_ok_msg(get_string('plansavedsuccessfully', 'artefact.plans'));
 
-        redirect('/artefact/plans/plan.php?id='.$values['parent']);
+        if ($returnurl = $SESSION->get('artefact-plan_returnurl')) {
+            $SESSION->clear('artefact-plan_returnurl');
+        } else {
+            $returnurl = '/artefact/plans/plan.php?id='.$values['parent'];
+        }
+
+        redirect($returnurl);
     }
 
     /**
@@ -653,14 +662,16 @@ class ArtefactTypeTask extends ArtefactType {
      * @param   string  $template   The name of the template to use for rendering
      * @param   array   $options    The block instance options
      * @param   array   $pagination The pagination data
+     * @param   boolean $editing    True if page is being edited
      *
      * @return  array   $tasks      The tasks array updated with rendered table html
      */
-    public function render_tasks(&$tasks, $template, $options, $pagination) {
+    public function render_tasks(&$tasks, $template, $options, $pagination, $editing=false) {
 
         $smarty = smarty_core();
         $smarty->assign('tasks', $tasks);
         $smarty->assign('options', $options);
+        $smarty->assign('editing', $editing);
         $tasks['tablerows'] = $smarty->fetch($template);
 
         if ($tasks['limit'] && $pagination) {

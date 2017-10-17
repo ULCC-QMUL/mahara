@@ -20,7 +20,11 @@
                 <label for="{$prefix}_edit_tags">{str tag=tags}</label>
                 <select name="{$prefix}_edit_tags[]" id="{$prefix}_edit_tags" class="js-data-ajax" multiple="multiple">
                 {foreach from=$fileinfo->tags item=tag name=tags}
-                    <option value="{$tag}">{$tag}</option>
+                    {if $tag->prefix && $tag->prefix != ''}
+                    <option value="{if $tag->tagid !=0}{$tag->tagid}{else}{$tag->tag}{/if}">{$tag->prefix}: {$tag->tag}</option>
+                    {else}
+                    <option value="{if $tag->tagid !=0}{$tag->tagid}{else}{$tag->tag}{/if}">{$tag->tag}</option>
+                    {/if}
                 {/foreach}
                 </select>
                 <span>{contextualhelp plugintype='artefact' pluginname='file' section='tags'}</span>

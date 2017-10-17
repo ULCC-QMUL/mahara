@@ -237,6 +237,28 @@ foreach (array_keys($_POST + $_GET) as $key) {
     }
 }
 
+$inlinejs .= ";
+        function changeCheckBox(el, taskid) {
+            if (el.classList.contains('icon-square-o')) {
+                el.classList.remove('icon-square-o');
+                el.classList.remove('text-midtone');
+                el.classList.add('icon-check-square-o');
+                el.classList.add('text-success');
+                saveCheckBoxChange(taskid);
+            } else {
+                el.classList.remove('icon-check-square-o');
+                el.classList.remove('text-success');
+                el.classList.add('icon-square-o');
+                el.classList.add('text-midtone');
+                saveCheckBoxChange(taskid);
+            }
+        };
+        function saveCheckBoxChange(taskid) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open('POST','/artefact/plans/checktask.php', true);
+            xhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+            xhttp.send('taskid='+taskid);
+        }";
 $viewid = $view->get('id');
 $displaylink = $view->get_url();
 if ($new) {

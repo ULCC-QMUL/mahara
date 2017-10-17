@@ -121,7 +121,7 @@ function rewriteTagLink(elem, keep, replace) {
                 }
                 var edit_tag_link = getFirstElementByTagAndClassName('a', 'edit-tag', 'results_container');
                 if (edit_tag_link) {
-                    if (data.data.tag) {
+                    if (data.data.tag && !data.data.is_institution_tag) {
                         setNodeAttribute(edit_tag_link, 'href', config.wwwroot + 'edittags.php?tag=' + data.data.tagurl);
                         removeElementClass(edit_tag_link, 'hidden');
                     }
@@ -200,11 +200,16 @@ if (strpos($data->baseurl, 'tags.php?') !== 0) {
 else {
     $data->queryprefix = '&';
 }
+$notinstitutiontag = true;
+if ($tag && get_field('tag', 'id', 'text', $tag)) {
+    $notinstitutiontag = false;
+}
 
 $smarty = smarty(array('paginator'));
 $smarty->assign('tags', $tags);
 $smarty->assign('tagsortoptions', $tagsortoptions);
 $smarty->assign('tag', $tag);
+$smarty->assign('not_institution_tag', $notinstitutiontag);
 $smarty->assign('results', $data);
 $smarty->assign('INLINEJAVASCRIPT', $js);
 $smarty->display('tags.tpl');
