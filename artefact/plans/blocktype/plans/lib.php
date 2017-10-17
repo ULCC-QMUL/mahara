@@ -99,11 +99,11 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $pagination = false;
                 } else {
                     $baseurl = $instance->get_view()->get_url();
-                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
+                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
                     $pagination = array(
                         'baseurl'   => $baseurl,
                         'id'        => 'block' . $blockid . '_pagination',
-                        'datatable' => 'tasklist_' . $blockid,
+                        'datatable' => 'tasklist_' . $planid,
                         'jsonscript' => 'artefact/plans/viewtasks.json.php',
                     );
                 }
@@ -138,6 +138,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $tasks['planid'] = $planid;
                 array_push($alltasks, $tasks);
             }
+            // var_dump($alltasks);die;
             $smarty->assign('editing', $editing);
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);

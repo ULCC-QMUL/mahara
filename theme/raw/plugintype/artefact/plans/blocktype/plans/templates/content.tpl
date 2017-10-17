@@ -22,13 +22,13 @@
                     {$tasks.tablerows|safe}
                 </div>
                 {if $tasks.pagination}
-                    <div id="plans_page_container_{$blockid}" class="hidden">
+                    <div id="plans_page_container_{$blockid}">
                         {$tasks.pagination|safe}
                     </div>
                     <script>
                     addLoadEvent(function() {literal}{{/literal}
                         {$tasks.pagination_js|safe}
-                        removeElementClass('plans_page_container_{$blockid}', 'hidden');
+                        removeElementClass('plans_page_container_{$blockid}');
                     {literal}}{/literal});
                     </script>
                 {/if}
