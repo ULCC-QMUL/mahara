@@ -1,0 +1,12 @@
+[submodule "blocktype/contentcounts"]
+	path = blocktype/contentcounts
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contentcounts
+[submodule "blocktype/contenttags"]
+	path = blocktype/contenttags
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contenttags
+[submodule "blocktype/expandedcontent"]
+	path = blocktype/expandedcontent
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_expandedcontent
+[submodule "module/qmframework"]
+	path = module/qmframework
+	url = git@github.com:ULCC-QMUL/mahara-module_qmframework
