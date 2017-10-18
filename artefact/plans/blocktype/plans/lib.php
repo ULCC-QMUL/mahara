@@ -119,6 +119,8 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $plans[$planid]['description'] = $plan->get('description');
                 $plans[$planid]['owner'] = $plan->get('owner');
                 $plans[$planid]['tags'] = $plan->get('tags');
+                $plans[$planid]['details'] = '/artefact/artefact.php?artefact=' . $plan->get('id') . '&view=' .
+                        $instance->get_view()->get('id') . '&block=' . $blockid;
 
                 // CUSTOM CATALYST - filter tags for the QM dashboard.
                 if ($view->get('type') == 'qmdashboard') {
