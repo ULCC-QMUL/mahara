@@ -805,12 +805,13 @@ class Collection {
         else {
             return array();
         }
+        // CUSTOM CATALYST QM FRAMEWORK - adding the 'qmdashboard' type to be ignored to solve access issues
         ($views = get_records_sql_array("SELECT v.id, v.title
             FROM {view} v
             LEFT JOIN {collection_view} cv ON cv.view = v.id
             WHERE " . $wherestm .
             "   AND cv.view IS NULL
-                AND v.type NOT IN ('dashboard','grouphomepage','profile')
+                AND v.type NOT IN ('dashboard','grouphomepage','profile','qmdashboard')
                 AND v.template != 2
                 AND v.submittedgroup IS NULL
                 AND v.submittedhost IS NULL
