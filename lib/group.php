@@ -114,6 +114,12 @@ function group_change_role($groupid, $userid, $role) {
         throw new AccessDeniedException(get_string('usercannotchangetothisrole', 'group'));
     }
 
+    $data = new StdClass;
+    $data->user = $userid;
+    $data->group = $groupid;
+    $data->role = $role;
+    handle_event('userchangegrouprole', $data);
+
     set_field('group_member', 'role', $role, 'group', $groupid, 'member', $userid);
 }
 
