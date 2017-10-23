@@ -1,3 +1,0 @@
-[submodule "htdocs/theme/qmframework"]
-	path = htdocs/theme/qmframework
-	url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-theme_qmframework
