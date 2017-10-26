@@ -12,8 +12,14 @@
     margin: 20px 0;
 }
 
-.task-item .link-block .icon {
+.task-item .icon {
     margin-left: -8px; //correct alignment
+}
+
+.task-item .link-block + a {
+    position: absolute;
+    top: 9px;
+    right: 35px;
 }
 
 .no-results {
