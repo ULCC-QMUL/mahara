@@ -7,6 +7,9 @@
 [submodule "blocktype/expandedcontent"]
 	path = blocktype/expandedcontent
 	url = git@github.com:ULCC-QMUL/mahara-blocktype_expandedcontent
+[submodule "blocktype/stagevisualisation"]
+	path = blocktype/stagevisualisation
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
 [submodule "module/qmframework"]
 	path = module/qmframework
 	url = git@github.com:ULCC-QMUL/mahara-module_qmframework
