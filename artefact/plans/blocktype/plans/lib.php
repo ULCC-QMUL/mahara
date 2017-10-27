@@ -57,20 +57,44 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
     public static function render_instance(BlockInstance $instance, $editing=false) {
         global $exporter;
 
+        require_once(get_config('docroot') . 'artefact/lib.php');
+        safe_require('artefact','plans');
+
+        $configdata = $instance->get('configdata');
+        $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
+
         // CUSTOM CATALYST - filter tags for the QM Dashboard.
         global $view;
         if ($view->get('type') == 'qmdashboard') {
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
+
+            // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
+            if (!$filtertag) {
+                $userid = $view->get('owner');
+                $plans = get_records_sql_array("
+                    SELECT DISTINCT a.id
+                    FROM {artefact} a
+                    JOIN {artefact_tag} at ON at.artefact = a.id
+                    JOIN {tag} t ON at.tagid = t.id AND t.owner = ?
+                   WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan')", array($institutionid, $userid));
+
+                $planids = array();
+                if ($plans) {
+                    foreach ($plans as $plan) {
+                        array_push($planids, $plan->id);
+                    }
+                }
+                if ($configdata['artefactids'] == null || array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids'])) {
+                    $configdata['artefactids'] = $planids;
+                    $newconfigdata = serialize($configdata);
+                    $instance->set('configdata', $newconfigdata);
+                    update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
+                }
+            }
         }
         // END CUSTOM CATALYST.
-
-        require_once(get_config('docroot') . 'artefact/lib.php');
-        safe_require('artefact','plans');
-
-        $configdata = $instance->get('configdata');
-        $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
 
         $smarty = smarty_core();
         if (isset($configdata['artefactids']) && count($configdata['artefactids']) > 0) {
