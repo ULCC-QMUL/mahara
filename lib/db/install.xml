@@ -236,18 +236,6 @@
                 <INDEX NAME="usrix" UNIQUE="false" FIELDS="usr"/>
             </INDEXES>
         </TABLE>
-        <TABLE NAME="usr_tag">
-            <FIELDS>
-                <FIELD NAME="usr" TYPE="int" LENGTH="10" NOTNULL="true"/>
-                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true"/>
-                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
-            </FIELDS>
-            <KEYS>
-                <KEY NAME="primary" TYPE="primary" FIELDS="usr,tag"/>
-                <KEY NAME="usrfk" TYPE="foreign" FIELDS="usr" REFTABLE="usr" REFFIELDS="id"/>
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
-            </KEYS>
-        </TABLE>
         <TABLE NAME="auth_remote_user">
             <FIELDS>
                 <FIELD NAME="authinstance" TYPE="int" LENGTH="10" NOTNULL="true" />
@@ -547,18 +535,6 @@
                 <KEY NAME="primary" TYPE="primary" FIELDS="name" />
             </KEYS>
         </TABLE>
-        <TABLE NAME="artefact_tag">
-            <FIELDS>
-                <FIELD NAME="artefact" TYPE="int" LENGTH="10" NOTNULL="true" />
-                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
-                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
-            </FIELDS>
-            <KEYS>
-                <KEY NAME="primary" TYPE="primary" FIELDS="artefact,tag" />
-                <KEY NAME="artefactfk" TYPE="foreign" FIELDS="artefact" REFTABLE="artefact" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
-            </KEYS>
-        </TABLE>
         <TABLE NAME="artefact_access_usr">
             <FIELDS>
                 <FIELD NAME="usr" TYPE="int" LENGTH="10" NOTNULL="true" />
@@ -844,18 +820,6 @@
                 <KEY NAME="viewfk" TYPE="foreign" FIELDS="view" REFTABLE="view" REFFIELDS="id"/>
             </KEYS>
         </TABLE>
-        <TABLE NAME="view_tag">
-            <FIELDS>
-                <FIELD NAME="view" TYPE="int" LENGTH="10" NOTNULL="true" />
-                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
-                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
-            </FIELDS>
-            <KEYS>
-                <KEY NAME="primary" TYPE="primary" FIELDS="view,tag" />
-                <KEY NAME="viewfk" TYPE="foreign" FIELDS="view" REFTABLE="view" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
-            </KEYS>
-        </TABLE>
         <TABLE NAME="view_autocreate_grouptype">
             <FIELDS>
                 <FIELD NAME="view" TYPE="int" LENGTH="10" NOTNULL="true" />
@@ -1121,18 +1085,6 @@
                 <KEY NAME="viewfk" TYPE="foreign" FIELDS="view" REFTABLE="view" REFFIELDS="id"  />
             </KEYS>
         </TABLE>
-        <TABLE NAME="collection_tag">
-            <FIELDS>
-                <FIELD NAME="collection" TYPE="int" LENGTH="10" NOTNULL="true" />
-                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
-                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
-            </FIELDS>
-            <KEYS>
-                <KEY NAME="primary" TYPE="primary" FIELDS="collection,tag" />
-                <KEY NAME="collectionfk" TYPE="foreign" FIELDS="collection" REFTABLE="collection" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
-            </KEYS>
-        </TABLE>
         <TABLE NAME="iframe_source_icon">
             <FIELDS>
                 <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" />
@@ -1373,6 +1325,7 @@
             <INDEX NAME="connectionk" UNIQUE="true" FIELDS="name,class,connection,institution" COMMENT="the connections can be repeated but the name must be unique for a given type and institution"/>
           </INDEXES>
         </TABLE>
+        <!-- Tagging feature -->
         <TABLE NAME="tag">
             <FIELDS>
                 <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true" />
@@ -1386,6 +1339,54 @@
                 <KEY NAME="primary" TYPE="primary" FIELDS="id" />
                 <KEY NAME="ownerfk" TYPE="foreign" FIELDS="owner" REFTABLE="institution" REFFIELDS="id" />
                 <KEY NAME="usrfk" TYPE="foreign" FIELDS="editedby" REFTABLE="usr" REFFIELDS="id" />
+            </KEYS>
+        </TABLE>
+        <TABLE NAME="usr_tag">
+            <FIELDS>
+                <FIELD NAME="usr" TYPE="int" LENGTH="10" NOTNULL="true"/>
+                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true"/>
+                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
+            </FIELDS>
+            <KEYS>
+                <KEY NAME="primary" TYPE="primary" FIELDS="usr,tag"/>
+                <KEY NAME="usrfk" TYPE="foreign" FIELDS="usr" REFTABLE="usr" REFFIELDS="id"/>
+                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
+            </KEYS>
+        </TABLE>
+        <TABLE NAME="artefact_tag">
+            <FIELDS>
+                <FIELD NAME="artefact" TYPE="int" LENGTH="10" NOTNULL="true" />
+                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
+                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
+            </FIELDS>
+            <KEYS>
+                <KEY NAME="primary" TYPE="primary" FIELDS="artefact,tag" />
+                <KEY NAME="artefactfk" TYPE="foreign" FIELDS="artefact" REFTABLE="artefact" REFFIELDS="id" />
+                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
+            </KEYS>
+        </TABLE>
+        <TABLE NAME="view_tag">
+            <FIELDS>
+                <FIELD NAME="view" TYPE="int" LENGTH="10" NOTNULL="true" />
+                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
+                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
+            </FIELDS>
+            <KEYS>
+                <KEY NAME="primary" TYPE="primary" FIELDS="view,tag" />
+                <KEY NAME="viewfk" TYPE="foreign" FIELDS="view" REFTABLE="view" REFFIELDS="id" />
+                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
+            </KEYS>
+        </TABLE>
+        <TABLE NAME="collection_tag">
+            <FIELDS>
+                <FIELD NAME="collection" TYPE="int" LENGTH="10" NOTNULL="true" />
+                <FIELD NAME="tag" TYPE="char" LENGTH="128" NOTNULL="true" />
+                <FIELD NAME="tagid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" />
+            </FIELDS>
+            <KEYS>
+                <KEY NAME="primary" TYPE="primary" FIELDS="collection,tag" />
+                <KEY NAME="collectionfk" TYPE="foreign" FIELDS="collection" REFTABLE="collection" REFFIELDS="id" />
+                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
         </TABLE>
     </TABLES>

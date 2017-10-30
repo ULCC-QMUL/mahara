@@ -22,13 +22,13 @@
                     {$tasks.tablerows|safe}
                 </div>
                 {if $tasks.pagination}
-                    <div id="plans_page_container_{$blockid}" class="hidden">
+                    <div id="plans_page_container_{$blockid}">
                         {$tasks.pagination|safe}
                     </div>
                     <script>
                     addLoadEvent(function() {literal}{{/literal}
                         {$tasks.pagination_js|safe}
-                        removeElementClass('plans_page_container_{$blockid}', 'hidden');
+                        removeElementClass('plans_page_container_{$blockid}');
                     {literal}}{/literal});
                     </script>
                 {/if}
@@ -37,5 +37,6 @@
     {else}
         <div class="lead text-center content-text">{str tag='notasks' section='artefact.plans'}</div>
     {/if}
+    <a href="{$plan.details}" class="detail-link link-blocktype"><span class="icon icon-link" role="presentation" aria-hidden="true"></span> {str tag=detailslinkalt section=view}</a>
 </div>
 {/foreach}

@@ -4883,5 +4883,12 @@ function xmldb_core_upgrade($oldversion=0) {
             insert_record('event_type', $record);
     }
 
+    if ($oldversion < 2017101901) {
+        $record = (object)array(
+            'name'  => 'userchangegrouprole'
+        );
+        insert_record('event_type', $record);
+    }
+
     return $status;
 }
