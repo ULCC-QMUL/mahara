@@ -28,3 +28,6 @@
 [submodule "blocktype/contenttags"]
 	path = blocktype/contenttags
 	url = git@github.com:/ULCC-QMUL/mahara-blocktype_contenttags
+[submodule "blocktype/stagevisualisation"]
+	path = blocktype/stagevisualisation
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
