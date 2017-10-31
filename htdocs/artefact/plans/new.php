@@ -36,7 +36,7 @@ else {
     $form = ArtefactTypePlan::get_form();
 }
 // This SESSION variable is necessary for the return to the previous page after the adding of a task.
-if (!$SESSION->get('artefact-plan_returnurl')) {
+if (!strpos($_SERVER['HTTP_REFERER'], 'artefact/plans') && !$SESSION->get('artefact-plan_returnurl')) {
     $SESSION->set('artefact-plan_returnurl', $_SERVER['HTTP_REFERER']);
 }
 $smarty = smarty();
