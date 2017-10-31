@@ -23,6 +23,11 @@ if (!$USER->can_edit_artefact($todelete)) {
     throw new AccessDeniedException(get_string('accessdenied', 'error'));
 }
 
+// This SESSION variable is necessary for the return to the previous page after task edit.
+if (!strpos($_SERVER['HTTP_REFERER'], 'artefact/plans') && !$SESSION->get('artefact-plan_returnurl')) {
+    $SESSION->set('artefact-plan_returnurl', $_SERVER['HTTP_REFERER']);
+}
+
 $deleteform = array(
     'name' => 'deleteplanform',
     'class' => 'form-delete',
@@ -54,5 +59,12 @@ function deleteplanform_submit(Pieform $form, $values) {
     $todelete->delete();
     $SESSION->add_ok_msg(get_string('plandeletedsuccessfully', 'artefact.plans'));
 
-    redirect('/artefact/plans/index.php');
+    // Redirect to blocktype view if plan was deleted from a blocktype.
+    if ($returnurl = $SESSION->get('artefact-plan_returnurl')) {
+        $SESSION->clear('artefact-plan_returnurl');
+    } else {
+        $returnurl = '/artefact/plans/index.php';
+    }
+
+    redirect($returnurl);
 }
