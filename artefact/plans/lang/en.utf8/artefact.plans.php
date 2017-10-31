@@ -41,6 +41,7 @@ $string['title'] = 'Title';
 $string['titledesc'] = 'The title will be used to display each task in the plans blocktype.';
 
 /* Tasks */
+$string['addtask'] = 'Add task';
 $string['alltasks'] = 'All tasks';
 $string['canteditdontowntask'] = 'You cannot edit this task because you do not own it.';
 $string['completed'] = 'Completed';
