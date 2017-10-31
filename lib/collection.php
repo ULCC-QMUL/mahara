@@ -194,9 +194,9 @@ class Collection {
             }
         }
 
-        delete_records('collection_tag', 'collection', $this->get('id'));
         if (isset($this->tags) && is_array($this->tags)) {
             $this->tags = check_case_sensitive($this->tags, 'collection_tag');
+            delete_records('collection_tag', 'collection', $this->get('id'));
             foreach ($this->tags as $tag) {
                 if (is_numeric($tag) && $tag != 0) {
                     $tagid = $tag;

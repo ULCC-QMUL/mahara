@@ -793,9 +793,9 @@ class View {
         }
 
         // Delete and update tags.
-        delete_records('view_tag', 'view', $this->get('id'));
         if (isset($this->tags) && is_array($this->tags)) {
             $this->tags = check_case_sensitive($this->tags, 'view_tag');
+            delete_records('view_tag', 'view', $this->get('id'));
             foreach ($this->tags as $tag) {
                 if (is_numeric($tag) && $tag != 0) {
                     $tagid = $tag;
