@@ -57,7 +57,10 @@
                     {/if}
 
                     {if $editing}
-                    <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span class="pull-right" role="presentation" aria-hidden="true">Edit </span></a>
+                    <div class="pull-right">
+                        <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span role="presentation" aria-hidden="true">{str tag='edit' section='mahara'} |</span></a>
+                        <a href="{$WWWROOT}artefact/plans/delete/task.php?id={$task->id}"><span role="presentation" aria-hidden="true">{str tag='delete' section='mahara'}</span></a>
+                    </div>
                     {/$if}
 
                 </span>
