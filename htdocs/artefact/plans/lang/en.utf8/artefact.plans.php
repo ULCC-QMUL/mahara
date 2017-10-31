@@ -45,6 +45,7 @@ $string['youhavenplan'] = array(
 );
 
 /* Tasks */
+$string['addtask'] = 'Add task';
 $string['alltasks'] = 'All tasks';
 $string['canteditdontowntask'] = 'You cannot edit this task because you do not own it.';
 $string['completed'] = 'Completed';
