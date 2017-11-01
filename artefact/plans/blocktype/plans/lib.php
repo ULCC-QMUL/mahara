@@ -80,8 +80,8 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
                     $pagination = array(
                         'baseurl'   => $baseurl,
-                        'id'        => 'block' . $blockid . '_pagination',
-                        'datatable' => 'tasklist_' . $planid,
+                        'id'        => "block{$blockid}_plan{$planid}_pagination",
+                        'datatable' => "tasklist_{$blockid}_plan{$planid}",
                         'jsonscript' => 'artefact/plans/viewtasks.json.php',
                     );
                 }

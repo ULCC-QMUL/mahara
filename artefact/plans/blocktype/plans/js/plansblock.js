@@ -1,5 +1,5 @@
-function rewriteTaskTitles(blockid) {
-  jQuery('tasktable_' + blockid + ' a.task-title').each(function() {
+function rewriteTaskTitles(blockid, planid) {
+  jQuery('tasklist_' + blockid + '_plan' + planid + ' a.task-title').each(function() {
       jQuery(this).off();
       jQuery(this).on('click', function(e) {
           e.preventDefault();
@@ -8,18 +8,30 @@ function rewriteTaskTitles(blockid) {
       });
   });
 }
-function TaskPager(blockid) {
+function TaskPager(blockid, planid) {
     var self = this;
     paginatorProxy.addObserver(self);
-    jQuery(self).on('pagechanged', rewriteTaskTitles.bind(null, blockid));
+    jQuery(self).on('pagechanged', rewriteTaskTitles.bind(null, blockid, planid));
 }
 
 var taskPagers = [];
 
 function initNewPlansBlock(blockid) {
-    if (jQuery('#plans_page_container_' + blockid)) {
-        new Paginator('block' + blockid + '_pagination', 'tasktable_' + blockid, null, 'artefact/plans/viewtasks.json.php', null);
-        taskPagers.push(new TaskPager(blockid));
-    }
-    rewriteTaskTitles(blockid);
+    var planslist = $(".bt-plans .pagination-wrapper");
+    jQuery.each(
+        planslist,
+        function(key, value){
+          var nodeid  = getNodeAttribute(value, 'id');
+          var frompos = nodeid.indexOf('_') + 5;
+          var topos   = nodeid.lastIndexOf('_');
+          var planid  = nodeid.substring(frompos, topos);
+
+          var data = [];
+          data['block']  = blockid;
+          data['planid'] = planid;
+          new Paginator(nodeid, 'tasklist_' + blockid + '_plan' + planid, null, 'artefact/plans/viewtasks.json.php', data);
+          taskPagers.push(new TaskPager(blockid, planid));
+          rewriteTaskTitles(blockid, planid);
+        }
+    );
 }

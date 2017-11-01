@@ -21,11 +21,11 @@
     {if $plan.numtasks != 0}
         {foreach from=$alltasks item=tasks}
             {if $tasks.planid == $plan.id}
-                <div id="tasklist_{$blockid}" class="list-group list-unstyled">
+                <div id="tasklist_{$blockid}_plan{$tasks.planid}" class="list-group list-unstyled">
                     {$tasks.tablerows|safe}
                 </div>
                 {if $tasks.pagination}
-                    <div id="plans_page_container_{$blockid}">
+                    <div id="plans_page_container_{$blockid}_plan{$tasks.planid}">
                         {$tasks.pagination|safe}
                     </div>
                     <script type="application/javascript">
