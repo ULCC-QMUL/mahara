@@ -26,22 +26,19 @@ if ($blockid = param_integer('block', null)) {
         json_reply(true, get_string('accessdenied', 'error'));
     }
     $options = $configdata = $bi->get('configdata');
+
     // If block sets limit use that instead
     $limit = !empty($configdata['count']) ? $configdata['count'] : $limit;
-    $planid = param_integer('planid', null);
-    if ($planid) {
-        $tasks = ArtefactTypeTask::get_tasks($planid, $offset, $limit);
-    } else {
-        $tasks = ArtefactTypeTask::get_tasks($configdata['artefactid'], $offset, $limit);
-    }
+    $planid = param_integer('planid');
+    $tasks = ArtefactTypeTask::get_tasks($planid, $offset, $limit);
 
     $template = 'artefact:plans:taskrows.tpl';
     $baseurl = $bi->get_view()->get_url();
-    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid;
+    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
     $pagination = array(
-        'baseurl'   => $baseurl,
-        'id'        => 'block' . $blockid . '_pagination',
-        'datatable' => 'tasklist_' . $blockid,
+        'baseurl'    => $baseurl,
+        'id'         => "block{$blockid}_plan{$planid}_pagination",
+        'datatable'  => "tasklist_{$blockid}_plan{$planid}",
         'jsonscript' => 'artefact/plans/viewtasks.json.php',
     );
 }
@@ -59,7 +56,7 @@ else {
     $pagination = array(
         'baseurl' => $baseurl,
         'id' => 'task_pagination',
-        'datatable' => 'tasktable',
+        'datatable' => 'tasklist',
         'jsonscript' => 'artefact/plans/viewtasks.json.php',
     );
 

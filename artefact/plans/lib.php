@@ -285,7 +285,7 @@ class ArtefactTypePlan extends ArtefactType {
         $pagination = array(
             'baseurl' => $baseurl,
             'id' => 'task_pagination',
-            'datatable' => 'tasktable',
+            'datatable' => 'tasklist',
             'jsonscript' => 'artefact/plans/viewtasks.json.php',
         );
 
