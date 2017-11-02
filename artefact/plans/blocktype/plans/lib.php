@@ -73,17 +73,24 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
             if (!$filtertag) {
                 $userid = $view->get('owner');
-                $plans = get_records_sql_array("
-                    SELECT DISTINCT a.id
+                $artefacts = get_records_sql_array("
+                    SELECT DISTINCT a.id, a.artefacttype, a.parent
                     FROM {artefact} a
                     JOIN {artefact_tag} at ON at.artefact = a.id
                     JOIN {tag} t ON at.tagid = t.id AND t.owner = ?
-                   WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan')", array($institutionid, $userid));
+                   WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan', 'task')", array($institutionid, $userid));
 
                 $planids = array();
-                if ($plans) {
-                    foreach ($plans as $plan) {
-                        array_push($planids, $plan->id);
+                if ($artefacts) {
+                    foreach ($artefacts as $artefact) {
+                        if ($artefact->artefacttype == 'plan') {
+                            array_push($planids, $artefact->id);
+                        } else {
+                            // If a plan has more than one tagged task or is itself tagged, make sure we're addig it just once.
+                            if (!in_array($artefact->parent, $planids)) {
+                                array_push($planids, $artefact->parent);
+                            }
+                        }
                     }
                 }
                 if ($configdata['artefactids'] == null || array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids'])) {
