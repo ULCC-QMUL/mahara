@@ -15,8 +15,11 @@
                     {/if}
 
                     {if $editing}
-                    <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span class="pull-right" role="presentation" aria-hidden="true">Edit </span></a>
-                    {/$if}
+                    <div class="pull-right controls">
+                        <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}" title="{str tag='edit' section='mahara'}"><span class="icon icon-cog text-default"></span></a>
+                        <a href="{$WWWROOT}artefact/plans/delete/task.php?id={$task->id}" title="{str tag='delete' section='mahara'}"><span class="icon icon-remove text-danger"></span></a>
+                    </div>
+                    {/if}
                 </span>
             {if $task->description}</a>{/if}
 
@@ -57,11 +60,11 @@
                     {/if}
 
                     {if $editing}
-                    <div class="pull-right">
-                        <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}"><span role="presentation" aria-hidden="true">{str tag='edit' section='mahara'} |</span></a>
-                        <a href="{$WWWROOT}artefact/plans/delete/task.php?id={$task->id}"><span role="presentation" aria-hidden="true">{str tag='delete' section='mahara'}</span></a>
+                    <div class="pull-right controls">
+                        <a href="{$WWWROOT}artefact/plans/edit/task.php?id={$task->id}" title="{str tag='edit' section='mahara'}"><span class="icon icon-cog text-default"></span></a>
+                        <a href="{$WWWROOT}artefact/plans/delete/task.php?id={$task->id}" title="{str tag='delete' section='mahara'}"><span class="icon icon-remove text-danger"></span></a>
                     </div>
-                    {/$if}
+                    {/if}
 
                 </span>
 
