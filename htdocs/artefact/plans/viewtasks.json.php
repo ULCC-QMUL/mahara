@@ -19,6 +19,7 @@ require_once(get_config('docroot') . 'artefact/plans/blocktype/plans/lib.php');
 
 $offset = param_integer('offset', 0);
 $limit = param_integer('limit', 10);
+$editing = param_variable('editing', false);
 
 if ($blockid = param_integer('block', null)) {
     $bi = new BlockInstance($blockid);
@@ -34,6 +35,12 @@ if ($blockid = param_integer('block', null)) {
 
     $template = 'artefact:plans:taskrows.tpl';
     $baseurl = $bi->get_view()->get_url();
+    // CUSTOM Catalyst - use the QM Dashboard URL.
+    $view = new View($bi->get('view'));
+    $baseurl = ($view->get('type') == 'qmdashboard')
+        ? get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id')
+        : $baseurl;
+    // END CUSTOM Catalyst.
     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
     $pagination = array(
         'baseurl'    => $baseurl,
@@ -61,6 +68,6 @@ else {
     );
 
 }
-ArtefactTypeTask::render_tasks($tasks, $template, $options, $pagination);
+ArtefactTypeTask::render_tasks($tasks, $template, $options, $pagination, $editing);
 
 json_reply(false, (object) array('message' => false, 'data' => $tasks));
