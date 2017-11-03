@@ -69,7 +69,6 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
-            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id');
 
             // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
             if (!$filtertag) {
@@ -110,40 +109,20 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $alltasks = array();
             foreach ($configdata['artefactids'] as $planid) {
                 $plan = artefact_instance_from_id($planid);
-                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 // CUSTOM CATALYST - filter tags for the QM Dashboard.
-                if ($view->get('type') == 'qmdashboard' && $filtertag) {
-                    $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
-                    $matches = true;
-                    $matched = array_map(function($k) {
+                if ($view->get('type') == 'qmdashboard') {
+                    $alltags = $plan->get('tags');
+                    $tagkeys = array_map(function($k) {
                         return $k->tag;
-                    }, $plan->get('tags'));
-                    if (!in_array($filtertag, $matched)) {
-                        $matches = false;
-                    }
-
-                    // The plan tags do not match the filter; check tasks.
-                    if (!$matches) {
-                        foreach ($tasks['data'] as $key => $task) {
-                            $tags = json_decode(json_encode($task->tags), true);
-                            foreach ($tags as $tag) {
-                                if (!in_array($filtertag, $tag)) {
-                                    unset($tasks['data'][$key]);
-                                }
-                            }
-                            if (!empty($tasks['data'])) {
-                                $matches = true; // At least one task tag matches the filter.
-                            }
-                        }
-                    }
-
-                    // Nothing matched; skip this plan.
-                    if (!$matches) {
+                    }, $alltags);
+                    if ($filtertag && !in_array($filtertag, $tagkeys)) {
                         continue;
                     }
                 }
                 // END CUSTOM CATALYST.
+
+                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 $template = 'artefact:plans:taskrows.tpl';
                 $blockid = $instance->get('id');
@@ -151,7 +130,6 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $pagination = false;
                 } else {
                     $baseurl = $instance->get_view()->get_url();
-                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM Catalyst - use the QM Dashboard URL.
                     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
                     $pagination = array(
                         'baseurl'   => $baseurl,
@@ -191,6 +169,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $tasks['planid'] = $planid;
                 array_push($alltasks, $tasks);
             }
+            // var_dump($alltasks);die;
             $smarty->assign('editing', $editing);
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);
