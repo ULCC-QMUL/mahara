@@ -245,6 +245,14 @@ $inlinejs .= ";
                 el.classList.add('icon-check-square-o');
                 el.classList.add('text-success');
                 saveCheckBoxChange(taskid);
+            } else if (el.classList.contains('icon-times')) {
+                el.classList.remove('icon-times');
+                el.classList.remove('text-danger');
+                el.classList.add('icon-check-square-o');
+                el.classList.add('text-success');
+                el.nextElementSibling.classList.remove('text-danger');
+                el.nextElementSibling.classList.add('text-default');
+                saveCheckBoxChange(taskid);
             } else {
                 el.classList.remove('icon-check-square-o');
                 el.classList.remove('text-success');
