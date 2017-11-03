@@ -69,6 +69,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
+            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id');
 
             // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
             if (!$filtertag) {
@@ -131,7 +132,8 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $pagination = false;
                 } else {
                     $baseurl = $instance->get_view()->get_url();
-                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
+                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM Catalyst - use the QM Dashboard URL.
+                    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
                     $pagination = array(
                         'baseurl'   => $baseurl,
                         'id'        => "block{$blockid}_plan{$planid}_pagination",
