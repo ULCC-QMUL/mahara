@@ -16,10 +16,19 @@
     margin-left: -8px; //correct alignment
 }
 
-.task-item .link-block + a {
+.task-item .link-block {
+    margin-right: 27px;
+}
+
+.task-item .controls {
     position: absolute;
-    top: 9px;
-    right: 35px;
+    top: 10px;
+    right: 10px;
+}
+
+.task-item .controls .icon {
+    display: inline-block;
+    margin-left: 0;
 }
 
 .no-results {
