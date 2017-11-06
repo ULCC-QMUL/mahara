@@ -93,7 +93,8 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                         }
                     }
                 }
-                if ($configdata['artefactids'] == null || array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids'])) {
+                if (isset($configdata['artefactids']) || $configdata['artefactids'] == null
+                    || array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids'])) {
                     $configdata['artefactids'] = $planids;
                     $newconfigdata = serialize($configdata);
                     $instance->set('configdata', $newconfigdata);
