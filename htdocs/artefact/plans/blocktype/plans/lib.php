@@ -94,8 +94,8 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                         }
                     }
                 }
-                if (isset($configdata['artefactids']) || $configdata['artefactids'] == null
-                    || array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids'])) {
+                if ((!isset($configdata['artefactids']) || $configdata['artefactids'] == null)
+                    || (array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids']))) {
                     $configdata['artefactids'] = $planids;
                     $newconfigdata = serialize($configdata);
                     $instance->set('configdata', $newconfigdata);
@@ -172,14 +172,11 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 $tasks['planid'] = $planid;
                 array_push($alltasks, $tasks);
             }
-            // var_dump($alltasks);die;
             $smarty->assign('editing', $editing);
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);
         }
-        else {
-            $smarty->assign('noplans','blocktype.plans/plans');
-        }
+
         $smarty->assign('blockid', $instance->get('id'));
         return $smarty->fetch('blocktype:plans:content.tpl');
     }
