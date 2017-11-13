@@ -41,7 +41,7 @@ if ($blockid = param_integer('block', null)) {
         ? get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id')
         : $baseurl;
     // END CUSTOM Catalyst.
-    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid;
+    $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
     $pagination = array(
         'baseurl'    => $baseurl,
         'id'         => "block{$blockid}_plan{$planid}_pagination",
