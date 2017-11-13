@@ -44,6 +44,6 @@
 {/foreach}
 {else}
 <div class="panel-body flush">
-    <a href="{$WWWROOT}artefact/plans/new.php">{str tag='noplansaddone' section='artefact.plans'}</a>
+    {str tag='noplans' section='blocktype.plans/plans'} <a href="{$WWWROOT}artefact/plans/new.php">{str tag='addone' section='blocktype.plans/plans'}</a>
 </div>
 {/if}
