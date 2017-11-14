@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [submodule "theme/qmulpurple"]
 	path = theme/qmulpurple
 	url = git@github.com:ULCC-QMUL/mahara-theme_qmulpurple.git
@@ -20,7 +19,6 @@
 [submodule "module/qmframework"]
 	path = module/qmframework
 	url = git@github.com:ULCC-QMUL/mahara-module_qmframework.git
-=======
 [submodule "blocktype/contentcounts"]
 	path = blocktype/contentcounts
 	url = git@github.com:ULCC-QMUL/mahara-blocktype_contentcounts
@@ -35,5 +33,4 @@
 	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
 [submodule "module/qmframework"]
 	path = module/qmframework
-	url = git@github.com:ULCC-QMUL/mahara-module_qmframework
->>>>>>> remotes/origin/client-qmul-16.10-prod
+	url = git@github.com:ULCC-QMUL/mahara-module_qmframework.git
