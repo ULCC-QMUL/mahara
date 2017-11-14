@@ -58,7 +58,8 @@ class Institution {
         'licensedefault' => null,
         'licensemandatory' => 0,
         'dropdownmenu' => 0,
-        'skins' => true
+        'skins' => true,
+        'tags' => false
     );
 
     // This institution's config settings
@@ -124,6 +125,7 @@ class Institution {
             // int 1 (i.e. true/false)
             case 'registerallowed':
             case 'skins':
+            case 'tags':
             case 'suspended':
             case 'licensemandatory':
             case 'expirymailsent':
@@ -838,7 +840,8 @@ class Institution {
     }
 }
 
-function get_institution_selector($includedefault = true, $assumesiteadmin=false, $includesitestaff=false, $includeinstitutionstaff=false) {
+function get_institution_selector($includedefault=true, $assumesiteadmin=false, $includesitestaff=false,
+    $includeinstitutionstaff=false, $withactiveinstitutiontags=false) {
     global $USER;
 
     if (($assumesiteadmin || $USER->get('admin')) || ($includesitestaff && $USER->get('staff'))) {
@@ -881,9 +884,18 @@ function get_institution_selector($includedefault = true, $assumesiteadmin=false
     }
 
     $options = array();
-    foreach ($institutions as $i) {
-        $options[$i->name] = $i->displayname;
+    if ($withactiveinstitutiontags) {
+        foreach ($institutions as $i) {
+            if ($i->tags) {
+                $options[$i->name] = $i->displayname;
+            }
+        }
+    } else {
+        foreach ($institutions as $i) {
+            $options[$i->name] = $i->displayname;
+        }
     }
+
     $institution = key($options);
     $institutionelement = array(
         'type' => 'select',

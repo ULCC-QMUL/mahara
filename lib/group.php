@@ -114,6 +114,12 @@ function group_change_role($groupid, $userid, $role) {
         throw new AccessDeniedException(get_string('usercannotchangetothisrole', 'group'));
     }
 
+    $data = new StdClass;
+    $data->user = $userid;
+    $data->group = $groupid;
+    $data->role = $role;
+    handle_event('userchangegrouprole', $data);
+
     set_field('group_member', 'role', $role, 'group', $groupid, 'member', $userid);
 }
 
@@ -950,6 +956,11 @@ function group_remove_user($groupid, $userid=null, $force=false) {
     if (!$force && !group_user_can_leave($groupid, $userid)) {
         throw new AccessDeniedException(get_string('usercantleavegroup', 'group'));
     }
+    $data = new StdClass;
+    $data->user = $userid;
+    $data->group = $groupid;
+    $data->role = get_field('group_member', 'role', 'group', $groupid, 'member', $userid);
+    handle_event('userleavesgroup', $data);
     delete_records('group_member', 'group', $groupid, 'member', $userid);
 
     global $USER;
@@ -1910,6 +1921,13 @@ function group_get_menu_tabs() {
                 $plugin_menu = call_static_method(generate_class_name('artefact',$plugin->name), 'group_tabs', $group->id);
                 $menu = array_merge($menu, $plugin_menu);
             }
+        }
+    }
+    if ($plugins = plugins_installed('module')) {
+        foreach ($plugins as &$plugin) {
+            safe_require('module', $plugin->name);
+            $plugin_menu = call_static_method(generate_class_name('module', $plugin->name), 'group_menu_items', $group);
+            $menu = array_merge($menu, $plugin_menu);
         }
     }
 

@@ -543,6 +543,13 @@ if ($institution || $add) {
         'disabled'     => is_plugin_active('framework', 'module') == false,
         'help'         => true,
     );
+    $elements['allowinstitutiontags'] = array(
+        'type'         => 'switchbox',
+        'title'        => get_string('allowinstitutiontags', 'tags'),
+        'description'  => get_string('allowinstitutiontagsdescription', 'tags'),
+        'defaultvalue' => isset($data->tags) ? $data->tags : false,
+        'help'         => true,
+    );
     $elements['lockedfields'] = array(
         'type' => 'fieldset',
         'class' => 'last with-formgroup',
@@ -856,6 +863,7 @@ function institution_submit(Pieform $form, $values) {
 
     $newinstitution->allowinstitutionpublicviews  = (isset($values['allowinstitutionpublicviews']) && $values['allowinstitutionpublicviews']) ? 1 : 0;
     $newinstitution->allowinstitutionsmartevidence  = (isset($values['allowinstitutionsmartevidence']) && $values['allowinstitutionsmartevidence']) ? 1 : 0;
+    $newinstitution->tags  = (isset($values['allowinstitutiontags']) && $values['allowinstitutiontags']) ? 1 : 0;
 
     // TODO: Move handling of authentication instances within the Institution class as well?
     if (!empty($values['authplugin'])) {
