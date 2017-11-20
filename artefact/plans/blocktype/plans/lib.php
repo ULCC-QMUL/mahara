@@ -89,6 +89,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                         $planids[$artefact->parent] = $artefact->parent;
                     }
                 }
+                ksort($planids); // Sort by ID.
 
                 // Update the configdata with the identified Artefact IDs;
                 $configdata['artefactids'] = array_values($planids);
