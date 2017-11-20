@@ -82,25 +82,19 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                    WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan', 'task')", array($institutionid, $userid));
 
                 $planids = array();
-                if ($artefacts) {
-                    foreach ($artefacts as $artefact) {
-                        if ($artefact->artefacttype == 'plan') {
-                            array_push($planids, $artefact->id);
-                        } else {
-                            // If a plan has more than one tagged task or is itself tagged, make sure we're addig it just once.
-                            if (!in_array($artefact->parent, $planids)) {
-                                array_push($planids, $artefact->parent);
-                            }
-                        }
+                foreach ($artefacts as $artefact) {
+                    if ($artefact->artefacttype == 'plan') {
+                        $planids[$artefact->id] = $artefact->id;
+                    } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
+                        $planids[$artefact->parent] = $artefact->parent;
                     }
                 }
-                if ((!isset($configdata['artefactids']) || $configdata['artefactids'] == null)
-                    || (array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids']))) {
-                    $configdata['artefactids'] = $planids;
-                    $newconfigdata = serialize($configdata);
-                    $instance->set('configdata', $newconfigdata);
-                    update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
-                }
+
+                // Update the configdata with the identified Artefact IDs;
+                $configdata['artefactids'] = array_values($planids);
+                $newconfigdata = serialize($configdata);
+                $instance->set('configdata', $newconfigdata);
+                update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
             }
         }
         // END CUSTOM CATALYST.
