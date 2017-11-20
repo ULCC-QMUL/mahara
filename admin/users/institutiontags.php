@@ -21,7 +21,6 @@ require_once(get_config('libroot') . 'institution.php');
 
 $institution = param_alphanum('institution', false);
 $new = param_boolean('new', 0);
-$tag = param_variable('tag', null);
 
 // Get all the institutions that the current user has access to.
 $institutionelement = get_institution_selector(true, false, false, false, true);
@@ -147,11 +146,11 @@ function institutiontag_validate(Pieform $form, $values) {
     }
 }
 
-$institutionid = get_field('institution', 'id', 'name', $institution);
 // Delete tag.
-if ($tag) {
-    $tagid = (int) get_field('tag', 'id', 'text', $tag, 'owner', $institutionid);
-    $tagrecords = get_records_sql_array("
+$delete = param_variable('delete', null);
+if ($delete) {
+    $institutionid = get_field('institution', 'id', 'name', $institution);
+    $deleterecords = get_records_sql_array("
         SELECT
             t.tag
         FROM (
@@ -161,22 +160,54 @@ if ($tag) {
            UNION
            (SELECT ct.tag FROM {collection_tag} ct WHERE ct.tagid = ?)
     ) t",
-        array($tagid, $tagid, $tagid)
+        array($delete, $delete, $delete)
     );
-    if (!$tagrecords) {
+    if (!$deleterecords || empty($deleterecords)) {
         db_begin();
-        delete_records_select('tag', "owner = $institutionid AND text = '$tag'");
+        if (delete_records_select('tag', "owner = {$institutionid} AND id = {$delete}")) {
+            $SESSION->add_ok_msg(get_string('institutiontagdeleted', 'tags'));
+        } else {
+            $SESSION->add_error_msg(get_string('cantdeleteinstitutiontag', 'tags'));
+        }
         db_commit();
-        $SESSION->add_ok_msg(get_string('institutiontagdeleted', 'tags'));
-    } else {
-        $SESSION->add_error_msg(get_string('cantdeleteinstitutiontag', 'tags'));
     }
-    redirect("/admin/users/institutiontags.php?new=0&institution={$institution}");
+
+    redirect("/admin/users/institutiontags.php?institution={$institution}");
 }
 
-// Get the exiting institution tags.
-$id   = get_field('institution', 'id', 'name', $institution);
-$tags = get_records_sql_array('SELECT * FROM {tag} t WHERE owner = ?', array((int)$id));
+// Get the institution tags and their used.
+$id  = get_field('institution', 'id', 'name', $institution);
+$sql = "
+    SELECT id, text, SUM(count) AS count
+    FROM (
+        SELECT tag.id, tag.text, 0 AS count
+          FROM {tag} tag
+         WHERE tag.owner = ?
+      GROUP BY 1
+     UNION ALL
+        SELECT tag.id, tag.text, COUNT(*) AS count
+          FROM {artefact_tag} t
+     LEFT JOIN {tag} tag ON t.tag = tag.text
+         WHERE tag.owner = ?
+      GROUP BY 1
+     UNION ALL
+        SELECT tag.id, tag.text, COUNT(*) AS count
+          FROM {view_tag} t
+     LEFT JOIN {tag} tag ON t.tag = tag.text
+         WHERE tag.owner = ?
+      GROUP BY 1
+     UNION ALL
+        SELECT tag.id, tag.text, COUNT(*) AS count
+          FROM {collection_tag} t
+     LEFT JOIN {tag} tag ON t.tag = tag.text
+         WHERE tag.owner = ?
+      GROUP BY 1) tags
+      GROUP BY text
+      ORDER BY LOWER(text)";
+$tags = get_records_sql_assoc($sql, array($id, $id, $id, $id));
+if (!$tags) {
+    $tags = array();
+}
 
 $smarty = smarty(array('paginator'));
 setpageicon($smarty, 'icon-university');

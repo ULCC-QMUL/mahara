@@ -13,6 +13,7 @@ defined('INTERNAL') || die();
 
 $string['tag'] = 'Tag';
 $string['tags'] = 'Tags';
+$string['timesused'] = 'Times used:';
 $string['allowinstitutiontags'] = 'Allow institution tags';
 $string['allowinstitutiontagsdescription'] = 'If yes, administrators can define a set of tags that members can use.';
 $string['cantdeleteinstitutiontag'] = 'You are not allowed to delete this institution tag because it is used by institution members.';
@@ -20,6 +21,7 @@ $string['canteditinstitutiontags'] = 'You are not allowed to edit institution ta
 $string['cantlistinstitutiontags'] = 'You are not allowed to list institution tags.';
 $string['createtag'] = 'Create tag';
 $string['deleteinstitutiontag'] = 'Delete institution tag';
+$string['editinstitutiontag'] = 'Edit institution tag';
 $string['error:duplicatetag'] = 'Institutional tag already exists.';
 $string['error:emptytag'] = 'Institutional tag cannot be empty.';
 $string['institutiontagcantbesaved'] = 'Institution tag can\'t be saved.';
