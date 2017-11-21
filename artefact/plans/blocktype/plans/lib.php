@@ -82,11 +82,13 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                    WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan', 'task')", array($institutionid, $userid));
 
                 $planids = array();
-                foreach ($artefacts as $artefact) {
-                    if ($artefact->artefacttype == 'plan') {
-                        $planids[$artefact->id] = $artefact->id;
-                    } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
-                        $planids[$artefact->parent] = $artefact->parent;
+                if (!empty($artefacts)) {
+                    foreach ($artefacts as $artefact) {
+                        if ($artefact->artefacttype == 'plan') {
+                            $planids[$artefact->id] = $artefact->id;
+                        } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
+                            $planids[$artefact->parent] = $artefact->parent;
+                        }
                     }
                 }
                 ksort($planids); // Sort by ID.
@@ -192,7 +194,9 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);
         }
-
+        else {
+            $smarty->assign('noplans','blocktype.plans/plans');
+        }
         $smarty->assign('blockid', $instance->get('id'));
         return $smarty->fetch('blocktype:plans:content.tpl');
     }
