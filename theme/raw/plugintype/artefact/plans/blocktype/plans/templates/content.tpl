@@ -1,4 +1,3 @@
-{if $plans}
 {foreach from=$plans item=plan}
 <div class="panel-body flush">
     {if $editing}
@@ -44,8 +43,3 @@
     <a href="{$plan.details}" class="detail-link link-blocktype"><span class="icon icon-link" role="presentation" aria-hidden="true"></span> {str tag=detailslinkalt section=view}</a>
 </div>
 {/foreach}
-{else}
-<div class="panel-body flush">
-    {str tag='noplans' section='blocktype.plans/plans'} <a href="{$WWWROOT}artefact/plans/new.php">{str tag='addone' section='blocktype.plans/plans'}</a>
-</div>
-{/if}
