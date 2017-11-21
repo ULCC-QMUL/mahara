@@ -1408,7 +1408,6 @@
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="usr,tag"/>
                 <KEY NAME="usrfk" TYPE="foreign" FIELDS="usr" REFTABLE="usr" REFFIELDS="id"/>
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
         </TABLE>
         <TABLE NAME="artefact_tag">
@@ -1420,7 +1419,6 @@
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="artefact,tag" />
                 <KEY NAME="artefactfk" TYPE="foreign" FIELDS="artefact" REFTABLE="artefact" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
         </TABLE>
         <TABLE NAME="view_tag">
@@ -1432,7 +1430,6 @@
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="view,tag" />
                 <KEY NAME="viewfk" TYPE="foreign" FIELDS="view" REFTABLE="view" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
         </TABLE>
         <TABLE NAME="collection_tag">
@@ -1444,7 +1441,6 @@
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="collection,tag" />
                 <KEY NAME="collectionfk" TYPE="foreign" FIELDS="collection" REFTABLE="collection" REFFIELDS="id" />
-                <KEY NAME="tagfk" TYPE="foreign" FIELDS="tagid" REFTABLE="tag" REFFIELDS="id" />
             </KEYS>
         </TABLE>
     </TABLES>
