@@ -69,7 +69,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
-            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id');
+            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id') . '&tag=' . $filtertag;
 
             // Add to $configdata['artefactids'] the ids of the plans taged with institution tags.
             if (!$filtertag) {
@@ -82,25 +82,22 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                    WHERE a.owner = ? AND at.tagid != 0 AND a.artefacttype IN ('plan', 'task')", array($institutionid, $userid));
 
                 $planids = array();
-                if ($artefacts) {
+                if (!empty($artefacts)) {
                     foreach ($artefacts as $artefact) {
                         if ($artefact->artefacttype == 'plan') {
-                            array_push($planids, $artefact->id);
-                        } else {
-                            // If a plan has more than one tagged task or is itself tagged, make sure we're addig it just once.
-                            if (!in_array($artefact->parent, $planids)) {
-                                array_push($planids, $artefact->parent);
-                            }
+                            $planids[$artefact->id] = $artefact->id;
+                        } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
+                            $planids[$artefact->parent] = $artefact->parent;
                         }
                     }
                 }
-                if ((!isset($configdata['artefactids']) || $configdata['artefactids'] == null)
-                    || (array_diff($configdata['artefactids'], $planids) || array_diff($planids, $configdata['artefactids']))) {
-                    $configdata['artefactids'] = $planids;
-                    $newconfigdata = serialize($configdata);
-                    $instance->set('configdata', $newconfigdata);
-                    update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
-                }
+                ksort($planids); // Sort by ID.
+
+                // Update the configdata with the identified Artefact IDs;
+                $configdata['artefactids'] = array_values($planids);
+                $newconfigdata = serialize($configdata);
+                $instance->set('configdata', $newconfigdata);
+                update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
             }
         }
         // END CUSTOM CATALYST.
@@ -111,20 +108,37 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $alltasks = array();
             foreach ($configdata['artefactids'] as $planid) {
                 $plan = artefact_instance_from_id($planid);
+                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 // CUSTOM CATALYST - filter tags for the QM Dashboard.
-                if ($view->get('type') == 'qmdashboard') {
-                    $alltags = $plan->get('tags');
-                    $tagkeys = array_map(function($k) {
+                if ($view->get('type') == 'qmdashboard' && $filtertag) {
+                    $split = explode(':', $filtertag);
+                    if (count($split) == 2) {
+                        $filtertag = trim($split[1]);
+                    }
+                    $matches = true;
+
+                    // Check if a plan tag matches first; and we will
+                    // display all tasks within this.
+                    $matched = array_map(function($k) {
                         return $k->tag;
-                    }, $alltags);
-                    if ($filtertag && !in_array($filtertag, $tagkeys)) {
+                    }, $plan->get('tags'));
+                    if (!in_array($filtertag, $matched)) {
+                        $matches = false;
+                    }
+
+                    // If the plan hasn't matched but one of the
+                    // tasks has then the list won't be empty.
+                    if (!$matches && !empty($tasks)) {
+                        $matches = true;
+                    }
+
+                    // Nothing matched; skip this plan.
+                    if (!$matches) {
                         continue;
                     }
                 }
                 // END CUSTOM CATALYST.
-
-                $tasks = ArtefactTypeTask::get_tasks($planid, 0, $limit);
 
                 $template = 'artefact:plans:taskrows.tpl';
                 $blockid = $instance->get('id');
@@ -132,7 +146,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $pagination = false;
                 } else {
                     $baseurl = $instance->get_view()->get_url();
-                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM Catalyst - use the QM Dashboard URL.
+                    $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM CATALYST - use the QM Dashboard URL.
                     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
                     $pagination = array(
                         'baseurl'   => $baseurl,
@@ -160,7 +174,11 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 if ($view->get('type') == 'qmdashboard') {
                     $plans[$planid]['tags'] = array();
                     foreach ($plan->get('tags') as $tag) {
-                        if ($tag->ownerid && $tag->ownerid == $institutionid) {
+                        if ($filtertag) {
+                            if ($tag->tag === $filtertag) {
+                                array_push($plans[$planid]['tags'], $tag);
+                            }
+                        } else if ($tag->ownerid && $tag->ownerid == $institutionid) {
                             array_push($plans[$planid]['tags'], $tag);
                         }
                     }
@@ -176,7 +194,9 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
             $smarty->assign('plans', $plans);
             $smarty->assign('alltasks', $alltasks);
         }
-
+        else {
+            $smarty->assign('noplans','blocktype.plans/plans');
+        }
         $smarty->assign('blockid', $instance->get('id'));
         return $smarty->fetch('blocktype:plans:content.tpl');
     }

@@ -600,6 +600,38 @@ class ArtefactTypeTask extends ArtefactType {
             ORDER BY at.completiondate ASC, a.id", array($plan), $offset, $limit))
             || ($results = array());
 
+        // CUSTOM CATALYST - filter by applicable tag if set.
+        $filtertag = param_variable('tag', null);
+        if ($filtertag) {
+            $institution   = get_config_plugin('module', 'qmframework', 'qminstitution');
+            $institutionid = get_field('institution', 'id', 'name', $institution);
+            $split = explode(':', $filtertag);
+            if (count($split) == 2) {
+                $filtertag = trim($split[1]);
+            }
+            ($results = get_records_sql_array("
+                SELECT a.id, at.artefact AS task, at.completed, " . db_format_tsfield('completiondate').",
+                       a.title, a.description, a.parent, a.owner
+                  FROM {artefact} a
+                  JOIN {artefact_plans_task} at ON at.artefact = a.id
+                  JOIN {artefact_tag} tag ON tag.artefact = a.id
+                  JOIN {tag} t ON t.id = tag.tagid AND t.owner = ?
+                 WHERE a.artefacttype = 'task' AND a.parent = ? AND tag.tag = ?
+              ORDER BY at.completiondate ASC, a.id", array($institutionid, $plan, $filtertag), $offset, $limit))
+                || ($results = array());
+
+            // Fetch a total count for all tagged elements.
+            $totalcount = count_records_sql("
+                SELECT COUNT(a.id)
+                  FROM {artefact} a
+                  JOIN {artefact_plans_task} at ON at.artefact = a.id
+                  JOIN {artefact_tag} tag ON tag.artefact = a.id
+                  JOIN {tag} t ON t.id = tag.tagid AND t.owner = ?
+                 WHERE a.artefacttype = 'task' AND a.parent = ? AND tag.tag = ?
+              ORDER BY at.completiondate ASC, a.id", array($institutionid, $plan, $filtertag));
+        }
+        // END CUSTOM CATALYST.
+
         // format the date and setup completed for display if task is incomplete
         if (!empty($results)) {
             foreach ($results as $result) {
@@ -624,6 +656,12 @@ class ArtefactTypeTask extends ArtefactType {
             'limit'  => $limit,
             'id'     => $plan,
         );
+
+        // CUSTOM CATALYST - update the total count value.
+        if (isset($totalcount)) {
+            $result['count'] = $totalcount;
+        }
+        // END CUSTOM CATALYST.
 
         return $result;
     }
