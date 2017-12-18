@@ -184,12 +184,15 @@ class ArtefactTypePlan extends ArtefactType {
 
         $SESSION->add_ok_msg(get_string('plansavedsuccessfully', 'artefact.plans'));
 
-        if ($new) {
-            redirect('/artefact/plans/plan.php?id='.$artefact->get('id'));
+        if ($returnurl = $SESSION->get('artefact-plan_returnurl')) {
+            $SESSION->clear('artefact-plan_returnurl');
+        } else if ($new) {
+            $returnurl = '/artefact/plans/plan.php?id='.$artefact->get('id');
+        } else {
+            $returnurl = '/artefact/plans/index.php';
         }
-        else {
-            redirect('/artefact/plans/index.php');
-        }
+
+        redirect($returnurl);
     }
 
     /**
@@ -282,7 +285,7 @@ class ArtefactTypePlan extends ArtefactType {
         $pagination = array(
             'baseurl' => $baseurl,
             'id' => 'task_pagination',
-            'datatable' => 'tasktable',
+            'datatable' => 'tasklist',
             'jsonscript' => 'artefact/plans/viewtasks.json.php',
         );
 
@@ -569,7 +572,13 @@ class ArtefactTypeTask extends ArtefactType {
 
         $SESSION->add_ok_msg(get_string('plansavedsuccessfully', 'artefact.plans'));
 
-        redirect('/artefact/plans/plan.php?id='.$values['parent']);
+        if ($returnurl = $SESSION->get('artefact-plan_returnurl')) {
+            $SESSION->clear('artefact-plan_returnurl');
+        } else {
+            $returnurl = '/artefact/plans/plan.php?id='.$values['parent'];
+        }
+
+        redirect($returnurl);
     }
 
     /**
@@ -590,6 +599,38 @@ class ArtefactTypeTask extends ArtefactType {
             WHERE a.artefacttype = 'task' AND a.parent = ?
             ORDER BY at.completiondate ASC, a.id", array($plan), $offset, $limit))
             || ($results = array());
+
+        // CUSTOM CATALYST - filter by applicable tag if set.
+        $filtertag = param_variable('tag', null);
+        if ($filtertag) {
+            $institution   = get_config_plugin('module', 'qmframework', 'qminstitution');
+            $institutionid = get_field('institution', 'id', 'name', $institution);
+            $split = explode(':', $filtertag);
+            if (count($split) == 2) {
+                $filtertag = trim($split[1]);
+            }
+            ($results = get_records_sql_array("
+                SELECT a.id, at.artefact AS task, at.completed, " . db_format_tsfield('completiondate').",
+                       a.title, a.description, a.parent, a.owner
+                  FROM {artefact} a
+                  JOIN {artefact_plans_task} at ON at.artefact = a.id
+                  JOIN {artefact_tag} tag ON tag.artefact = a.id
+                  JOIN {tag} t ON t.id = tag.tagid AND t.owner = ?
+                 WHERE a.artefacttype = 'task' AND a.parent = ? AND tag.tag = ?
+              ORDER BY at.completiondate ASC, a.id", array($institutionid, $plan, $filtertag), $offset, $limit))
+                || ($results = array());
+
+            // Fetch a total count for all tagged elements.
+            $totalcount = count_records_sql("
+                SELECT COUNT(a.id)
+                  FROM {artefact} a
+                  JOIN {artefact_plans_task} at ON at.artefact = a.id
+                  JOIN {artefact_tag} tag ON tag.artefact = a.id
+                  JOIN {tag} t ON t.id = tag.tagid AND t.owner = ?
+                 WHERE a.artefacttype = 'task' AND a.parent = ? AND tag.tag = ?
+              ORDER BY at.completiondate ASC, a.id", array($institutionid, $plan, $filtertag));
+        }
+        // END CUSTOM CATALYST.
 
         // format the date and setup completed for display if task is incomplete
         if (!empty($results)) {
@@ -615,6 +656,12 @@ class ArtefactTypeTask extends ArtefactType {
             'limit'  => $limit,
             'id'     => $plan,
         );
+
+        // CUSTOM CATALYST - update the total count value.
+        if (isset($totalcount)) {
+            $result['count'] = $totalcount;
+        }
+        // END CUSTOM CATALYST.
 
         return $result;
     }
@@ -653,14 +700,16 @@ class ArtefactTypeTask extends ArtefactType {
      * @param   string  $template   The name of the template to use for rendering
      * @param   array   $options    The block instance options
      * @param   array   $pagination The pagination data
+     * @param   boolean $editing    True if page is being edited
      *
      * @return  array   $tasks      The tasks array updated with rendered table html
      */
-    public function render_tasks(&$tasks, $template, $options, $pagination) {
+    public function render_tasks(&$tasks, $template, $options, $pagination, $editing=false) {
 
         $smarty = smarty_core();
         $smarty->assign('tasks', $tasks);
         $smarty->assign('options', $options);
+        $smarty->assign('editing', $editing);
         $tasks['tablerows'] = $smarty->fetch($template);
 
         if ($tasks['limit'] && $pagination) {

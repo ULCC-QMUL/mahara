@@ -35,3 +35,6 @@ mahara-*.zip
 logfile
 node_modules/
 htdocs/.externalToolBuilders/
+/config.php
+!lib/tests
+*.scssc

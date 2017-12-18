@@ -28,8 +28,11 @@ if ($page < 1) {
 }
 $tagsperpage = 5;
 $values = array($USER->id);
-$sql = "SELECT at.tag FROM {artefact_tag} at
+$sql = "SELECT at.tag, i.displayname AS prefix
+        FROM {artefact_tag} at
         JOIN {artefact} a ON a.id = at.artefact
+        LEFT JOIN {tag} t ON t.id = at.tagid
+        LEFT JOIN {institution} i ON i.id = t.owner
         WHERE a.owner = ?
         AND a.artefacttype = 'blogpost'";
 if ($request !== '') {
@@ -53,7 +56,7 @@ while ($alltags !== false && $more && count($tmptags) < $tagsperpage) {
         if (stripos($tag->tag, $request) !== false || $request === '') {
             $tmptags[] = (object) array(
                     'id' => hsc($tagexcluded . $tag->tag),
-                    'text' => hsc($tag->tag),
+                    'text' => ($tag->prefix != null) ? hsc($tag->prefix.": ".$tag->tag) : hsc($tag->tag),
             );
         }
     }

@@ -660,13 +660,27 @@ abstract class ArtefactTypeFileBase extends ArtefactType {
                     }
                 }
             }
-            $where = 'artefact IN (' . join(',', array_keys($filedata)) . ')';
-            $tags = get_records_select_array('artefact_tag', $where);
+            $where = 'at.artefact IN (' . join(',', array_keys($filedata)) . ')';
+            $tags = get_records_sql_array("SELECT t.tag, t.prefix, t.tagid, t.ownerid, t.artefact, t.artefacttype
+                FROM (
+                    SELECT at.tag, NULL AS prefix, 0 AS tagid, 0 AS ownerid, a.artefacttype, at.artefact
+                      FROM {artefact_tag} at
+                      JOIN {artefact} a ON a.id = at.artefact
+                     WHERE {$where} AND tagid = 0
+              UNION SELECT at.tag, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid, a.artefacttype, at.artefact
+                      FROM {artefact_tag} at
+                      JOIN {artefact} a ON a.id = at.artefact
+                      JOIN {tag} t ON t.id = at.tagid
+                      JOIN {institution} i ON i.id = t.owner
+                     WHERE {$where}
+                     ) t
+            GROUP BY t.tag, t.prefix, t.tagid, t.ownerid, t.artefact, t.artefacttype");
             if ($tags) {
-                foreach ($tags as $t) {
-                    $filedata[$t->artefact]->tags[] = $t->tag;
+                foreach ($tags as $tag) {
+                    $filedata[$tag->artefact]->tags[] = $tag;
                 }
             }
+
             if ($group) {  // Fetch permissions for each artefact
                 $perms = get_records_select_array('artefact_access_role', $where);
                 if ($perms) {

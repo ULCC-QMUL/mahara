@@ -1,0 +1,12 @@
+a.user-icon {
+  border: none;
+  padding: 0;
+  background: none;
+  img {
+      border-radius: 50%;
+      border: 0px solid #FFF;
+  }
+  &:hover {
+    background-color: transparent;
+  }
+}

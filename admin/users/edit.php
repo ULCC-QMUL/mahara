@@ -239,7 +239,18 @@ if (count($authinstances) > 1) {
     );
 }
 
-$tags = get_column_sql('SELECT tag FROM {usr_tag} WHERE usr = ? AND NOT tag ' . db_ilike() . " 'lastinstitution:%'", array($user->id));
+$tags = get_records_sql_array("SELECT t.tag, t.prefix, t.tagid, t.ownerid
+    FROM (
+        SELECT ut.tag, NULL AS prefix, 0 AS tagid, 0 AS ownerid
+          FROM {usr_tag} ut
+         WHERE ut.usr = ? AND tagid = 0 AND NOT tag " . db_ilike() . " 'lastinstitution:%'
+  UNION SELECT ut.tag, i.displayname AS prefix, t.id AS tagid, i.id AS ownerid
+          FROM {usr_tag} ut
+          JOIN {tag} t ON t.id = ut.tagid
+          JOIN {institution} i ON i.id = t.owner
+         WHERE ut.usr = ? " . db_ilike() . " 'lastinstitution:%'
+         ) t
+GROUP BY t.tag, t.prefix, t.tagid, t.ownerid", array($user->id, $user->id));
 
 $elements['tags'] = array(
     'defaultvalue' => $tags,
@@ -571,11 +582,18 @@ function edituser_site_submit(Pieform $form, $values) {
             if (empty($tag)) {
                 continue;
             }
+            if (is_numeric($tag) && $tag != 0) {
+                $tagid = $tag;
+                $tag   = get_field('tag', 'text', 'id', $tagid);
+            } else {
+                $tagid = 0;
+            }
             insert_record(
                 'usr_tag',
                 (object) array(
-                    'usr' => $user->id,
-                    'tag' => strtolower($tag),
+                    'usr'   => $user->id,
+                    'tag'   => strtolower($tag),
+                    'tagid' => $tagid
                 )
             );
         }
