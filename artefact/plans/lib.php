@@ -597,7 +597,7 @@ class ArtefactTypeTask extends ArtefactType {
                 FROM {artefact} a
             JOIN {artefact_plans_task} at ON at.artefact = a.id
             WHERE a.artefacttype = 'task' AND a.parent = ?
-            ORDER BY at.completiondate ASC, a.id", array($plan), $offset, $limit))
+            ORDER BY at.completed, at.completiondate ASC, a.id", array($plan), $offset, $limit))
             || ($results = array());
 
         // CUSTOM CATALYST - filter by applicable tag if set.
