@@ -66,6 +66,7 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         // CUSTOM CATALYST - filter tags for the QM Dashboard.
         global $view;
         if ($view->get('type') == 'qmdashboard') {
+            $limit = 4;
             $filtertag = param_variable('tag', null);
             $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
             $institutionid = get_field('institution', 'id', 'name', $institution);
