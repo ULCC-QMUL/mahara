@@ -635,8 +635,18 @@ class mahara_group_external extends external_api {
                 throw new WebserviceInvalidParameterException('update_group_members | ' . get_string('accessdeniedforinstgroup', 'auth.webservice', $group['institution'], $group['shortname']));
             }
 
-            // get old members
-            $oldmembers = get_records_array('group_member', 'group', $dbgroup->id, '', 'member,role');
+            // Get old members - dependent on institution or not.
+            if ($group['institution'] && $group['institution'] != 'mahara') {
+                $oldmembers = get_records_sql_array('
+                    SELECT gm.member, gm.role
+                    FROM {group_member} gm
+                    JOIN {usr_institution} ui ON ui.usr = gm.member
+                    WHERE ui.institution = ? AND gm.group = ?',
+                    array($group['institution'], $group['id'])
+                );
+            } else {
+                $oldmembers = get_records_array('group_member', 'group', $dbgroup->id, '', 'member,role');
+            }
             $existingmembers = array();
             if (!empty($oldmembers)) {
                 foreach ($oldmembers as $member) {
