@@ -7,9 +7,10 @@
             <a href="{$WWWROOT}artefact/plans/new.php?id={$plan.id}">{str tag='addtask' section='artefact.plans'}</a>
         </div>
     {/if}
+    {if $.foreach.plans.total > 1}
     <a class="link-block collapsed" href="#plan{$plan.id}-expand" data-toggle="collapse" aria-expanded="false" aria-controls="plan{$plan.id}-expand"><strong>{$plan.title}</strong>
     <p>{$plan.description}</p><span class="icon icon-chevron-down right collapse-indicator pull-right" role="presentation" aria-hidden="true"></span></a>
-
+    {/if}
     {if $plan.tags}
     <div class="tags">
         <strong>{str tag=tags}:</strong> {list_tags owner=$plan.owner tags=$plan.tags}
@@ -19,7 +20,7 @@
     {if $plan.numtasks != 0}
         {foreach from=$alltasks item=tasks}
             {if $tasks.planid == $plan.id}
-            <div id="plan{$plan.id}-expand" class="collapse">
+            <div id="plan{$plan.id}-expand"{if $.foreach.plans.total > 1} class="collapse"{/if}>
                 <div id="tasklist_{$blockid}_plan{$tasks.planid}" class="list-group list-unstyled">
                     {$tasks.tablerows|safe}
                 </div>
