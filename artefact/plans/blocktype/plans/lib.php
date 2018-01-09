@@ -87,6 +87,9 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     foreach ($artefacts as $artefact) {
                         if ($artefact->artefacttype == 'plan') {
                             $planids[$artefact->id] = $artefact->id;
+                            if (!$viewartefact = get_field('view_artefact', 'id', 'view', $view->get('id'), 'artefact', $artefact->id)) {
+                                insert_record('view_artefact', (object) array('view' => $view->get('id'), 'artefact' => $artefact->id, 'block' => $instance->get('id')));
+                            }
                         } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
                             $planids[$artefact->parent] = $artefact->parent;
                         }
