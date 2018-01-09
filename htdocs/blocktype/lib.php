@@ -999,6 +999,8 @@ class BlockInstance {
             if (isset($configdata['artefactids'])) {
                 $smarty->assign('planid', $configdata['artefactids']);
             }
+
+            $smarty->assign('blocktype', $this->get('blocktype'));
             return array('html' => $smarty->fetch('module:qmframework:blockedit.tpl'), 'javascript' => $js, 'pieformcss' => $css);
         } else {
             return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);
