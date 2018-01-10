@@ -1,4 +1,4 @@
-{foreach from=$plans item=plan}
+{foreach from=$plans item=plan name='plans'}
 <div class="panel-body flush">
     {if $editing}
         <div style="float:right">
@@ -10,6 +10,9 @@
     {if $.foreach.plans.total > 1}
     <a class="link-block collapsed" href="#plan{$plan.id}-expand" data-toggle="collapse" aria-expanded="false" aria-controls="plan{$plan.id}-expand"><strong>{$plan.title}</strong>
     <p>{$plan.description}</p><span class="icon icon-chevron-down right collapse-indicator pull-right" role="presentation" aria-hidden="true"></span></a>
+    {else}
+    <strong>{$plan.title}</strong>
+    <p>{$plan.description}</p>
     {/if}
     {if $plan.tags}
     <div class="tags">
