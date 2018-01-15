@@ -710,6 +710,7 @@ abstract class ArtefactTypeFileBase extends ArtefactType {
             }
 
             if ($group) {  // Fetch permissions for each artefact
+                $where = 'artefact IN (' . join(',', array_keys($filedata)) . ')';
                 $perms = get_records_select_array('artefact_access_role', $where);
                 if ($perms) {
                     foreach ($perms as $perm) {
