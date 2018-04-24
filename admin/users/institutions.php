@@ -598,6 +598,7 @@ if ($institution || $add) {
         'description'  => get_string('reviewsselfdeletiondescription','admin'),
         'disabled'     => get_config('defaultreviewselfdeletion') == true,
         'defaultvalue' => get_config('defaultreviewselfdeletion') ? get_config('defaultreviewselfdeletion') : (isset($data->reviewselfdeletion) && $data->reviewselfdeletion),
+    );
     $elements['allowinstitutiontags'] = array(
         'type'         => 'switchbox',
         'title'        => get_string('allowinstitutiontags', 'tags'),
