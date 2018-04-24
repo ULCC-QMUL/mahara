@@ -31,10 +31,10 @@
                             {$tasks.pagination|safe}
                         </div>
                         <script>
-                        addLoadEvent(function() {literal}{{/literal}
-                            {$tasks.pagination_js|safe}
-                            removeElementClass('plans_page_container_{$blockid}_plan{$tasks.planid}');
-                        {literal}}{/literal});
+                            jQuery(function($) {literal}{{/literal}
+                                {$tasks.pagination_js|safe}
+                                $('#plans_page_container_{$blockid}_plan{$tasks.planid}').removeClass('hidden');
+                            {literal}}{/literal});
                         </script>
                     {/if}
                     <a href="{$plan.details}" class="detail-link link-blocktype"><span class="icon icon-link" role="presentation" aria-hidden="true"></span> {str tag=detailslinkalt section=view}</a>
