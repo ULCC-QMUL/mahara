@@ -23,14 +23,15 @@ $institution = param_alphanum('institution', false);
 $new = param_boolean('new', 0);
 
 // Get all the institutions that the current user has access to.
-$institutionelement = get_institution_selector(true, false, false, false, true);
+$institutionelement = get_institution_selector(true, false, false, false, false, true);
 if (!$institutionelement || empty($institutionelement['options'])) {
     throw new AccessDeniedException(get_string('cantlistinstitutioncollections', 'collection'));
 }
 
 if (!$institution || !$USER->can_edit_institution($institution, true)) {
     $institution = empty($institutionelement['value']) ? $institutionelement['defaultvalue'] : $institutionelement['value'];
-} else if (!empty($institution)) {
+}
+else if (!empty($institution)) {
     $institutionelement['defaultvalue'] = $institution;
 }
 
@@ -106,7 +107,8 @@ function institutiontag_submit(Pieform $form, $values) {
     $id = insert_record('tag', $institutiontag, 'id', true);
     if ($id) {
         $SESSION->add_ok_msg(get_string('institutiontagsaved', 'tags'));
-    } else {
+    }
+    else {
         $SESSION->add_error_msg(get_string('institutiontagcantbesaved', 'tags'));
     }
     redirect("/admin/users/institutiontags.php?institution={$institution}");
@@ -130,7 +132,6 @@ function institutiontag_cancel_submit() {
  */
 function institutiontag_validate(Pieform $form, $values) {
     global $institution;
-    $institutionid = get_field('institution', 'id', 'name', $institution);
 
     // Don't even start attempting to parse if there are previous errors
     if ($form->has_errors()) {
@@ -140,7 +141,8 @@ function institutiontag_validate(Pieform $form, $values) {
         $form->set_error('tag', get_string('error:emptytag', 'tags'));
         return;
     }
-    if (record_exists('tag', 'owner', $institutionid, 'text', $values['tag'])) {
+    $id = get_field('institution', 'id', 'name', $institution);
+    if (record_exists('tag', 'owner', $id, 'text', $values['tag'])) {
         $form->set_error('tag', get_string('error:duplicatetag', 'tags'));
         return;
     }
