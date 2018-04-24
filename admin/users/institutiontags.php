@@ -49,10 +49,10 @@ $institutionselector = pieform(array(
 $wwwroot = get_config('wwwroot');
 $js = <<< EOF
 function reloadTags() {
-    window.location.href = '{$wwwroot}admin/users/institutiontags.php?new={$new}&institution='+$('usertypeselect_institution').value;
+    window.location.href = '{$wwwroot}admin/users/institutiontags.php?institution='+$('#usertypeselect_institution').val();
 }
-addLoadEvent(function() {
-    connect($('usertypeselect_institution'), 'onchange', reloadTags);
+$(document).ready(function() {
+    $('#usertypeselect_institution').on('change', reloadTags);
 });
 EOF;
 

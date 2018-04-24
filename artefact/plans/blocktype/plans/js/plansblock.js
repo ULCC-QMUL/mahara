@@ -21,7 +21,7 @@ function initNewPlansBlock(blockid) {
     jQuery.each(
         planslist,
         function(key, value){
-          var nodeid  = getNodeAttribute(value, 'id');
+          var nodeid  = $(value).attr('id');
           var frompos = nodeid.indexOf('_') + 5;
           var topos   = nodeid.lastIndexOf('_');
           var planid  = nodeid.substring(frompos, topos);
