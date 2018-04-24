@@ -5811,7 +5811,33 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
-    if ($oldversion < 2017080101) {
+    if ($oldversion < 2018040900) {
+        log_debug('Change the artefactid (integer) in the configdata of the existing plan blocktypes to artefactids (array). This change will allow plan blocktypes to contain more than one plan.');
+
+        require_once(get_config('docroot') . 'blocktype/lib.php');
+        $instances = get_records_array('block_instance', 'blocktype', 'plans');
+        if ($instances) {
+            foreach ($instances as $instance) {
+                $blockinstance = new BlockInstance($instance->id);
+                $configdata = $blockinstance->get('configdata');
+
+                if (isset($configdata['artefactid'])) {
+                    $configdata['artefactids'] = array($configdata['artefactid']);
+                    unset($configdata['artefactid']);
+                    $blockinstance->set('configdata', $configdata);
+                    $blockinstance->commit();
+                }
+                else if (is_null($configdata['artefactid'])) {
+                    $configdata['artefactids'] = array();
+                    unset($configdata['artefactid']);
+                    $blockinstance->set('configdata', $configdata);
+                    $blockinstance->commit();
+                }
+            }
+        }
+    }
+
+    if ($oldversion < 2018040901) {
         log_debug('Add a "tags" field to the institution table');
         $table = new XMLDBTable('institution');
         $field = new XMLDBField('tags');
@@ -5821,7 +5847,7 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
-    if ($oldversion < 2017092503) {
+    if ($oldversion < 2018040902) {
         log_debug('Add tag table');
         $table = new XMLDBTable('tag');
         $table->addFieldInfo('id', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
@@ -5836,7 +5862,9 @@ function xmldb_core_upgrade($oldversion=0) {
         $table->addKeyInfo('owner', XMLDB_KEY_FOREIGN, array('owner'), 'institution', array('id'));
         create_table($table);
         clear_menu_cache();
+    }
 
+    if ($oldversion < 2018040903) {
         log_debug('Add a "tagid" field to the artefact_tag table');
         $table = new XMLDBTable('artefact_tag');
         $institutionfield = new XMLDBField('institution');
@@ -5883,36 +5911,11 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
-    if ($oldversion < 2017100400) {
-        require_once(get_config('docroot') . 'blocktype/lib.php');
-        $instances = get_records_array('block_instance', 'blocktype', 'plans');
-        if ($instances) {
-            foreach ($instances as $instance) {
-                $blockinstance = new BlockInstance($instance->id);
-                $configdata = $blockinstance->get('configdata');
-
-                if (isset($configdata['artefactid'])) {
-                    $configdata['artefactids'] = array($configdata['artefactid']);
-                    unset($configdata['artefactid']);
-                    $blockinstance->set('configdata', $configdata);
-                    $blockinstance->commit();
-                }
-            }
-        }
-    }
-
-    if ($oldversion < 2017101100) {
-            $record = (object)array(
-                'name'  => 'userleavesgroup'
-            );
-            insert_record('event_type', $record);
-    }
-
-    if ($oldversion < 2017101901) {
-        $record = (object)array(
-            'name'  => 'userchangegrouprole'
+    if ($oldversion < 2018042400) {
+        $event = (object)array(
+            'name' => 'userchangegrouprole',
         );
-        insert_record('event_type', $record);
+        ensure_record_exists('event_type', $event, $event);
     }
 
     return $status;
