@@ -1,0 +1,15 @@
+[submodule "htdocs/blocktype/contentcounts"]
+    path = htdocs/blocktype/contentcounts
+    url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-blocktype_contentcounts
+[submodule "htdocs/blocktype/contenttags"]
+    path = htdocs/blocktype/contenttags
+    url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-blocktype_contenttags
+[submodule "htdocs/blocktype/expandedcontent"]
+    path = htdocs/blocktype/expandedcontent
+    url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-blocktype_expandedcontent
+[submodule "htdocs/blocktype/stagevisualisation"]
+    path = htdocs/blocktype/stagevisualisation
+    url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-blocktype_stagevisualisation
+[submodule "htdocs/module/qmframework"]
+    path = htdocs/module/qmframework
+    url = ssh://reviews.ci.catalyst-eu.net:29418/mahara-module_qmframework
