@@ -18,7 +18,7 @@ endif
 	@if gulp css --production $(production) ; then echo "Done!"; else npm install; gulp css --production $(production);  fi
 
 clean-css:
-	find ./htdocs/theme/* -maxdepth 1 -name "style" -type d -exec rm -Rf {} \;
+	find ./theme/* -maxdepth 1 -name "style" -type d -exec rm -Rf {} \;
 
 help:
 	@echo "Run 'make' to do "build" Mahara (currently only CSS)"
@@ -51,25 +51,25 @@ initcomposer: installcomposer
 	@echo "Updating external dependencies with Composer..."
 	@php external/composer.phar --working-dir=external update
 
-simplesamlphp := $(shell ls -d htdocs/auth/saml/extlib/simplesamlphp 2>/dev/null)
+simplesamlphp := $(shell ls -d auth/saml/extlib/simplesamlphp 2>/dev/null)
 
 cleanssphp:
 	@echo "Cleaning out SimpleSAMLphp..."
-	rm -rf htdocs/auth/saml/extlib/simplesamlphp
+	rm -rf auth/saml/extlib/simplesamlphp
 
 ssphp: initcomposer
 ifdef simplesamlphp
 	@echo "SimpleSAMLphp already exists - doing nothing"
 else
 	@echo "Pulling SimpleSAMLphp from download ..."
-	@curl -sSL https://github.com/simplesamlphp/simplesamlphp/releases/download/v1.15.1/simplesamlphp-1.15.1.tar.gz | tar  --transform 's/simplesamlphp-[0-9]+\.[0-9]+\.[0-9]+/simplesamlphp/x1' -C htdocs/auth/saml/extlib -xzf - # SimpleSAMLPHP release tarball already has all composer dependencies.
-	@php external/composer.phar --working-dir=htdocs/auth/saml/extlib/simplesamlphp require predis/predis
+	@curl -sSL https://github.com/simplesamlphp/simplesamlphp/releases/download/v1.15.1/simplesamlphp-1.15.1.tar.gz | tar  --transform 's/simplesamlphp-[0-9]+\.[0-9]+\.[0-9]+/simplesamlphp/x1' -C auth/saml/extlib -xzf - # SimpleSAMLPHP release tarball already has all composer dependencies.
+	@php external/composer.phar --working-dir=auth/saml/extlib/simplesamlphp require predis/predis
 	@echo "Copying www/resources/* files to sp/resources/ ..."
-	@cp -R htdocs/auth/saml/extlib/simplesamlphp/www/resources/ htdocs/auth/saml/sp/
+	@cp -R auth/saml/extlib/simplesamlphp/www/resources/ auth/saml/sp/
 	@echo "Deleting unneeded files ..."
 #	Delete composer.json and .lock files to avoid leaking minor version info
-	@find htdocs/auth/saml/extlib -type f -name composer.json -delete
-	@find htdocs/auth/saml/extlib -type f -name composer.lock -delete
+	@find auth/saml/extlib -type f -name composer.json -delete
+	@find auth/saml/extlib -type f -name composer.lock -delete
 	@echo "Done!"
 endif
 
@@ -79,9 +79,9 @@ vendorphpunit := $(shell external/vendor/bin/phpunit --version 2>/dev/null)
 phpunit:
 	@echo "Running phpunit tests..."
 ifdef vendorphpunit
-	@external/vendor/bin/phpunit --log-junit logs/tests/phpunit-results.xml htdocs/
+	@external/vendor/bin/phpunit --log-junit logs/tests/phpunit-results.xml 
 else
-	@phpunit --log-junit logs/tests/phpunit-results.xml htdocs/
+	@phpunit --log-junit logs/tests/phpunit-results.xml 
 endif
 
 
@@ -98,9 +98,9 @@ ifdef breakpoints
 	exit 1
 endif
 ifdef revision
-	@git diff-tree --diff-filter=ACM --no-commit-id --name-only -z -r $(revision) htdocs | grep -z "^htdocs/.*\.php$$" | xargs -0 -n 1 -P 2 --no-run-if-empty php -l
+	@git diff-tree --diff-filter=ACM --no-commit-id --name-only -z -r $(revision) htdocs | grep -z "^.*\.php$$" | xargs -0 -n 1 -P 2 --no-run-if-empty php -l
 	@php test/versioncheck.php
-	@git diff-tree --diff-filter=ACM --no-commit-id --name-only -z -r $(revision) htdocs | grep -z '^htdocs/.*/db/install\.xml$$' | xargs -0 -n 1 -P 2 --no-run-if-empty xmllint --schema htdocs/lib/xmldb/xmldb.xsd --noout
+	@git diff-tree --diff-filter=ACM --no-commit-id --name-only -z -r $(revision) htdocs | grep -z '^.*/db/install\.xml$$' | xargs -0 -n 1 -P 2 --no-run-if-empty xmllint --schema lib/xmldb/xmldb.xsd --noout
 	@git diff-tree --diff-filter=ACM --no-commit-id --name-only -r $(revision) | xargs -I {} find {} $(whitelist) | xargs -I list git show $(revision) -- list | test/coding-standard-check.pl
 	@echo "Acceptance test passed. :)"
 else
