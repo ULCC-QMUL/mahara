@@ -1373,7 +1373,7 @@
                 <KEY NAME="sitecontentfk" TYPE="foreign" FIELDS="sitecontentid" REFTABLE="site_content_version" REFFIELDS="id"/>
             </KEYS>
         </TABLE>
-	<TABLE NAME="usr_pendingdeletion">
+        <TABLE NAME="usr_pendingdeletion">
             <FIELDS>
                 <FIELD NAME="id" TYPE="int" LENGTH="10" SEQUENCE="true" NOTNULL="true" />
                 <FIELD NAME="usr" TYPE="int" LENGTH="10" NOTNULL="true" />
@@ -1383,6 +1383,8 @@
             <KEYS>
                 <KEY NAME="primary" TYPE="primary" FIELDS="id" />
                 <KEY NAME="usrfk" TYPE="foreign" FIELDS="usr" REFTABLE="usr" REFFIELDS="id"/>
+            </KEYS>
+        </TABLE>
         <!-- Tagging feature -->
         <TABLE NAME="tag">
             <FIELDS>
