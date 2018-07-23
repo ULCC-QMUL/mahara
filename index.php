@@ -71,15 +71,17 @@ if ($USER->is_logged_in()) {
         $strhowtodisable = json_encode(get_string('howtodisable', 'mahara', get_config('wwwroot') . 'account'));
         $js = <<<JAVASCRIPT
 jQuery(function($) {
-    function hideinfo() {
+    function hidecontentinfo() {
         var m = $('<span>');
         m.html({$strhowtodisable});
-        $('#home-info-container').slideUp('fast', function() { displayMessage(m, 'ok'); });
+        $('#homepage-content').hide();
+        $('.home>.main-content').addClass('hideinfo-active');
+        displayMessage(m, 'ok');
     }
 
     function nevershow() {
         var data = {'showhomeinfo' : 0};
-        sendjsonrequest('homeinfo.json.php', data, 'POST', hideinfo);
+        sendjsonrequest('homeinfo.json.php', data, 'POST', hidecontentinfo);
     }
 
     if ($('#hideinfo').length) {
