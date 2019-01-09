@@ -13,7 +13,7 @@ defined('INTERNAL') || die();
 
 $string['addresstag'] = 'Address: %s';
 $string['address'] = 'Address';
-$string['title'] = 'My entire résumé';
-$string['description'] = 'A quick way to show your whole résumé';
+$string['title'] = 'My entire CV';
+$string['description'] = 'A quick way to show your whole CV';
 
 $string['History'] = 'History';

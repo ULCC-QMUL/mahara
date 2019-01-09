@@ -167,7 +167,7 @@ jQuery(function($) {
         }
         else if (self) {
             $(self).removeClass('panel-primary js-panel-unread').addClass('panel-default');
-            $(self).find('.control').removeClass('control');
+            // CUSTOM Catalyst - removed line as it interfered with deleting notifications redirected from Moodle.
         }
         $('#selectall').attr('checked', false); // Need to uncheck bulk checkbox
     }
