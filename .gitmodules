@@ -22,3 +22,6 @@
 [submodule "blocktype/stagevisualisation"]
 	path = blocktype/stagevisualisation
 	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
+[submodule "blocktype/careerreadiness"]
+        path = blocktype/careerreadiness
+        url = git@github.com:ULCC-QMUL/mahara-blocktype_careerreadiness.git
