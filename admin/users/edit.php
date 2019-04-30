@@ -21,6 +21,11 @@ require_once('activity.php');
 require_once(get_config('docroot') . 'lib/antispam.php');
 
 $id = param_integer('id');
+if ($id == 0) {
+    // We shouldn't be editing / masquerading as 'root' user
+    throw new UserException(get_string('invaliduser', 'error'));
+}
+
 $user = new User;
 $user->find_by_id($id);
 $authobj = AuthFactory::create($user->authinstance);
@@ -324,7 +329,7 @@ function edituser_site_validate(Pieform $form, $values) {
             }
 
             if (!$form->get_error('username') && record_exists_select('usr', 'LOWER(username) = ?', array(strtolower($values['username'])))) {
-                $form->set_error('username', get_string('usernamealreadytaken', 'auth.internal'));
+                $form->set_error('username', get_string('usernamealreadytaken1', 'auth.internal'));
             }
         }
         else {

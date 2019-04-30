@@ -51,7 +51,7 @@ class PluginBlocktypeGroupViews extends MaharaCoreBlocktype {
      * @param array options
      * @param array pagination
      */
-    public function render_items(&$items, $template, $options, $pagination) {
+    public static function render_items(&$items, $template, $options, $pagination) {
         $smarty = smarty_core();
         $smarty->assign('options', $options);
         $smarty->assign('items', $items['data']);
@@ -320,7 +320,8 @@ class PluginBlocktypeGroupViews extends MaharaCoreBlocktype {
                                                     null, null, true);
             foreach ($data['groupviews']->data as &$view) {
                 if (!$editing && isset($view['template']) && $view['template']) {
-                    $view['form'] = pieform(create_view_form(null, null, $view['id']));
+                    $collid = !empty($view['collid']) ? $view['collid'] : null;
+                    $view['form'] = pieform(create_view_form(null, null, $view['viewid'], $collid, $collid));
                 }
             }
 

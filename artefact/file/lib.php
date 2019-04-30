@@ -1123,7 +1123,9 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
     }
 
     protected function save_content_hash() {
-        $this->contenthash = self::generate_content_hash($this->get_local_path());
+        // We set generateifpossible = false because if we dont have a hash, then the file must be local or missing.
+        // This also avoids calling ensure_local for images, which would call this infinitely.
+        $this->contenthash = self::generate_content_hash($this->get_local_path(array(), false));
 
         if (!empty($this->contenthash)) {
             $this->dirty = true;
@@ -1153,7 +1155,7 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
         }
     }
 
-    public function get_local_path($data = array()) {
+    public function get_local_path($data = array(), $generateifpossible = true) {
         return get_config('dataroot') . self::get_file_directory($this->fileid) . '/' .  $this->fileid;
     }
 
@@ -1489,15 +1491,20 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
 
         // Get all files so that we can delete the files on filesystem
         $filerecords = get_records_sql_assoc('
-            SELECT aff1.*, a.artefacttype
-            FROM {artefact_file_files} aff1
-            JOIN {artefact} a ON aff1.artefact = a.id
-            WHERE artefact IN (' . $idstr . ')
-            GROUP BY fileid
-            HAVING COUNT(aff1.artefact) IN
-               (SELECT COUNT(aff2.artefact)
-                FROM {artefact_file_files} aff2
-                WHERE aff1.fileid = aff2.fileid)'
+            SELECT aff.*, art.artefacttype
+            FROM {artefact_file_files} aff
+            JOIN {artefact} art ON aff.artefact = art.id
+            WHERE fileid IN (
+                SELECT fileid
+                FROM {artefact_file_files} aff1
+                JOIN {artefact} a ON aff1.artefact = a.id
+                WHERE artefact IN (' . $idstr . ')
+                GROUP BY fileid
+                HAVING COUNT(aff1.artefact) IN
+                   (SELECT COUNT(aff2.artefact)
+                    FROM {artefact_file_files} aff2
+                    WHERE aff1.fileid = aff2.fileid)
+            )'
         );
 
         // The current rule is that file deletion should be logged in the artefact_log table
@@ -1980,7 +1987,7 @@ class ArtefactTypeFile extends ArtefactTypeFileBase {
         safe_require('notification', 'internal');
         foreach ($groups as $group) {
             // find the group admins and notify them - there should be at least 1 admin for a group
-            if ($admins = group_get_admin_ids(array($group->id))) {
+            if ($admins = group_get_admin_ids($group->id)) {
                 $data = array(
                     'subject'   => get_string('adm_group_notificationsubject', 'artefact.file'),
                     'message'   => get_string('adm_group_notificationmessage', 'artefact.file', $group->name, ceil((int)$group->quotausedpercent), display_size($group->quota)),
@@ -2396,9 +2403,9 @@ class ArtefactTypeImage extends ArtefactTypeFile {
         return $url;
     }
 
-    public function get_local_path($data=array()) {
+    public function get_local_path($data=array(), $generateifpossible = true) {
         require_once('file.php');
-        $result = get_dataroot_image_path('artefact/file/', $this->fileid, $data, $this->orientation);
+        $result = get_dataroot_image_path('artefact/file/', $this->fileid, $data, $this->orientation, $generateifpossible);
         return $result;
     }
 
@@ -2498,9 +2505,9 @@ class ArtefactTypeProfileIcon extends ArtefactTypeImage {
         return $url;
     }
 
-    public function get_local_path($data=array()) {
+    public function get_local_path($data=array(), $generateifpossible = true) {
         require_once('file.php');
-        $result = get_dataroot_image_path('artefact/file/profileicons/', $this->fileid, $data, $this->orientation);
+        $result = get_dataroot_image_path('artefact/file/profileicons/', $this->fileid, $data, $this->orientation, $generateifpossible);
         return $result;
     }
 

@@ -13,6 +13,12 @@ defined('INTERNAL') || die();
 
 define('MAX_USERNAME_DISPLAY', 30);
 
+require 'phpmailer/src/PHPMailer.php';
+require 'phpmailer/src/Exception.php';
+require 'phpmailer/src/SMTP.php';
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception as phpmailerException;
+use PHPMailer\PHPMailer\SMTP;
 /**
  * loads up activity preferences for a given user
  *
@@ -715,9 +721,6 @@ function email_user($userto, $userfrom, $subject, $messagetext, $messagehtml='',
             $messagehtml);
     }
 
-
-    require_once('phpmailer/PHPMailerAutoload.php');
-
     $mail = new PHPMailer(true);
 
     $mail->CharSet = 'UTF-8';
@@ -1418,6 +1421,11 @@ function get_user($userid) {
  * @param int $suspendinguserid The ID of the user who is performing the suspension
  */
 function suspend_user($suspendeduserid, $reason, $suspendinguserid=null) {
+    if ($suspendeduserid == 0) {
+        // We shouldn't be suspending 'root' user
+        throw new UserException(get_string('invaliduser', 'error'));
+    }
+
     if ($suspendinguserid === null) {
         global $USER;
         $suspendinguserid = $USER->get('id');

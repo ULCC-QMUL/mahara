@@ -1,3 +1,81 @@
+18.04.4 (2019-04-30)
+- Bug 1777014: Inst admin cannot see profile completion
+- Bug 1794990: Can't export portfolio with french translation
+- Bug 1800315: Cookie Consent links to privacy.php instead of legal.php
+- Bug 1801993: Old Mochikit function still in views.js
+- Bug 1802046: Upgrade to 18.10 error on oAuth clean up
+- Bug 1803194: Error when creating automatic groups via LDAP
+- Bug 1804328: need to clean html tag classes in comments
+- Bug 1805492: Updating npm event-stream in Mahara package.json
+- Bug 1805517: Unable to update site template as expected
+- Bug 1811034: Upgrade ADODB to version 5.20.14
+- Bug 1811141: Upgrade cookie consent to 3.1.0
+- Bug 1811163: need to upgrade PHPMailer library from 5.2.22 to 6.0.6
+- Bug 1811282: upgrade simplesaml from 1.16.1 to 1.16.3
+- Bug 1811284: Equation editor will not load in HTTPS
+- Bug 1812910: count(): Parameter must be an array or an object that implements Countable in Importer
+- Bug 1812939: remove jquery-ui-timepicker library
+- Bug 1813200: Wall posts to other users not sending notification
+- Bug 1814078: Error sending message with mail notofication -> Class 'PHPMailer\PHPMailer\SMTP' not found
+- Bug 1816311: Adding comment to journal entry shows wrong poster
+- Bug 1817221: A site admin can access Mahara 'root' user and break the site
+- Bug 1819547: XSS in collection title when viewwing on matrix page
+- Bug 1820774: Resume 'introduction' submenu not working in clean urls site
+- Bug 1826474: langpack sync not working
+- Bug 1765264: Error when deleting a user relating to the group quota
+- Bug 1801843: Cleanurl prefix not displayed on the page edit setting form
+- Bug 1820912: HTML export dos not display retracted block content
+- Bug 1820927: Two $string['portfolio'] language strings in view.php lang file
+- Bug 1825894: Drop / ignore LTI parameters that Mahara doesn't need
+- Bug 1809494: Incorrect message for Collection submitted-to status
+
+18.04.3 (2018-10-25)
+- Bug 1774554: Need to throw correct error in Webservices user delete
+- Bug 1776364: External file system image infinite loop
+- Bug 1776814: can't search on mobile
+- Bug 1785928: Update the minupgradeversion now that we are using a different structure for tag table
+- Bug 1786867: Upgrade Mahara PHPUnit test system to Namespaced version
+- Bug 1788300: Group collections not copyable on group homepage
+- Bug 1792638: Problems with ldap user sync database error
+- Bug 1794370: Block change watchlist notification not displaying correct owner
+- Bug 1797812: Privacy statements in logged out page should show latest version
+- Bug 1774524: Behat step to allow the top of an element to be scrolled to the center of the viewport
+- Bug 1777741: filter artefact chooser search by tag
+- Bug 1778451: user statistics sendjasonrequest error
+- Bug 1779959: upgrade modernizr library to v3.6.0
+- Bug 1794724: Can't upload images previously taken on Mobile device
+- Bug 1797278: Reports page is missing a link to a string
+- Bug 1798209: ignore Dashboard and Profile pages when importing Leap2A
+
+18.04.2 (2018-06-11)
+- 1773864 	ExternalFeed block cron task fails when SSL cert is not valid for a feed
+- 1774309 	Getting an Undefined index: QUERY_STRING when logging in
+- 1774334 	Redirecting to wrong adminurl post login
+- 1767867 	'Search results for' link in My Tags page not working correctly
+
+18.04.1 (2018-05-30)
+- 1763581 	Capitalisation of username / email address issue with LTI
+- 1766041 	Password policy setting for only upper and lowercase letters doesn't require uppercase
+- 1767220 	Error when viewing a profile page with wall post as an Institution admin
+- 1767887 	Select2 tag selector is not positioning correctly
+- 1769512 	find_by_email_address() and MySql problem
+- 1770496 	Group member can't paginate through group pages
+- 1770535 	Able to upload a virus file to Files section
+- 1770561 	Browser back and refresh button attack vulnerability
+- 1772773 	Need to call render_items in the static way
+- 1772774 	change error message when changing username
+- 1773247 	sql exception when deleting a user
+- 1755660 	Behat: test for saving of Student ID
+- 1755680 	Behat: test that plans can be edited/deleted
+- 1755688 	Behat: test sharing a page 		Medium 	  	Fix Committed
+- 1767882 	"tablerenderer call updatecallback" js error in profileicons.php
+- 1768685 	Upgrade chromedriver / selenium
+- 1769581 	Remove info on subscribe / unsubscribe from topics in group forums
+- 1769833 	Incorrect lang string when looking at the T&C of a person under "Legal consent"
+- 1770281 	Behat Resume page test failing at various points during execution
+- 1771473 	No sorting of tags according to "date" when clicked on a tag
+- 1773043 	Undefined property: stdClass::$logoxs due to wrong order of the upgrade tasks (upgrading from 16.10.9 to 17.10.4)
+
 18.04.0 (2018-04-06)
 - New feature highlights:
 - 

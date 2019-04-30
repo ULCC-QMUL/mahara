@@ -625,8 +625,10 @@ class external_api {
                 if (!empty($customkeys) && !get_config('productionmode')) {
                     log_info(get_string('errorunexpectedcustomkey', 'auth.webservice', $customkeys));
                 }
-                if (!empty($keys)) {
-                    throw new WebserviceInvalidParameterException(get_string('errorunexpectedkey', 'auth.webservice', $keys));
+                if (!empty($keys) && !get_config('productionmode')) {
+                    // We will stop throwing error on unexpected param keys and instead just show them in error log
+                    // when the site is not in production mode
+                    log_info(get_string('errorunexpectedkey', 'auth.webservice', $keys));
                 }
             }
             return $result;
@@ -1982,6 +1984,7 @@ function external_delete_descriptions($component) {
     delete_records_select('external_services_users', "externalserviceid IN (SELECT id FROM {external_services} WHERE component = ?)", $params);
     delete_records_select('external_tokens', "externalserviceid IN (SELECT id FROM {external_services} WHERE component = ?)", $params);
     delete_records_select('oauth_server_token', "osr_id_ref IN (SELECT id FROM {oauth_server_registry} WHERE externalserviceid IN (SELECT id FROM {external_services} WHERE component = ?))", $params);
+    delete_records_select('oauth_server_config', "oauthserverregistryid IN (SELECT id FROM {oauth_server_registry} WHERE externalserviceid IN (SELECT id FROM {external_services} WHERE component = ?))", $params);
     delete_records_select('oauth_server_registry', "externalserviceid IN (SELECT id FROM {external_services} WHERE component = ?)", $params);
     delete_records_select(
         'external_services_functions',

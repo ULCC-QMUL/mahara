@@ -233,6 +233,7 @@ EOF;
             'postdate' => db_format_timestamp(time()),
             'text'     => clean_html($values['text']),
         );
+        $activityrecord = clone $record;
 
         $newid = insert_record('blocktype_wall_post', $record, 'id', true);
 
@@ -246,7 +247,7 @@ EOF;
               update_record('blocktype_wall_post', $updatedwallpost, 'id');
         }
 
-        activity_occurred('wallpost', $record, 'blocktype', 'wall');
+        activity_occurred('wallpost', $activityrecord, 'blocktype', 'wall');
 
         $instance = new BlockInstance($values['instance']);
         $owner = $instance->get_view()->get('owner');
@@ -288,11 +289,11 @@ EOF;
         $params = array($instance->get('id'));
 
         if ($records = get_records_sql_array($sql, $params, $nolimit ? '' : 0, $nolimit ? '' : 10)) {
-            return array_map(function($item) {
+            return array_map(function($item) use ($owner) {
                 $item->displayname = display_name($item);
                 $item->text = clean_html($item->text);
                 $item->profileurl = profile_url($item);
-                $item->deletable = PluginBlocktypeWall::can_delete_wallpost($item->from, ' . intval($owner) .');
+                $item->deletable = PluginBlocktypeWall::can_delete_wallpost($item->from, $owner);
                 return $item;
             }, $records);
         }
@@ -307,7 +308,7 @@ EOF;
      * Wall only makes sense on profile viewtypes
      */
     public static function allowed_in_view(View $view) {
-        return $view->get('type') == 'profile';
+        return in_array($view->get('type'), self::get_viewtypes());
     }
 
     public static function override_instance_title(BlockInstance $instance) {

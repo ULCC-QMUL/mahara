@@ -245,7 +245,7 @@ class mahara_user_external extends external_api {
         foreach ($params['users'] as $user) {
             // Make sure that the username doesn't already exist
             if (get_record('usr', 'username', $user['username'])) {
-                throw new WebserviceInvalidParameterException(get_string('usernameexists1', 'auth.webservice', $user['username']));
+                throw new WebserviceInvalidParameterException(get_string('usernameexists2', 'auth.webservice', $user['username']));
             }
 
             // check the institution is allowed
@@ -397,6 +397,10 @@ class mahara_user_external extends external_api {
                 throw new WebserviceInvalidParameterException('delete_users | ' . get_string('accessdeniedforinstuser', 'auth.webservice', $authinstance->institution, $user->id));
             }
 
+            if ($USER->get('id') == $user->id) {
+                throw new WebserviceInvalidParameterException('delete_users | ' . get_string('unabletodeleteself1', 'admin'));
+            }
+
             // only allow deletion of users that have not signed in
             if (!empty($user->lastlogin) && !$user->suspendedcusr) {
                 throw new WebserviceInvalidParameterException('delete_users | ' . get_string('cannotdeleteaccount', 'auth.webservice', $user->id));
@@ -404,11 +408,9 @@ class mahara_user_external extends external_api {
 
             // must not allow deleting of admins or self!!!
             if ($user->admin) {
-                throw new MaharaException('useradminodelete', 'error');
+                throw new WebserviceInvalidParameterException('delete_users | ' . get_string('unabletodeleteadmin', 'auth.webservice', $user->id));
             }
-            if ($USER->get('id') == $user->id) {
-                throw new MaharaException('usernotdeletederror', 'error');
-            }
+
             delete_user($user->id);
         }
         db_commit();

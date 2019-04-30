@@ -845,6 +845,11 @@ function privacy_form($ignoreagreevalue = false, $ignoreformswitch = false) {
 function auth_check_required_fields() {
     global $USER, $SESSION;
 
+    if ($USER->get('id') == 0) {
+        // We shouldn't be checking either logged out user or User = 0
+        throw new ConfigSanityException(get_string('invaliduser', 'error'));
+    }
+
     // for the case we are mascarading as the user and we want to return to be admin user
     $restoreadmin = param_integer('restore', 0);
     $loginanyway = false;
@@ -1072,7 +1077,7 @@ function auth_check_required_fields() {
             'action'   => '',
             'elements' => $elements,
             'dieaftersubmit' => FALSE,
-            'backoutaftersubmit' => TRUE,
+            'backoutaftersubmit' => FALSE,
         ));
     }
 
@@ -1122,7 +1127,7 @@ function requiredfields_validate(Pieform $form, $values) {
                 $form->set_error('username', get_string('usernameinvalidform', 'auth.internal'));
             }
             if (!$form->get_error('username') && record_exists_select('usr', 'LOWER(username) = ?', array(strtolower($values['username'])))) {
-                $form->set_error('username', get_string('usernamealreadytaken', 'auth.internal'));
+                $form->set_error('username', get_string('usernamealreadytaken1', 'auth.internal'));
             }
         }
     }
@@ -1253,9 +1258,6 @@ function requiredfields_submit(Pieform $form, $values) {
     }
 
     $SESSION->set('nocheckrequiredfields', true);
-    if ($form->get_property('backoutaftersubmit')) {
-        return;
-    }
 
     redirect();
 }
@@ -1818,15 +1820,17 @@ function login_submit(Pieform $form, $values) {
         }
     }
 
-    auth_check_admin_section();
+    // Do redirect on login to avoid browser back button exploit
+    // We need to strip the path from domain set in $wwwroot from the path we are trying
+    // to get to.
+    $wwwroot = get_config('wwwroot');
+    $path = parse_url($wwwroot, PHP_URL_PATH);
+    $path = substr($path, 0, -1); // Remove the last '/' character
+    $scriptname = $_SERVER['SCRIPT_NAME'];
+    $scriptname = str_replace($path, '', $scriptname);
+    $requesturi = $scriptname . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
+    redirect($requesturi);
 
-    // This is also checked in $USER->login(), but it's good to check it again here in case a buggy auth plugin
-    // lets a suspended user through somehow.
-    ensure_user_account_is_active();
-
-    // User is allowed to log in
-    //$USER->login($userdata);
-    auth_check_required_fields();
 }
 
 /**

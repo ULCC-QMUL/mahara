@@ -347,6 +347,21 @@ class BehatGeneral extends BehatBase {
     }
 
     /**
+     * Click on the delete confirm link or button.
+     *
+     * @When /^I click on "(?P<link_or_button>(?:[^"]|\\")*)" delete button$/
+     * @param string $link_or_button we look for
+     */
+    public function i_click_on_delete($link_or_button) {
+
+        // Gets the node based on the requested selector type and locator.
+        $node = $this->get_selected_node('link_or_button', $link_or_button);
+        $this->ensure_node_is_visible($node);
+        $node->click();
+        $this->getSession()->getDriver()->getWebDriverSession()->accept_alert();
+    }
+
+    /**
      * Press the key.
      *
      * @When /^I press the key "(?P<key>(?:[^"]|\\")*)" in the "(?P<element_container_string>(?:[^"]|\\")*)" field$/
@@ -362,21 +377,6 @@ class BehatGeneral extends BehatBase {
         $node = $this->get_selected_node('field', $nodeelement);
         // Note: keyPres does not work with all drivers
         $node->keyPress($key_press);
-    }
-
-    /**
-    * @Given I click on the :selector element
-    * @param string $selector - css selector
-    */
-    public function i_click_on_the($selector) {
-        $page = $this->getSession()->getPage();
-        $element = $page->find('css', $selector);
-
-        if (empty($element)) {
-            throw new Exception("No html element found for the selector ('$selector')");
-        }
-
-        $element->click();
     }
 
     /**
@@ -422,6 +422,36 @@ class BehatGeneral extends BehatBase {
         $node = $this->get_node_in_container('button', $button, $nodeselectortype, $nodeelement);
         $this->ensure_node_is_visible($node);
         $node->click();
+    }
+
+    /**
+     * Check if the page contains the specified text within viewport
+     *
+     * @Then I should see :text in :element on the screen
+     */
+    public function i_see_in_viewport($text, $element) {
+        $textliteral = $this->escaper->escapeLiteral($text);
+        $exception = new ElementNotFoundException($this->getSession(), 'text', null, 'the element "' . $element . '"');
+        $xpath = "//" . $element . "[contains(normalize-space(.), " . $textliteral . ")]";
+        $node = $this->find('xpath', $xpath, $exception);
+        $this->ensure_node_is_visible($node);
+        // now that we know it exists on the page and is not a 'hidden' element
+        // we check if it is within the viewport
+        $textliteraljs = $this->escapeDoubleQuotes($textliteral);
+        $jscode = <<<EOF
+(function isScrolledIntoView() {
+    var elem = jQuery("$element:contains($textliteraljs)")[0];
+    var docViewTop = jQuery(window).scrollTop();
+    var docViewBottom = docViewTop + jQuery(window).height();
+    var elemTop = jQuery(elem).offset().top;
+    var elemBottom = elemTop + jQuery(elem).height();
+    return (docViewBottom >= elemTop && docViewTop <= elemBottom);
+})();
+EOF;
+        $result = $this->getSession()->evaluateScript("return $jscode");
+        if (!$result) {
+            throw new Exception("Element $element containing $text not within the viewport.");
+        }
     }
 
     /**
@@ -687,6 +717,18 @@ class BehatGeneral extends BehatBase {
     }
 
     /**
+    * @Given /^I click on the "(?P<element>(?:[^"]|\\")*)" "(?P<tselectortype>[^"]*)"$/
+    *
+    * calls function in parent class
+    *
+    * @param string $element - thing to look for
+    * @param string $selectortype - e.g. css/xpath
+    */
+    public function i_click_on_element($element, $selectortype='css_element') {
+        parent::i_click_on_element($element, $selectortype);
+    }
+
+    /**
      * Click on the delete button inside a list/table row containing the specified text.
      *
      * @When /^I delete the "(?P<row_text_string>(?:[^"]|\\")*)" row$/
@@ -882,7 +924,7 @@ class BehatGeneral extends BehatBase {
     */
     public function click_on_property($property) {
         $property = get_property($property);
-        $this->i_click_on_the($property[0]);
+        $this->i_click_on_element($property[0], $property[1]);
     }
 
     /**
@@ -1504,6 +1546,32 @@ JS;
             throw new \Exception("scrollIntoView failed");
         }
     }
+
+/**
+ * Scroll element into view and align top of element with the center of the visible area.
+ *
+ * @When I scroll to the center of id :id
+ *
+ */
+    public function i_scroll_into_view_center($id) {
+        $function = <<<JS
+          (function(){
+              var elem = document.getElementById("$id");
+              var elementRect = elem.getBoundingClientRect();
+              var absoluteElementTop = elementRect.top + window.pageYOffset;
+              var middle = absoluteElementTop - (window.innerHeight / 2);
+              window.scrollTo(0, middle);
+              return 1;
+          })()
+JS;
+        try {
+            $this->getSession()->wait(5000, $function);
+        }
+        catch(Exception $e) {
+            throw new \Exception("scrollIntoView failed");
+        }
+    }
+
 
 /**
  * Check if images exist in the block given its title

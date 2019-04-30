@@ -86,7 +86,7 @@ else if ($view->get('type') == 'dashboard') {
     define('TITLE', $title );
 }
 else if ($view->get('type') == 'grouphomepage') {
-    $title = get_string('grouphomepage', 'view');
+    $title = get_string('Grouphomepage', 'view');
     if ($view->get('template') != View::SITE_TEMPLATE) {
         $groupurl = group_homepage_url(get_group_by_id($view->get('group'), true), false);
     }
@@ -145,7 +145,7 @@ if ($viewtheme && !isset($allowedthemes[$viewtheme])) {
 
 $javascript = array('views', 'tinymce', 'paginator', 'js/jquery/jquery-ui/js/jquery-ui.min.js',
                     'js/jquery/jquery-ui/js/jquery-ui.touch-punch.min.js', 'tablerenderer', 'artefact/file/js/filebrowser.js',
-                    'lib/pieforms/static/core/pieforms.js','js/jquery/modernizr.custom.js', 'js/switchbox.js');
+                    'lib/pieforms/static/core/pieforms.js', 'js/switchbox.js');
 $blocktype_js = $view->get_all_blocktype_javascript();
 $javascript = array_merge($javascript, $blocktype_js['jsfiles']);
 if (is_plugin_active('externalvideo', 'blocktype')) {

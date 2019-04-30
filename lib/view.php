@@ -3415,7 +3415,7 @@ class View {
                 else {
                     $sortorder .= ', ';
                 }
-                $fieldname = $field['fieldname'];
+                $fieldname = 'a.' . $field['fieldname'];
                 if (!empty($field['fieldvalue'])) {
                     $fieldname .= " = '" . $field['fieldvalue'] . "'";
                 }
@@ -3447,10 +3447,10 @@ class View {
                 $extraselect .= ' AND ';
 
                 if (count($values) > 1) {
-                    $extraselect .= $field['fieldname'] . ' IN (' . implode(', ', $values) . ')';
+                    $extraselect .= 'a.' . $field['fieldname'] . ' IN (' . implode(', ', $values) . ')';
                 }
                 else {
-                    $extraselect .= $field['fieldname'] . ' = ' . reset($values);
+                    $extraselect .= 'a.' . $field['fieldname'] . ' = ' . reset($values);
                 }
             }
         }
@@ -3459,6 +3459,8 @@ class View {
              || $data['blocktype'] == 'recentposts');
 
         $from = ' FROM {artefact} a ';
+        // To also check tags
+        $from .= " LEFT JOIN {artefact_tag} t ON t.artefact = a.id ";
 
         if ($group) {
             // Get group-owned artefacts that the user has view
@@ -3567,7 +3569,10 @@ class View {
 
         if (!empty($data['search'])) {
             $search = db_quote('%' . str_replace('%', '%%', $data['search']) . '%');
-            $select .= 'AND (title ' . db_ilike() . '(' . $search . ') OR description ' . db_ilike() . '(' . $search . ') )';
+            $select .= 'AND (title ' . db_ilike() . '(' . $search . ')
+                             OR description ' . db_ilike() . '(' . $search . ')
+                             OR t.tag ' . db_ilike() . '(' . $search . ')
+                        )';
         }
 
         $select .= $extraselect;
@@ -3613,9 +3618,10 @@ class View {
         }
 
         $artefacts = get_records_sql_assoc(
-            'SELECT ' . $cols . $from . ' WHERE ' . $select . $sortorder, $selectph, $offset, $limit
+            'SELECT DISTINCT agg.* FROM (SELECT ' . $cols . $from . ' WHERE ' . $select . $sortorder . ') AS agg', $selectph, $offset, $limit
         );
-        $totalartefacts = count_records_sql('SELECT COUNT(*) ' . $from . ' WHERE ' . $select, $countph);
+        $totalartefacts = count_records_sql('SELECT COUNT(DISTINCT agg.id) FROM (SELECT a.* ' . $from . ' WHERE ' . $select . ') AS agg', $countph);
+
         // If our profile artefact is saving it's data to a special place
         if (!empty($data['artefacttypes'])) {
             safe_require('artefact', 'internal');
@@ -3926,10 +3932,10 @@ class View {
                     $time = (!empty($data['submittedtime'])) ? format_date(strtotime($data['submittedtime'])) : null;
 
                     if (!empty($status) && !empty($time)) {
-                        $data['submittedto'] = get_string('viewsubmittedtogroupon', 'view', $url, $name, $time);
+                        $data['submittedto'] = get_string('viewsubmittedtogroupon1', 'view', $url, $name, $time);
                     }
                     else if (!empty($status)) {
-                        $data['submittedto'] = get_string('viewsubmittedtogroup', 'view', $url, $name);
+                        $data['submittedto'] = get_string('viewsubmittedtogroup1', 'view', $url, $name);
                     }
                     if ($status == self::PENDING_RELEASE) {
                         $data['submittedto'] .= ' ' . get_string('submittedpendingrelease', 'view');
@@ -6093,7 +6099,7 @@ class View {
             return get_string('dashboardviewtitle', 'view');
         }
         if ($this->type == 'grouphomepage') {
-            return get_string('grouphomepage', 'view');
+            return get_string('Grouphomepage', 'view');
         }
         return $this->title;
     }
@@ -6727,7 +6733,18 @@ class ViewSubmissionException extends UserException {
     }
 }
 
-function create_view_form($group=null, $institution=null, $template=null, $collection=null) {
+/**
+ * Create the form buttons for copying a page and/or a collection
+ *
+ * @param string $group           The ID of the group to copy to
+ * @param string $institution     The ID of the institution to copy to
+ * @param string $template        The ID of the page to copy
+ * @param string $collection      The ID of the collection to copy
+ * @param string $collectiononly  Only display the copy collection button
+ *
+ * @return form array
+ */
+function create_view_form($group=null, $institution=null, $template=null, $collection=null, $collectiononly=false) {
     global $USER;
     $form = array(
         'name'            => 'createview',
@@ -6795,6 +6812,9 @@ function create_view_form($group=null, $institution=null, $template=null, $colle
             $form['elements']['submit']['class'] .= ' last';
         }
         $form['name'] .= $template;
+    }
+    if ($collectiononly) {
+        unset($form['elements']['submit']);
     }
     return $form;
 }

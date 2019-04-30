@@ -41,7 +41,7 @@ class PluginBlocktypeMyviews extends MaharaCoreBlocktype {
      * @param array options
      * @param array pagination
      */
-    public function render_items(&$items, $template, $options, $pagination) {
+    public static function render_items(&$items, $template, $options, $pagination) {
         $smarty = smarty_core();
         $smarty->assign('options', $options);
         $smarty->assign('items', $items['data']);
@@ -123,7 +123,7 @@ class PluginBlocktypeMyviews extends MaharaCoreBlocktype {
      * Myviews only makes sense for personal views
      */
     public static function allowed_in_view(View $view) {
-        return $view->get('owner') != null;
+        return in_array($view->get('type'), self::get_viewtypes());
     }
 
     public static function override_instance_title(BlockInstance $instance) {
