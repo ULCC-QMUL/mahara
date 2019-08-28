@@ -1,0 +1,27 @@
+[submodule "theme/qmul"]
+	path = theme/qmul
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmul.git
+[submodule "artefact/cloud"]
+	path = artefact/cloud
+	url = git@github.com:povsod/mahara-artefact-cloud.git
+[submodule "artefact/cpds"]
+	path = artefact/cpds
+	url = git@github.com:ULCC-QMUL/mahara-artefact_cpds
+[submodule "module/qmframework"]
+	path = module/qmframework
+	url = git@github.com:ULCC-QMUL/mahara-module_qmframework.git
+[submodule "blocktype/expandedcontent"]
+	path = blocktype/expandedcontent
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_expandedcontent.git
+[submodule "blocktype/contentcounts"]
+	path = blocktype/contentcounts
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contentcounts.git
+[submodule "blocktype/contenttags"]
+	path = blocktype/contenttags
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contenttags.git
+[submodule "blocktype/stagevisualisation"]
+	path = blocktype/stagevisualisation
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
+[submodule "blocktype/careerreadiness"]
+	path = blocktype/careerreadiness
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_careerreadiness.git
