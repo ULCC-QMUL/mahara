@@ -3,11 +3,11 @@
 .settings/
 .settings
 logs
-htdocs/config.php
-htdocs/.project
-htdocs/.projectOptions
-htdocs/.settings/
-htdocs/.settings
+config.php
+.project
+.projectOptions
+.settings/
+.settings
 mahara-*.tar.bz2
 mahara-*.tar.gz
 mahara-*.zip
@@ -35,7 +35,7 @@ mahara-*.zip
 /external
 logfile
 node_modules/
-htdocs/.externalToolBuilders/
-htdocs/auth/saml/extlib/simplesamlphp
-htdocs/auth/saml/sp/resources
+.externalToolBuilders/
+auth/saml/extlib/simplesamlphp
+auth/saml/sp/resources
 package-lock.json
