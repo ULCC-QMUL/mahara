@@ -936,6 +936,32 @@ function xmldb_core_upgrade($oldversion=0) {
         }
     }
 
+    // CATALYST CUSTOM - migrate the custom QMUL tags into their own table.
+    if ($oldversion < 2018061800) {
+        // First, make a new table.
+        log_debug('Moving QMUL institution tags to their own table temporarily.');
+        $table = new XMLDBTable('qmul_tag');
+        $table->addFieldInfo('id', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        $table->addFieldInfo('text', XMLDB_TYPE_CHAR, 255, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('owner', XMLDB_TYPE_INTEGER, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('editedby', XMLDB_TYPE_INTEGER, 10, false, XMLDB_NOTNULL);
+        $table->addFieldInfo('ctime', XMLDB_TYPE_DATETIME, null, XMLDB_NOTNULL);
+        $table->addFieldInfo('mtime', XMLDB_TYPE_DATETIME, null, XMLDB_NOTNULL);
+
+        $table->addKeyInfo('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->addKeyInfo('editedby', XMLDB_KEY_FOREIGN, array('editedby'), 'usr', array('id'));
+        $table->addKeyInfo('owner', XMLDB_KEY_FOREIGN, array('owner'), 'institution', array('id'));
+
+        if (create_table($table)) {
+            // We made the table, let's now import everything.
+            execute_sql("INSERT INTO {qmul_tag} (id, text, owner, editedby, ctime, mtime)
+                              SELECT t.id, t.text, t.owner, t.editedby, t.ctime, t.mtime
+                                FROM {tag} t");
+            execute_sql("DROP TABLE {tag}");
+        }
+    }
+    // END CATALYST CUSTOM.
+
     if ($oldversion < 2018061801) {
         log_debug('Add a "tag" table to migrate all the tag information to');
         $table = new XMLDBTable('tag');
@@ -953,6 +979,55 @@ function xmldb_core_upgrade($oldversion=0) {
         $table->addKeyInfo('editedbyfk', XMLDB_KEY_FOREIGN, array('editedby'), 'usr', array('id'));
 
         if (create_table($table)) {
+            // CATALYST CUSTOM - create institution tags from QMUL data.
+            execute_sql("INSERT INTO {tag} (tag,resourcetype,resourceid,ownertype,ownerid,editedby,ctime,mtime)
+                              SELECT q.text AS tag,
+                                     'institution' AS resourcetype,
+                                     q.owner AS resourceid,
+                                     'institution' AS ownertype,
+                                     i.name AS ownerid,
+                                     q.editedby,
+                                     q.ctime,
+                                     q.mtime
+                                FROM {qmul_tag} AS q
+                           LEFT JOIN {institution} AS i ON (q.owner = i.id)
+                            ORDER BY q.id");
+            // Now, insert the instances of institutional tags into the main table.
+            $types = array('artefact', 'collection', 'view');
+            $typecast = is_postgres() ? '::varchar' : '';
+            foreach ($types as $type) {
+                execute_sql("INSERT INTO {tag} (tag,resourcetype,resourceid,ownertype,ownerid,editedby,ctime,mtime)
+                             SELECT CONCAT('tagid_', xt.tagid) AS tag, '" . $type . "' AS resourcetype,
+                                    xt." . $type . " AS resourceid,
+                                    CASE WHEN x.owner IS NOT NULL THEN 'user'
+                                         WHEN x.group IS NOT NULL THEN 'group'
+                                         ELSE 'institution'
+                                    END AS ownertype,
+                                    CASE WHEN x.owner IS NOT NULL THEN x.owner" . $typecast . "
+                                         WHEN x.group IS NOT NULL THEN x.group" . $typecast . "
+                                         ELSE x.institution
+                                    END AS ownerid,
+                                    NULL AS editedby, x.ctime AS ctime, x.mtime AS mtime
+                             FROM {" . $type . "_tag} xt
+                             JOIN {" . $type . "} x ON x.id = xt." . $type . "
+                            WHERE xt.tagid > 0");
+            }
+            execute_sql("INSERT INTO {tag} (tag,resourcetype,resourceid,ownertype,ownerid,editedby,ctime,mtime)
+                         SELECT CONCAT('tagid_', ut.tagid) AS tag, 'usr' AS resourcetype,
+                                ut.usr AS resourceid, 'institution' AS ownertype,
+                                SUBSTRING(ut.tag, LENGTH('lastinstitution:') + 1, 255) AS ownerid,
+                                NULL as editedby, u.ctime AS ctime, NULL AS mtime
+                         FROM {usr_tag} ut
+                         JOIN {usr} u ON u.id = ut.usr
+                        WHERE u.deleted = 0
+                          AND ut.tagid > 0");
+            // And remove the tags that are institution tags, so core import can finish the job.
+            execute_sql("DELETE FROM {artefact_tag} WHERE tagid > 0");
+            execute_sql("DELETE FROM {collection_tag} WHERE tagid > 0");
+            execute_sql("DELETE FROM {view_tag} WHERE tagid > 0");
+            execute_sql("DELETE FROM {user_tag} WHERE tagid > 0");
+            // END CATALYST CUSTOM.
+
             log_debug('Move the data from the old *_tag tables');
             $types = array('artefact', 'collection', 'view');
             $typecast = is_postgres() ? '::varchar' : '';
