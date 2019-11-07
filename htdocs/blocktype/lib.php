@@ -1113,7 +1113,20 @@ class BlockInstance {
         if (is_array($css)) {
             $css = array_unique($css);
         }
-        return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+
+        // CATALYST CUSTOM - for the QM Framework Dashboard use a different block editing template.
+        if (strpos($_SERVER['REQUEST_URI'], 'module/qmframework')) {
+            // If there is no artefact added in the blocktype, $configdata['artefactids'] is not defined.
+            if (isset($configdata['artefactids'])) {
+                $smarty->assign('planid', $configdata['artefactids']);
+            }
+
+            $smarty->assign('blocktype', $this->get('blocktype'));
+            return array('html' => $smarty->fetch('module:qmframework:blockedit.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+        } else {
+            return array('html' => $smarty->fetch('view/blocktypecontainerediting.tpl'), 'javascript' => $js, 'pieformcss' => $css);
+        }
+        // END CATALYST CUSTOM.
     }
 
 
