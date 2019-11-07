@@ -847,12 +847,13 @@ class Collection {
         else {
             return array();
         }
+        // CATALYST CUSTOM - adding the QM dashboard type to be ignored alongside the normal dashboard etc.
         ($views = get_records_sql_array("SELECT v.id, v.title
             FROM {view} v
             LEFT JOIN {collection_view} cv ON cv.view = v.id
             WHERE " . $wherestm .
             "   AND cv.view IS NULL
-                AND v.type NOT IN ('dashboard','grouphomepage','profile')
+                AND v.type NOT IN ('dashboard','grouphomepage','profile','qmdashboard')
                 AND v.template != 2
                 AND v.submittedgroup IS NULL
                 AND v.submittedhost IS NULL
