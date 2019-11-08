@@ -625,6 +625,55 @@ class ArtefactTypeTask extends ArtefactType {
             $sql .= " AND a.id IN ( " . join(',', array_fill(0, count($tasks), '?')) . ")";
             $values = array_merge($values, $tasks);
         }
+
+        // CATALYST CUSTOM - filter by applicable institution tag.
+        $filtertag = param_variable('tag', null);
+        if ($filtertag && substr_count($filtertag, ':') == 1) {
+            $institution = get_config('module', 'qmframework', 'qminstitution');
+            $institutionid = get_field('institution', 'id', 'name', $institution);
+            list($taginstitution, $filtertag) = explode(':', $filtertag);
+            $filtertag = trim($filtertag);
+
+            // So we need to find the filtered tag amongst the institution's tags.
+            $tagsql = "
+                SELECT id
+                  FROM {tag} t
+                 WHERE resourcetype = ?
+                   AND resourceid = ?
+                   AND tag = ?";
+            $tagresults = get_records_sql_array($tagsql, 'institution', $institutionid, $filtertag);
+            if (!empty($tagresults)) {
+                $tagidsql = "
+                    SELECT resourceid
+                      FROM {tag}
+                     WHERE resourcetype = ?
+                       AND tag = ?";
+                $tagids = get_records_sql_array($tagidsql, 'artefact', 'tagid_' . $tagresults[0]->id);
+
+                // Having found the institution tag, find all the instances of it tagged on artefacts.
+                if (!empty($tagids)) {
+                    $sql .= " AND a.id IN (" . join(',', array_fill(0, count($tagids), '?')) . ")";
+                    foreach ($tagids as $tagid) {
+                        $values[] = $tagid->resourceid;
+                    }
+                }
+
+                // Fetch a total count for all tagged elements.
+                $totalcount = get_record_sql("
+                    SELECT COUNT(a.id) AS artefactcount
+                      FROM {artefact} a
+                      JOIN {artefact_plans_task} at ON at.artefact = a.id
+                      JOIN {tag} tag ON tag.resourcetype = ? AND tag.resourceid = a.id
+                     WHERE a.artefacttype = 'task' AND a.parent = ? AND tag.tag = ?",
+                        array($institutionid, $plan, 'tagid_' . $tagresults[0]->id));
+                $totalcount = $totalcount->artefactcount;
+            } else {
+                // There's no matching tags, we can know this in advance.
+                $totalcount = 0;
+            }
+        }
+        // END CATALYST CUSTOM.
+
         $sql .= " ORDER BY at.completed, at.completiondate ASC, a.id";
         ($results = get_records_sql_array($sql, $values, $offset, $limit))
             || ($results = array());
@@ -653,6 +702,11 @@ class ArtefactTypeTask extends ArtefactType {
             'limit'  => $limit,
             'id'     => $plan,
         );
+
+        // CATALYST CUSTOM - use the calculated totalcount if we have it.
+        if (isset($totalcount)) {
+            $result['count'] = $totalcount;
+        }
 
         return $result;
     }
