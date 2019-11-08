@@ -34,11 +34,22 @@ if ($blockid && !$artefactid) {
 
     // If block sets limit use that instead
     $limit = !empty($configdata['count']) ? $configdata['count'] : $limit;
+    // CATALYST CUSTOM - for QM dashboard, limit to 4.
+    if ($options['view']->get('type') == 'qmdashboard') {
+        $limit = 4;
+    }
+    // END CATALYST CUSTOM.
     $planid = param_integer('planid');
     $tasks = ArtefactTypeTask::get_tasks($planid, $offset, $limit);
 
     $template = 'artefact:plans:taskrows.tpl';
     $baseurl = $bi->get_view()->get_url();
+    // CUSTOM CATALYST - reset the base URL if on the QM dashboard.
+    if ($options['view']->get('type') == 'qmdashboard') {
+        $baseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $options['view']->get('id');
+        $baseurl .= '&tag=' . param_variable('tag', '');
+    }
+    // END CATALYST CUSTOM.
     $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
     $pagination = array(
         'baseurl'    => $baseurl,
