@@ -62,6 +62,73 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
         $limit = (!empty($configdata['count'])) ? $configdata['count'] : 10;
         $smarty = smarty_core();
 
+        // CATALYST CUSTOM - make sure we have institution tagged items for QM dashboard.
+        $view = $instance->get_view();
+        if ($view->get('type') == 'qmdashboard') {
+            $limit = 4;
+            $filtertag = param_variable('tag', null);
+            $institution = get_config_plugin('module', 'qmframework', 'qminstitution');
+            $institutionrow = get_record('institution', 'name', $institution);
+            $institutionid = $institutionrow->id;
+            $institutionname = $institutionrow->displayname;
+            $qmbaseurl = get_config('wwwroot') . 'module/qmframework/dashboard.php?id=' . $view->get('id') . '&tag=' . $filtertag;
+
+            // Reset the list of plans to ones tagged wht institution tags when on QM dashboard.
+            if (!$filtertag) {
+                $userid = $view->get('owner');
+
+                // First, find all the institution tags.
+                $tagsql = "
+                    SELECT id
+                      FROM {tag} t
+                     WHERE resourcetype = ?
+                       AND resourceid = ?";
+                $tagresults = get_records_sql_array($tagsql, 'institution', $institutionid);
+
+                // If we found some, let's find the artefacts connected to them.
+                if (!empty($tagresults)) {
+                    $tagvalues = [];
+                    foreach ($tagresults as $tag) {
+                        $tagvalues[] = $tag->id;
+                    }
+                    // Get all the artefacts that are plans or tasks, tagged with any tag that is QM institution.
+                    $artefactsql = "
+                        SELECT DISTINCT a.id, a.artefacttype, a.parent
+                          FROM {artefact} a
+                          JOIN {tag} t ON (t.resourcetype = ? AND t.resourceid = a.id)
+                         WHERE a.owner = ?
+                           AND a.artefacttype IN (?, ?)
+                           AND t.tag IN (" . join(',', array_fill(0, count($tagvalues), '?')) . ")";
+                    $artefactvalues = array_merge(['artefact', $userid, 'plan', 'task'], $tagvalues);
+
+                    $artefacts = get_records_sql_array($artefactsql, $artefactvalues);
+
+                    // Make sure we add a connection from the view to this artefact if for some reason it doesn't have one.
+                    $planids = array();
+                    if (!empty($artefacts)) {
+                        foreach ($artefacts as $artefact) {
+                            if ($artefact->artefacttype == 'plan') {
+                                $planids[$artefact->id] = $artefact->id;
+                                if (!$viewartefact = get_field('view_artefact', 'id', 'view', $view->get('id'), 'artefact', $artefact->id)) {
+                                    insert_record('view_artefact', (object) array('view' => $view->get('id'), 'artefact' => $artefact->id, 'block' => $instance->get('id')));
+                                }
+                            } else if ($artefact->artefacttype == 'task' && !array_key_exists($artefact->parent, $planids)) {
+                                $planids[$artefact->parent] = $artefact->parent;
+                            }
+                        }
+                    }
+                    ksort($planids); // Sort by ID.
+
+                    // Update the configdata with the identified Artefact IDs;
+                    $configdata['artefactids'] = array_values($planids);
+                    $newconfigdata = serialize($configdata);
+                    $instance->set('configdata', $newconfigdata);
+                    update_record('block_instance', array('configdata' => $newconfigdata), array('id' => $instance->get('id')));
+                }
+            }
+        }
+        // END CATALYST CUSTOM.
+
         $plans = array();
         $alltasks = array();
         $template = 'artefact:plans:taskrows.tpl';
@@ -88,11 +155,24 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                 try {
                     $tasks = isset($plancontent->tasks) ? (array)$plancontent->tasks : ArtefactTypeTask::get_tasks($planid, 0, $limit);
                     $blockid = $instance->get('id');
+
+                    // CATALYST CUSTOM - filter tags for the QM dashboard.
+                    if ($view->get('type') == 'qmdashboard' && $filtertag && strpos($filtertag, ':') !== false) {
+                        if (!in_array($filtertag, $plan->get('tags')) && empty($tasks)) {
+                            // If this plan matches the institution tag, OK.
+                            // If we didn't match - but there's a matching task with the institution tag, OK.
+                            // If neither, move to the next one.
+                            continue;
+                        }
+                    }
+                    // END CATALYST CUSTOM.
+
                     if ($exporter || $versioning) {
                         $pagination = false;
                     }
                     else {
                         $baseurl = $instance->get_view()->get_url();
+                        $baseurl = ($view->get('type') == 'qmdashboard') ? $qmbaseurl : $baseurl; // CUSTOM CATALYST - use the QM Dashboard URL.
                         $baseurl .= ((false === strpos($baseurl, '?')) ? '?' : '&') . 'block=' . $blockid . '&planid=' . $planid . '&editing=' . $editing;
                         $pagination = array(
                             'baseurl'   => $baseurl,
@@ -127,6 +207,22 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                     $plans[$planid]['view'] = $instance->get('view');
                     $plans[$planid]['details'] = get_config('wwwroot') . 'artefact/artefact.php?artefact=' . $planid . '&view=' .
                             $instance->get_view()->get('id') . '&block=' . $blockid;
+
+                    // CATALYST CUSTOM - filter tags for the QM dashboard.
+                    if ($view->get('type') == 'qmdashboard') {
+                        $plans[$planid]['tags'] = array();
+                        foreach ($plan->get('tags') as $tag) {
+                            if ($filtertag && $tag === $filtertag) {
+                                // The tags are arrays of strings of "Institution: Tag" or similar.
+                                // So we're just looking for a simple and direct match.
+                                array_push($plans[$planid]['tags'], $tag);
+                            } else if (strpos($tag, $institutionname . ':') === 0) {
+                                // Otherwise we're looking for a match on "Institution Name:" at the start, matching the QM inst.
+                                array_push($plans[$planid]['tags'], $tag);
+                            }
+                        }
+                    }
+                    // END CATALYST CUSTOM.
 
                     $plans[$planid]['numtasks'] = $tasks['count'];
                     $tasks['planid'] = $planid;
