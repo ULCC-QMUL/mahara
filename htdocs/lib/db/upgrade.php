@@ -980,8 +980,9 @@ function xmldb_core_upgrade($oldversion=0) {
 
         if (create_table($table)) {
             // CATALYST CUSTOM - create institution tags from QMUL data.
-            execute_sql("INSERT INTO {tag} (tag,resourcetype,resourceid,ownertype,ownerid,editedby,ctime,mtime)
-                              SELECT q.text AS tag,
+            execute_sql("INSERT INTO {tag} (id,tag,resourcetype,resourceid,ownertype,ownerid,editedby,ctime,mtime)
+                              SELECT q.id,
+                                     q.text AS tag,
                                      'institution' AS resourcetype,
                                      q.owner AS resourceid,
                                      'institution' AS ownertype,
@@ -1025,7 +1026,7 @@ function xmldb_core_upgrade($oldversion=0) {
             execute_sql("DELETE FROM {artefact_tag} WHERE tagid > 0");
             execute_sql("DELETE FROM {collection_tag} WHERE tagid > 0");
             execute_sql("DELETE FROM {view_tag} WHERE tagid > 0");
-            execute_sql("DELETE FROM {user_tag} WHERE tagid > 0");
+            execute_sql("DELETE FROM {usr_tag} WHERE tagid > 0");
             // END CATALYST CUSTOM.
 
             log_debug('Move the data from the old *_tag tables');
