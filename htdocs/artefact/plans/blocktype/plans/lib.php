@@ -83,13 +83,13 @@ class PluginBlocktypePlans extends MaharaCoreBlocktype {
                       FROM {tag} t
                      WHERE resourcetype = ?
                        AND resourceid = ?";
-                $tagresults = get_records_sql_array($tagsql, 'institution', $institutionid);
+                $tagresults = get_records_sql_array($tagsql, ['institution', $institutionid]);
 
                 // If we found some, let's find the artefacts connected to them.
                 if (!empty($tagresults)) {
                     $tagvalues = [];
                     foreach ($tagresults as $tag) {
-                        $tagvalues[] = $tag->id;
+                        $tagvalues[] = 'tagid_' . $tag->id;
                     }
                     // Get all the artefacts that are plans or tasks, tagged with any tag that is QM institution.
                     $artefactsql = "
