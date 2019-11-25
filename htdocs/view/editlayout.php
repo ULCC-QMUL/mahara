@@ -760,6 +760,8 @@ function create_block($bt, $configdata, $view, $column, $blockinfo = null) {
     }
     if ($bt == 'taggedposts') {
         $blocktypeclass::save_tag_selection($tagselect, $bi);
+        // Need to make the block save again now we have made the tag selections
+        $bi->set('dirty', true);
     }
     $bi->commit();
     return $bi->get('id');
@@ -834,6 +836,14 @@ function set_view_title_and_description(Pieform $form, $values) {
                         foreach($bv['ids'] as $bid) {
                             $configdata = unserialize(get_field('block_instance', 'configdata', 'id', $bid));
                             $tags = get_column('tag', 'tag', 'resourcetype', 'blocktype', 'resourceid', $bid);
+                            foreach($tags as &$t) {
+                                if (preg_match('/^tagid\_(.*)/', $t, $matches)) {
+                                     if ($itag = get_record('tag', 'id', $matches[1])) {
+                                         $instname = get_field('institution', 'displayname', 'id', $itag->resourceid);
+                                         $t = $instname . ': ' . $itag->tag;
+                                      }
+                                  }
+                            }
                             $id = create_block($bk, $configdata, $view, $currentcolumn, array('oldid' => $bid, 'tags' => $tags));
                             $currentcolumn = (($currentcolumn +1) % $maxcols) ? ($currentcolumn +1) % $maxcols : $maxcols;
                         }

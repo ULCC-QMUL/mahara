@@ -1552,7 +1552,7 @@ class View {
                     break;
                 case 'friends':
                     if (!$this->owner) {
-                        continue; // Don't add friend access to group, institution or system views
+                        continue 2; // Don't add friend access to group, institution or system views
                     }
                 case 'public':
                 case 'loggedin':
@@ -4166,8 +4166,9 @@ class View {
             $collfrom .= $fromstr;
 
             if (!empty($groupby)) {
-                $groupby .= ', g.id, h.wwwroot';
-                $collgroupby .= ', g.id, h.wwwroot';
+                // Adding groupby condition for lti_assessment id column.
+                $groupby .= ', g.id, h.wwwroot' . ($haslti ? ', a.id' : '');
+                $collgroupby .= ', g.id, h.wwwroot' . ($haslti ? ', a.id' : '');
             }
             $sort = '
                 ORDER BY ' . $order . ' vtitle, vid';
