@@ -148,6 +148,15 @@ $javascript = array('views', 'tinymce', 'paginator', 'js/jquery/jquery-ui/js/jqu
                     'lib/pieforms/static/core/pieforms.js', 'js/switchbox.js');
 $blocktype_js = $view->get_all_blocktype_javascript();
 $javascript = array_merge($javascript, $blocktype_js['jsfiles']);
+
+// CUSTOM CHANGE ADDED BY ARTEFACT/CLOUD PLUGIN.
+if (class_exists('PluginArtefactCloud')) {
+    $blocktype_cloud_js = array('artefact/cloud/lib/datatables/js/jquery.dataTables.min.js',
+                                'artefact/cloud/lib/datatables/js/dataTables.bootstrap.min.js');
+    $javascript = array_merge($javascript, $blocktype_cloud_js);
+}
+// END CUTSOM CHANGE.
+
 if (is_plugin_active('externalvideo', 'blocktype')) {
     $javascript = array_merge($javascript, array((is_https() ? 'https:' : 'http:') . '//cdn.embedly.com/widgets/platform.js'));
 }
