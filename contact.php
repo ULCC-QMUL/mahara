@@ -18,6 +18,10 @@ require('init.php');
 require_once('lib/antispam.php');
 define('TITLE', get_string('contactus'));
 
+// CATALYST CUSTOM - redirect to QMUL's helpdesk rather than use this page.
+redirect('https://www.its.qmul.ac.uk/contact/');
+// END CATALYST CUSTOM.
+
 if ($USER->is_logged_in()) {
     $userid = $USER->get('id');
     $name = display_name($userid);
