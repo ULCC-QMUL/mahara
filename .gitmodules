@@ -1,0 +1,27 @@
+[submodule "htdocs/theme/qmul"]
+	path = htdocs/theme/qmul
+	url = git@github.com:ULCC-QMUL/mahara-theme_qmul.git
+[submodule "htdocs/artefact/cpds"]
+	path = htdocs/artefact/cpds
+	url = git@github.com:ULCC-QMUL/mahara-artefact_cpds.git
+[submodule "htdocs/module/qmframework"]
+	path = htdocs/module/qmframework
+	url = git@github.com:ULCC-QMUL/mahara-module_qmframework.git
+[submodule "htdocs/blocktype/expandedcontent"]
+	path = htdocs/blocktype/expandedcontent
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_expandedcontent.git
+[submodule "htdocs/blocktype/contentcounts"]
+	path = htdocs/blocktype/contentcounts
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contentcounts.git
+[submodule "htdocs/blocktype/contenttags"]
+	path = htdocs/blocktype/contenttags
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_contenttags.git
+[submodule "htdocs/blocktype/stagevisualisation"]
+	path = htdocs/blocktype/stagevisualisation
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_stagevisualisation.git
+[submodule "htdocs/blocktype/careerreadiness"]
+	path = htdocs/blocktype/careerreadiness
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_careerreadiness.git
+[submodule "htdocs/artefact/cloud"]
+	path = htdocs/artefact/cloud
+	url = git@github.com:ULCC-QMUL/mahara-artefact-cloud.git
