@@ -31,3 +31,6 @@
 [submodule "blocktype/areaviews"]
 	path = blocktype/areaviews
 	url = git@github.com:ULCC-QMUL/mahara-blocktype-areaviews.git
+[submodule "blocktype/areaassignmentgrade"]
+	path = blocktype/areaassignmentgrade
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_areaassignmentgrade.git
