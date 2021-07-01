@@ -25,3 +25,12 @@
 [submodule "blocktype/careerreadiness"]
         path = blocktype/careerreadiness
         url = git@github.com:ULCC-QMUL/mahara-blocktype_careerreadiness.git
+[submodule "blocktype/areaassignmentgrade"]
+	path = blocktype/areaassignmentgrade
+	url = git@github.com:ULCC-QMUL/mahara-blocktype_areaassignmentgrade.git
+[submodule "blocktype/areaviews"]
+	path = blocktype/areaviews
+	url = git@github.com:ULCC-QMUL/mahara-blocktype-areaviews.git
+[submodule "blocktype/assignmentgrade"]
+	path = blocktype/assignmentgrade
+	url = git@github.com:ULCC-QMUL/mahara-blocktype-assignmentgrade.git
